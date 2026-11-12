@@ -101,6 +101,17 @@
 		const r = await run(client.action(api.integrations.checkWebhook, {}));
 		webhookCheck = !r ? null : r.ok ? `Alive. Posting as "${r.name}" into channel ${r.channelId}.` : r.error;
 	}
+	let registering = $state(false);
+	let registerResult = $state<string | null>(null);
+	async function registerCommands() {
+		registering = true;
+		const r = await run(client.action(api.bot.registerCommands, {}));
+		registering = false;
+		if (!r) return;
+		registerResult = r.ok ? `Registered ${r.commands.join(', ')} · ${r.scope}` : r.error;
+		if (r.ok) toast.success('Slash commands registered. Type / in Discord.');
+		else toast.error(r.error);
+	}
 	async function copy(text: string) {
 		await navigator.clipboard.writeText(text);
 		toast.success('Copied.');
@@ -438,7 +449,8 @@
 							</p>
 							<ol class="list-decimal space-y-2 pl-5 text-sm">
 								<li>
-									<b>Add the bot to the server</b> (needs “Manage Server” on that Discord):
+									<b>Add the bot to the server</b> (needs “Manage Server” on that Discord). It only gets the
+									<i>applications.commands</i> permission — it can't read or post messages on its own:
 									{#if st.inviteUrl}
 										<div class="mt-1">
 											<a href={st.inviteUrl} target="_blank" rel="noopener" class={buttonVariants({ size: 'sm' })}>
@@ -464,7 +476,14 @@
 									{/if}
 								</li>
 								<li>
-									<b>Register the commands</b> — coming in the next phase. <span class="text-muted-foreground">(One button, promise.)</span>
+									<b>Register the commands</b> — tells Discord that <code>/roster</code>, <code>/hero</code> and
+									<code>/leaderboard</code> exist. Run again whenever commands change.
+									<div class="mt-1 flex flex-wrap items-center gap-2">
+										<Button size="sm" onclick={registerCommands} disabled={registering || !st.applicationId}>
+											{registering ? 'Shouting at Discord…' : 'Register commands'}
+										</Button>
+										{#if registerResult}<span class="text-xs text-muted-foreground">{registerResult}</span>{/if}
+									</div>
 								</li>
 							</ol>
 						</section>

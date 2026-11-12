@@ -15,7 +15,9 @@ const CONVEX_KEYS = [
 	'GOOGLE_CLIENT_SECRET',
 	'DISCORD_WEBHOOK_URL',
 	'DISCORD_APPLICATION_ID',
-	'DISCORD_GUILD_ID'
+	'DISCORD_GUILD_ID',
+	'DISCORD_PUBLIC_KEY',
+	'DISCORD_BOT_TOKEN'
 ];
 
 const prod = process.argv.includes('--prod');

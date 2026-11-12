@@ -53,6 +53,7 @@
 		"@mmailaender/convex-better-auth-svelte": "^0.10.0",
 		"better-auth": "~1.7.16",
 		"convex": "^1.49.0",
-		"convex-svelte": "^0.15.1"
+		"convex-svelte": "^0.15.1",
+		"tweetnacl": "^1.0.3"
 	}
 }

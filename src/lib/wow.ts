@@ -69,23 +69,7 @@ export const EMPTY_SLOT_JOKES: Record<string, string> = {
 
 export { COUNTER_LABELS } from '../convex/lib/humor.js';
 
-/** Death-count title for the character page. Dark humor lives here. */
-export function deathTitle(deaths: number): string {
-	if (deaths === 0) return 'Immortal (for now)';
-	if (deaths < 10) return 'Mostly Careful';
-	if (deaths < 30) return "Spirit Healer's Regular";
-	if (deaths < 100) return 'Frequent Corpse Runner';
-	if (deaths < 300) return 'Professional Corpse';
-	return 'The Graveyard Has a Bench With Their Name';
-}
-
-export function kdQuip(kd: number): string {
-	if (kd >= 100) return 'basically a war crime';
-	if (kd >= 50) return 'murder hobo certified';
-	if (kd >= 20) return 'mostly lethal';
-	if (kd >= 5) return 'trades blows with boars';
-	return 'loses to critters';
-}
+export { deathTitle, kdQuip } from '../convex/lib/humor.js';
 
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 export function ago(ms: number | null | undefined): string {

@@ -10,6 +10,7 @@
 
 import type * as admin from "../admin.js";
 import type * as auth from "../auth.js";
+import type * as bot from "../bot.js";
 import type * as claims from "../claims.js";
 import type * as crons from "../crons.js";
 import type * as discord from "../discord.js";
@@ -18,6 +19,7 @@ import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
 import type * as lib_access from "../lib/access.js";
 import type * as lib_blizzard from "../lib/blizzard.js";
+import type * as lib_discordBot from "../lib/discordBot.js";
 import type * as lib_discordEmbed from "../lib/discordEmbed.js";
 import type * as lib_humor from "../lib/humor.js";
 import type * as lib_normalize from "../lib/normalize.js";
@@ -36,6 +38,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   auth: typeof auth;
+  bot: typeof bot;
   claims: typeof claims;
   crons: typeof crons;
   discord: typeof discord;
@@ -44,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   integrations: typeof integrations;
   "lib/access": typeof lib_access;
   "lib/blizzard": typeof lib_blizzard;
+  "lib/discordBot": typeof lib_discordBot;
   "lib/discordEmbed": typeof lib_discordEmbed;
   "lib/humor": typeof lib_humor;
   "lib/normalize": typeof lib_normalize;

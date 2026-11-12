@@ -162,8 +162,8 @@ Po prvem tednu primerjaj ocene z Convex nadzorno ploščo; interval je nastavlji
 - [x] Convex projekt povezan (`bunx convex dev`)
 - [x] Google OAuth client
 - [x] Discord aplikacija, bot, webhook
-- [ ] GitHub repozitorij
-- [ ] Vercel projekt
+- [x] GitHub repozitorij
+- [x] Vercel projekt
 
 ### Faza 1 – Skelet
 
@@ -213,8 +213,8 @@ Po prvem tednu primerjaj ocene z Convex nadzorno ploščo; interval je nastavlji
 
 ### Faza 9 – Objava
 
-- [ ] Convex production deployment + env
-- [ ] Vercel projekt iz GitHuba + env
+- [x] Convex production deployment + env
+- [x] Vercel projekt iz GitHuba + env
 - [ ] Discord Interactions Endpoint URL → Vercel
 
 ### Faza 10 – Preizkus
