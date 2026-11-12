@@ -242,6 +242,6 @@ Lokalno: `.env` (tvoji ključi) in `.env.local` (Convex ga ustvari sam). Oba v `
 
 ## 11. Odprta vprašanja
 
-- [ ] Ali slash ukazi v Discordu prikazujejo samo javne podatke ali vse (kanal je zaseben za prijatelje)?
-- [ ] Katere dogodke objavljati (vsako sejo ali samo level up / nov predmet)?
+- [x] Ali slash ukazi v Discordu prikazujejo samo javne podatke ali vse? → ločen stolpec *Discord channel* v Visibility
+- [x] Katere dogodke objavljati? → vsako sejo, ki ima vsaj eno vidno spremembo (prazne seje se preskočijo)
 - [ ] Hitrost Blizzardove posodobitve profila po odjavi (izmeriti v praksi).
