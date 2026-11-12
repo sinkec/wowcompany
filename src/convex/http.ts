@@ -13,8 +13,7 @@ const json = (body: unknown, status = 200) =>
 	new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 /** Ed25519 preverba Discordovega podpisa: timestamp + surovo telo. */
-function verifyDiscord(body: string, signature: string | null, timestamp: string | null): boolean {
-	const key = process.env.DISCORD_PUBLIC_KEY;
+function verifyDiscord(key: string | null, body: string, signature: string | null, timestamp: string | null): boolean {
 	if (!key || !signature || !timestamp || !/^[0-9a-f]{128}$/i.test(signature)) return false;
 	try {
 		return nacl.sign.detached.verify(new TextEncoder().encode(timestamp + body), hex(signature), hex(key));
@@ -33,7 +32,8 @@ http.route({
 	method: 'POST',
 	handler: httpAction(async (ctx, req) => {
 		const body = await req.text();
-		if (!verifyDiscord(body, req.headers.get('x-signature-ed25519'), req.headers.get('x-signature-timestamp')))
+		const cfg = await ctx.runQuery(internal.integrations.config, {});
+		if (!verifyDiscord(cfg.publicKey, body, req.headers.get('x-signature-ed25519'), req.headers.get('x-signature-timestamp')))
 			return new Response('invalid request signature', { status: 401 });
 
 		const i = JSON.parse(body) as { type: number; data?: { name: string; options?: Option[] } };

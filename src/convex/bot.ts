@@ -15,6 +15,7 @@ import {
 	type BotSummary
 } from './lib/discordBot.js';
 import { getSettings } from './lib/settings.js';
+import type { DiscordConfig } from './lib/discordConfig.js';
 
 const EPHEMERAL = 64;
 const reply = (data: Record<string, unknown>) => ({ type: 4, data: { allowed_mentions: { parse: [] }, ...data } });
@@ -111,10 +112,9 @@ export const registerCommands = action({
 		const user = await authComponent.safeGetAuthUser(ctx);
 		if (!user || !(await ctx.runQuery(internal.discord.isAdminUser, { userId: user._id })))
 			return { ok: false, error: 'Guild Master only.' };
-		const appId = process.env.DISCORD_APPLICATION_ID;
-		const token = process.env.DISCORD_BOT_TOKEN;
-		const guildId = process.env.DISCORD_GUILD_ID;
-		if (!appId || !token) return { ok: false, error: 'DISCORD_APPLICATION_ID or DISCORD_BOT_TOKEN missing in Convex env.' };
+		const cfg: DiscordConfig = await ctx.runQuery(internal.integrations.config, {});
+		const { applicationId: appId, botToken: token, guildId } = cfg;
+		if (!appId || !token) return { ok: false, error: 'No bot token yet. Paste it in the "Discord Bot" portal first.' };
 		const url = guildId
 			? `https://discord.com/api/v10/applications/${appId}/guilds/${guildId}/commands`
 			: `https://discord.com/api/v10/applications/${appId}/commands`;

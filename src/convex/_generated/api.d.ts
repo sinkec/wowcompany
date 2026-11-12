@@ -20,6 +20,7 @@ import type * as integrations from "../integrations.js";
 import type * as lib_access from "../lib/access.js";
 import type * as lib_blizzard from "../lib/blizzard.js";
 import type * as lib_discordBot from "../lib/discordBot.js";
+import type * as lib_discordConfig from "../lib/discordConfig.js";
 import type * as lib_discordEmbed from "../lib/discordEmbed.js";
 import type * as lib_humor from "../lib/humor.js";
 import type * as lib_normalize from "../lib/normalize.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   "lib/access": typeof lib_access;
   "lib/blizzard": typeof lib_blizzard;
   "lib/discordBot": typeof lib_discordBot;
+  "lib/discordConfig": typeof lib_discordConfig;
   "lib/discordEmbed": typeof lib_discordEmbed;
   "lib/humor": typeof lib_humor;
   "lib/normalize": typeof lib_normalize;

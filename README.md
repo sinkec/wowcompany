@@ -36,6 +36,10 @@ Vercel builds with `vercel.json` (`convex deploy` + `bun run build`). Vercel nee
 
 The first user to sign in on a fresh deployment becomes the admin ("Guild Master").
 
+Discord (webhook + bot token) is configured in the browser: **Office → Portal Room**. Secrets are stored in a
+Convex table read only by internal functions and are never sent back to the browser. `DISCORD_*` env vars are
+only a fallback.
+
 ---
 
 Non-commercial fan project. Not affiliated with Blizzard Entertainment.

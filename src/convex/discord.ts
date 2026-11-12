@@ -7,6 +7,7 @@ import { authComponent } from './auth.js';
 import { isNewsworthy } from './lib/humor.js';
 import { SAMPLE_PAYLOAD, filterPayload, sessionEmbed, type Payload } from './lib/discordEmbed.js';
 import { getSettings } from './lib/settings.js';
+import type { DiscordConfig } from './lib/discordConfig.js';
 
 const MAX_AGE_MS = 6 * 3600 * 1000; // starejših dogodkov ne objavljamo (npr. po izpadu)
 
@@ -40,9 +41,8 @@ export const markPosted = internalMutation({
 	}
 });
 
-async function sendWebhook(body: object): Promise<{ ok: boolean; retryAfter?: number; error?: string }> {
-	const url = process.env.DISCORD_WEBHOOK_URL;
-	if (!url) return { ok: false, error: 'DISCORD_WEBHOOK_URL not set' };
+async function sendWebhook(url: string | null, body: object): Promise<{ ok: boolean; retryAfter?: number; error?: string }> {
+	if (!url) return { ok: false, error: 'No webhook configured. Set one in Office → Portal Room.' };
 	const res = await fetch(`${url}?wait=true`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
@@ -60,7 +60,8 @@ async function sendWebhook(body: object): Promise<{ ok: boolean; retryAfter?: nu
 export const postPending = internalAction({
 	args: {},
 	handler: async (ctx): Promise<{ posted: number; skipped: number }> => {
-		if (!process.env.DISCORD_WEBHOOK_URL) return { posted: 0, skipped: 0 };
+		const cfg: DiscordConfig = await ctx.runQuery(internal.integrations.config, {});
+		if (!cfg.webhookUrl) return { posted: 0, skipped: 0 };
 		type Raw = { id: Id<'events'>; at: number; type: string; slug: string | null; payload: Payload };
 		const raw: Raw[] = await ctx.runQuery(internal.discord.unposted, {});
 		if (!raw.length) return { posted: 0, skipped: 0 };
@@ -81,7 +82,7 @@ export const postPending = internalAction({
 		let posted = 0;
 		for (let i = 0; i < send.length; i += 10) {
 			const batch = send.slice(i, i + 10);
-			const r = await sendWebhook({ embeds: batch.map(sessionEmbed) });
+			const r = await sendWebhook(cfg.webhookUrl, { embeds: batch.map(sessionEmbed) });
 			if (r.ok) {
 				await ctx.runMutation(internal.discord.markPosted, { ids: batch.map((b) => b.id) });
 				posted += batch.length;
@@ -117,7 +118,8 @@ export const sendTest = action({
 		if (!user || !(await ctx.runQuery(internal.discord.isAdminUser, { userId: user._id })))
 			return { ok: false, error: 'Guild Master only.' };
 		const fields: string[] = await ctx.runQuery(internal.discord.discordFields, {});
-		return testPostImpl(fields);
+		const cfg: DiscordConfig = await ctx.runQuery(internal.integrations.config, {});
+		return testPostImpl(fields, cfg.webhookUrl);
 	}
 });
 
@@ -126,14 +128,15 @@ export const testPost = internalAction({
 	args: {},
 	handler: async (ctx): Promise<{ ok: boolean; error?: string }> => {
 		const fields: string[] = await ctx.runQuery(internal.discord.discordFields, {});
-		return testPostImpl(fields);
+		const cfg: DiscordConfig = await ctx.runQuery(internal.integrations.config, {});
+		return testPostImpl(fields, cfg.webhookUrl);
 	}
 });
 
-async function testPostImpl(fields: string[]): Promise<{ ok: boolean; error?: string }> {
+async function testPostImpl(fields: string[], url: string | null): Promise<{ ok: boolean; error?: string }> {
 	if (!fields.includes('lastLogin'))
 		return { ok: false, error: 'Session posts are off. Flip the master switch in Visibility → Discord first.' };
-	const r = await sendWebhook({
+	const r = await sendWebhook(url, {
 		embeds: [
 			sessionEmbed({
 				id: 'test-' + Date.now(),

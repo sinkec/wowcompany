@@ -143,6 +143,21 @@ export default defineSchema({
 		paused: v.boolean()
 	}).index('by_key', ['key']),
 
+	// Skrivnosti, nastavljene prek admin vmesnika (Portal Room). Berejo jih SAMO interne funkcije;
+	// v brskalnik nikoli ne gredo. Manjkajoče vrednosti -> rezerva iz okoljskih spremenljivk.
+	secrets: defineTable({
+		key: v.literal('discord'),
+		webhookUrl: v.optional(v.string()),
+		webhookName: v.optional(v.string()),
+		webhookChannelId: v.optional(v.string()),
+		botToken: v.optional(v.string()),
+		applicationId: v.optional(v.string()),
+		applicationName: v.optional(v.string()),
+		publicKey: v.optional(v.string()),
+		guildId: v.optional(v.string()),
+		updatedAt: v.number()
+	}).index('by_key', ['key']),
+
 	// Trajni predpomnilnik ikon predmetov.
 	itemIcons: defineTable({
 		itemId: v.number(),

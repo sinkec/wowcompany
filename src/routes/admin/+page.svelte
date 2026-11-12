@@ -95,6 +95,41 @@
 
 	// --- portal room
 	const integ = useQuery(api.integrations.status, () => (isAdmin ? {} : 'skip'));
+	let webhookInput = $state('');
+	let tokenInput = $state('');
+	let guildInput = $state('');
+	let savingWebhook = $state(false);
+	let savingBot = $state(false);
+	async function saveWebhook(e: SubmitEvent) {
+		e.preventDefault();
+		savingWebhook = true;
+		const r = await run(client.action(api.integrations.saveWebhook, { url: webhookInput }));
+		savingWebhook = false;
+		if (!r) return;
+		if (r.ok) {
+			toast.success(r.message);
+			webhookInput = '';
+		} else toast.error(r.error);
+	}
+	async function saveBot(e: SubmitEvent) {
+		e.preventDefault();
+		savingBot = true;
+		const r = await run(client.action(api.integrations.saveBot, { token: tokenInput }));
+		savingBot = false;
+		if (!r) return;
+		if (r.ok) {
+			toast.success(r.message);
+			tokenInput = '';
+		} else toast.error(r.error);
+	}
+	async function saveGuild(e: SubmitEvent) {
+		e.preventDefault();
+		const ok = await run(client.mutation(api.integrations.setGuild, { guildId: guildInput }), 'Server ID saved.');
+		if (ok !== undefined) guildInput = '';
+	}
+	const clearIntegration = (what: 'webhook' | 'bot') =>
+		run(client.mutation(api.integrations.clear, { what }), what === 'webhook' ? 'Raven released.' : 'Bot unbound.');
+	const sourceLabel = (src: 'web' | 'env' | null) => (src === 'web' ? 'set here' : src === 'env' ? 'from env variable' : '');
 	let webhookCheck = $state<string | null>(null);
 	async function checkWebhook() {
 		webhookCheck = 'checking…';
@@ -315,11 +350,11 @@
 
 							{#if col.target === 'discordFields'}
 								<div class="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
-									<Button size="sm" onclick={sendTest} disabled={!sessionsOn || sendingTest || !integ.data?.webhookConfigured}>
+									<Button size="sm" onclick={sendTest} disabled={!sessionsOn || sendingTest || !integ.data?.webhook.configured}>
 										<Send class="size-4" /> {sendingTest ? 'Sending raven…' : 'Send test post'}
 									</Button>
 									<span class="text-xs text-muted-foreground">
-										{#if !integ.data?.webhookConfigured}No webhook yet — see Portal Room.
+										{#if !integ.data?.webhook.configured}No webhook yet — see Portal Room.
 										{:else if !sessionsOn}Turn on the master switch to send posts.
 										{:else}Posts a fake session using exactly these switches.{/if}
 									</span>
@@ -399,8 +434,8 @@
 			<!-- PORTAL ROOM -->
 			<Tabs.Content value="portals" class="mt-4 space-y-4">
 				<p class="text-sm text-muted-foreground">
-					Where this tavern connects to the outside world. Each portal shows its status and exactly what the owner of the
-					Discord server has to click. Secrets never show up here.
+					Where this tavern connects to the outside world. Everything here can be set from the browser, even after
+					deploying. Secrets are write-only: once saved, they never come back to any browser — not even yours.
 				</p>
 				{#if integ.data}
 					{@const st = integ.data}
@@ -409,7 +444,7 @@
 						<section class="wow-frame space-y-3 rounded-lg p-4">
 							<div class="flex items-center justify-between gap-2">
 								<h2 class="font-display text-lg font-semibold text-primary">Messenger Raven</h2>
-								{#if st.webhookConfigured}
+								{#if st.webhook.configured}
 									<Badge class="gap-1"><CircleCheck class="size-3" /> connected</Badge>
 								{:else}
 									<Badge variant="secondary" class="gap-1"><CircleDashed class="size-3" /> not set up</Badge>
@@ -418,17 +453,37 @@
 							<p class="text-sm text-muted-foreground">
 								Discord webhook that posts session summaries into one channel. One-way: it talks, it never listens.
 							</p>
+
+							{#if st.webhook.configured}
+								<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md bg-background/40 p-3 text-xs">
+									<dt class="text-muted-foreground">Name</dt><dd>{st.webhook.name ?? '—'}</dd>
+									<dt class="text-muted-foreground">Channel ID</dt><dd>{st.webhook.channelId ?? '—'}</dd>
+									<dt class="text-muted-foreground">URL</dt><dd class="truncate">{st.webhook.hint}</dd>
+									<dt class="text-muted-foreground">Source</dt><dd>{sourceLabel(st.webhook.source)}</dd>
+								</dl>
+							{/if}
+
 							<ol class="list-decimal space-y-1 pl-5 text-sm">
 								<li>In Discord, hover the channel → <b>⚙ Edit Channel</b> → <b>Integrations</b> → <b>Webhooks</b> → <b>New Webhook</b>.</li>
-								<li>Name it (e.g. <i>Tavern Gossip</i>), click <b>Copy Webhook URL</b>.</li>
-								<li>
-									Put it in Convex as <code class="rounded bg-muted px-1">DISCORD_WEBHOOK_URL</code> (Convex dashboard → Settings →
-									Environment Variables, or <code class="rounded bg-muted px-1">bun run env:push</code> from <code>.env</code>).
-								</li>
-								<li>Come back here and poke the raven.</li>
+								<li>Name it (e.g. <i>Tavern Gossip</i>), click <b>Copy Webhook URL</b> and paste it below.</li>
 							</ol>
-							<div class="flex flex-wrap items-center gap-3">
-								<Button size="sm" variant="secondary" onclick={checkWebhook} disabled={!st.webhookConfigured}>Check raven</Button>
+							<form onsubmit={saveWebhook} class="flex gap-2">
+								<Input
+									type="password"
+									bind:value={webhookInput}
+									placeholder={st.webhook.configured ? 'Paste a new URL to replace' : 'https://discord.com/api/webhooks/…'}
+									autocomplete="off"
+									disabled={savingWebhook}
+								/>
+								<Button type="submit" size="sm" disabled={savingWebhook || webhookInput.trim().length < 20}>
+									{savingWebhook ? 'Checking…' : 'Save'}
+								</Button>
+							</form>
+							<div class="flex flex-wrap items-center gap-2">
+								<Button size="sm" variant="secondary" onclick={checkWebhook} disabled={!st.webhook.configured}>Check raven</Button>
+								{#if st.webhook.source === 'web'}
+									<Button size="sm" variant="ghost" onclick={() => clearIntegration('webhook')}>Remove</Button>
+								{/if}
 								{#if webhookCheck}<span class="text-xs text-muted-foreground">{webhookCheck}</span>{/if}
 							</div>
 						</section>
@@ -437,8 +492,8 @@
 						<section class="wow-frame space-y-3 rounded-lg p-4">
 							<div class="flex items-center justify-between gap-2">
 								<h2 class="font-display text-lg font-semibold text-primary">Discord Bot (slash commands)</h2>
-								{#if st.applicationId}
-									<Badge class="gap-1"><CircleCheck class="size-3" /> app known</Badge>
+								{#if st.bot.configured && st.bot.publicKeySet}
+									<Badge class="gap-1"><CircleCheck class="size-3" /> bound</Badge>
 								{:else}
 									<Badge variant="secondary" class="gap-1"><CircleDashed class="size-3" /> not set up</Badge>
 								{/if}
@@ -447,7 +502,49 @@
 								Lets people type <code>/roster</code>, <code>/hero</code>, <code>/leaderboard</code> in Discord. No always-online
 								bot — Discord calls this site over HTTP when someone uses a command.
 							</p>
-							<ol class="list-decimal space-y-2 pl-5 text-sm">
+
+							{#if st.bot.configured}
+								<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md bg-background/40 p-3 text-xs">
+									<dt class="text-muted-foreground">Application</dt><dd>{st.bot.applicationName ?? '—'} ({st.bot.applicationId ?? '—'})</dd>
+									<dt class="text-muted-foreground">Token</dt><dd>{st.bot.tokenHint}</dd>
+									<dt class="text-muted-foreground">Public key</dt><dd>{st.bot.publicKeySet ? 'set' : 'missing'}</dd>
+									<dt class="text-muted-foreground">Server ID</dt><dd>{st.guildId ?? 'not set (commands go global, up to 1 h)'}</dd>
+									<dt class="text-muted-foreground">Source</dt><dd>{sourceLabel(st.bot.source)}</dd>
+								</dl>
+							{/if}
+
+							<ol class="list-decimal space-y-3 pl-5 text-sm">
+								<li>
+									<b>Create the app:</b>
+									<a href="https://discord.com/developers/applications" target="_blank" rel="noopener" class="text-primary hover:underline"
+										>Discord Developer Portal</a
+									>
+									→ <b>New Application</b> → <b>Bot</b> → <b>Reset Token</b> → paste it here. Application ID and public key are
+									fetched automatically.
+									<form onsubmit={saveBot} class="mt-2 flex gap-2">
+										<Input
+											type="password"
+											bind:value={tokenInput}
+											placeholder={st.bot.configured ? 'Paste a new token to replace' : 'Bot token'}
+											autocomplete="off"
+											disabled={savingBot}
+										/>
+										<Button type="submit" size="sm" disabled={savingBot || tokenInput.trim().length < 50}>
+											{savingBot ? 'Checking…' : 'Save'}
+										</Button>
+									</form>
+									{#if st.bot.source === 'web'}
+										<Button size="sm" variant="ghost" class="mt-1" onclick={() => clearIntegration('bot')}>Remove bot</Button>
+									{/if}
+								</li>
+								<li>
+									<b>Server ID</b> — taken from the webhook automatically. Different server? Right-click it in Discord →
+									<b>Copy Server ID</b> (needs Developer Mode):
+									<form onsubmit={saveGuild} class="mt-2 flex gap-2">
+										<Input bind:value={guildInput} placeholder={st.guildId ?? '123456789012345678'} inputmode="numeric" />
+										<Button type="submit" size="sm" variant="secondary" disabled={guildInput.trim().length < 17}>Save</Button>
+									</form>
+								</li>
 								<li>
 									<b>Add the bot to the server</b> (needs “Manage Server” on that Discord). It only gets the
 									<i>applications.commands</i> permission — it can't read or post messages on its own:
@@ -458,11 +555,11 @@
 											</a>
 										</div>
 									{:else}
-										<span class="text-muted-foreground"> set <code>DISCORD_APPLICATION_ID</code> first.</span>
+										<span class="text-muted-foreground"> save the bot token first.</span>
 									{/if}
 								</li>
 								<li>
-									<b>Interactions Endpoint URL</b> — paste into Discord Developer Portal → your app → General Information:
+									<b>Interactions Endpoint URL</b> — paste into Developer Portal → your app → General Information → Save:
 									{#if st.interactionsUrl}
 										<div class="mt-1 flex items-center gap-2">
 											<code class="truncate rounded bg-muted px-2 py-1 text-xs">{st.interactionsUrl}</code>
@@ -471,7 +568,7 @@
 									{/if}
 									{#if !st.siteIsPublic}
 										<p class="mt-1 text-xs text-destructive">
-											This site runs on localhost — Discord can't reach it. Works after deploying to Vercel (or via a tunnel).
+											This site runs on localhost — Discord can't reach it. Works on the deployed site.
 										</p>
 									{/if}
 								</li>
@@ -479,7 +576,7 @@
 									<b>Register the commands</b> — tells Discord that <code>/roster</code>, <code>/hero</code> and
 									<code>/leaderboard</code> exist. Run again whenever commands change.
 									<div class="mt-1 flex flex-wrap items-center gap-2">
-										<Button size="sm" onclick={registerCommands} disabled={registering || !st.applicationId}>
+										<Button size="sm" onclick={registerCommands} disabled={registering || !st.bot.applicationId}>
 											{registering ? 'Shouting at Discord…' : 'Register commands'}
 										</Button>
 										{#if registerResult}<span class="text-xs text-muted-foreground">{registerResult}</span>{/if}
