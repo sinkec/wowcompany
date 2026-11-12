@@ -6,9 +6,11 @@
 const IDENTITY = new Set(['_id', 'playerId', 'slug', 'name', 'surname', 'updatedAt']);
 const SUMMARY_FIELDS = [
 	'level', 'classId', 'className', 'race', 'faction', 'guild', 'avatar', 'ilvlEquipped', 'experience', 'gender',
-	'ruleset', 'ilvlAverage', 'achievementPoints', 'lastLogin', 'kills', 'deaths', 'quests', 'honorableKills', 'counters'
+	'ruleset', 'ilvlAverage', 'achievementPoints', 'lastLogin', 'kills', 'deaths', 'quests', 'honorableKills', 'counters', 'talents'
 ];
-const SECTIONS = ['equipment', 'stats', 'professions', 'counters', 'allStats', 'history'];
+const SECTIONS = ['equipment', 'stats', 'professions', 'counters', 'allStats', 'history', 'talents'];
+/** ključ povzetka -> polje vidnosti */
+const fieldOf = (k: string) => (k === 'talentBuild' || k === 'talentSpec' ? 'talents' : k);
 const ALL = [...new Set([...SUMMARY_FIELDS, ...SECTIONS])];
 const WEEK_FIELD: Record<string, string> = { level: 'level', ilvl: 'ilvlEquipped', kills: 'kills', deaths: 'deaths', quests: 'quests', honorableKills: 'honorableKills' };
 const HIST_FIELD = WEEK_FIELD;
@@ -38,11 +40,11 @@ function scenario(name: string, pub: string[]) {
 	for (const pl of list.players) {
 		for (const [k, v] of Object.entries(pl.summary ?? {})) {
 			checks++;
-			if (!IDENTITY.has(k) && !ok(k)) fail(name, `list ${pl.slug}: uide summary.${k}=${JSON.stringify(v).slice(0, 40)}`);
+			if (!IDENTITY.has(k) && !ok(fieldOf(k))) fail(name, `list ${pl.slug}: uide summary.${k}=${JSON.stringify(v).slice(0, 40)}`);
 		}
 		for (const f of SUMMARY_FIELDS) {
 			checks++;
-			if (ok(f) && pl.summary && !(f in pl.summary) && f !== 'guild' && f !== 'ruleset' && f !== 'avatar' && f !== 'lastLogin' && f !== 'counters')
+			if (ok(f) && pl.summary && !(f in pl.summary) && f !== 'guild' && f !== 'ruleset' && f !== 'avatar' && f !== 'lastLogin' && f !== 'counters' && f !== 'talents')
 				fail(name, `list ${pl.slug}: manjka dovoljeno summary.${f}`);
 		}
 		for (const k of Object.keys(pl.week ?? {})) {
@@ -53,10 +55,10 @@ function scenario(name: string, pub: string[]) {
 		const g = convex('players:get', { slug: pl.slug });
 		for (const k of Object.keys(g.summary ?? {})) {
 			checks++;
-			if (!IDENTITY.has(k) && !ok(k)) fail(name, `get ${pl.slug}: uide summary.${k}`);
+			if (!IDENTITY.has(k) && !ok(fieldOf(k))) fail(name, `get ${pl.slug}: uide summary.${k}`);
 		}
 		const d = g.details ?? {};
-		for (const sec of ['equipment', 'stats', 'professions', 'counters', 'allStats']) {
+		for (const sec of ['equipment', 'stats', 'professions', 'counters', 'allStats', 'talents']) {
 			checks++;
 			if (!ok(sec) && d[sec] != null) fail(name, `get ${pl.slug}: uide details.${sec}`);
 			if (ok(sec) && g.details && d[sec] == null) fail(name, `get ${pl.slug}: manjka dovoljeno details.${sec}`);
@@ -86,6 +88,7 @@ function scenario(name: string, pub: string[]) {
 		checks++;
 		if (!ok('classId') && e.classId) fail(name, `feed ${e.slug}: uide classId`);
 		if (!ok('equipment') && e.newItems?.length) fail(name, `feed ${e.slug}: uide newItems`);
+		if (!ok('talents') && e.talentBuild) fail(name, `feed ${e.slug}: uide talentBuild`);
 	}
 	return events.length;
 }
@@ -100,6 +103,7 @@ const scenarios: [string, string[]][] = [
 	['history javna, številke zasebne', ['level', 'history']],
 	['feed javen, portret/level/razred skriti', ['lastLogin', 'kills']],
 	['samo oprema in poklici', ['equipment', 'professions']],
+	['samo talenti', ['talents']],
 	['vse javno', ALL]
 ];
 

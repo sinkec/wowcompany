@@ -3,8 +3,8 @@
 import { v } from 'convex/values';
 import { internal } from './_generated/api.js';
 import { internalAction, internalMutation, internalQuery } from './_generated/server.js';
-import { get, getCharacterParts, itemIcon, mapLimit, profileNs, type RawCharacter } from './lib/blizzard.js';
-import { itemIds, normalize, type Item } from './lib/normalize.js';
+import { classSpecs, get, getCharacterParts, itemIcon, mapLimit, profileNs, talentInfo, type RawCharacter } from './lib/blizzard.js';
+import { itemIds, normalize, talentRefs, type Item } from './lib/normalize.js';
 import { getSettings } from './lib/settings.js';
 import { detailFields, summaryFields } from './schema.js';
 import type { Id } from './_generated/dataModel.js';
@@ -64,6 +64,32 @@ export const cachedIcons = internalQuery({
 	}
 });
 
+type TalentRow = { talentId: number; maxRank: number; icon: string | null };
+type SpecRow = { classId: number; specs: { id: number; name: string }[] };
+
+export const cachedTalents = internalQuery({
+	args: { talentIds: v.array(v.number()), classIds: v.array(v.number()) },
+	handler: async (ctx, { talentIds, classIds }): Promise<{ talents: TalentRow[]; specs: SpecRow[] }> => {
+		const talents: TalentRow[] = [];
+		for (const talentId of talentIds) {
+			const d = await ctx.db
+				.query('talentInfo')
+				.withIndex('by_talent', (q) => q.eq('talentId', talentId))
+				.unique();
+			if (d) talents.push({ talentId, maxRank: d.maxRank, icon: d.icon });
+		}
+		const specs: SpecRow[] = [];
+		for (const classId of classIds) {
+			const d = await ctx.db
+				.query('classSpecs')
+				.withIndex('by_class', (q) => q.eq('classId', classId))
+				.unique();
+			if (d) specs.push({ classId, specs: d.specs });
+		}
+		return { talents, specs };
+	}
+});
+
 export const run = internalAction({
 	args: { force: v.optional(v.boolean()) },
 	handler: async (ctx, { force }): Promise<RunResult> => {
@@ -112,11 +138,39 @@ export const run = internalAction({
 			}
 		});
 
+		// talenti: največji rang + ikona (enkrat na talent) in drevesa razreda (enkrat na razred)
+		const refs = new Map(hits.flatMap((h) => talentRefs(h.raw)).map((r) => [r.talentId, r.spellId]));
+		const classIds = [...new Set(hits.map((h) => Number(h.raw.profile?.character_class?.id ?? 0)).filter(Boolean))];
+		const tc = await ctx.runQuery(internal.poll.cachedTalents, { talentIds: [...refs.keys()], classIds });
+		const tInfo = new Map(tc.talents.map((t) => [t.talentId, { maxRank: t.maxRank, icon: t.icon }]));
+		const specsByClass = new Map(tc.specs.map((x) => [x.classId, x.specs]));
+		const newTalents: TalentRow[] = [];
+		await mapLimit([...refs].filter(([id]) => !tInfo.has(id)), CONCURRENCY, async ([talentId, spellId]) => {
+			try {
+				const info = await talentInfo(talentId, spellId);
+				tInfo.set(talentId, info);
+				newTalents.push({ talentId, ...info });
+			} catch {
+				/* naslednjič */
+			}
+		});
+		const newSpecs: SpecRow[] = [];
+		for (const classId of classIds.filter((c) => !specsByClass.has(c))) {
+			const specs = await classSpecs(classId).catch(() => null);
+			if (specs?.length) {
+				specsByClass.set(classId, specs);
+				newSpecs.push({ classId, specs });
+			}
+		}
+
 		const updates = hits.map((h) => {
-			const { summary, details } = normalize(h.slug, h.raw, icons);
+			const { summary, details } = normalize(h.slug, h.raw, icons, {
+				info: tInfo,
+				specs: specsByClass.get(Number(h.raw.profile?.character_class?.id ?? 0)) ?? null
+			});
 			return { playerId: h.playerId, lastModified: h.lastModified, summary, details };
 		});
-		await ctx.runMutation(internal.poll.apply, { updates, newIcons });
+		await ctx.runMutation(internal.poll.apply, { updates, newIcons, newTalents, newSpecs });
 		return { checked: st.entries.length, changed: hits.length, notModified, notFound, failed };
 	}
 });
@@ -132,9 +186,25 @@ export const apply = internalMutation({
 				details: v.object(detailFields)
 			})
 		),
-		newIcons: v.array(v.object({ itemId: v.number(), url: v.union(v.string(), v.null()) }))
+		newIcons: v.array(v.object({ itemId: v.number(), url: v.union(v.string(), v.null()) })),
+		newTalents: v.optional(v.array(v.object({ talentId: v.number(), maxRank: v.number(), icon: v.union(v.string(), v.null()) }))),
+		newSpecs: v.optional(v.array(v.object({ classId: v.number(), specs: v.array(v.object({ id: v.number(), name: v.string() })) })))
 	},
-	handler: async (ctx, { updates, newIcons }) => {
+	handler: async (ctx, { updates, newIcons, newTalents = [], newSpecs = [] }) => {
+		for (const t of newTalents) {
+			const exists = await ctx.db
+				.query('talentInfo')
+				.withIndex('by_talent', (q) => q.eq('talentId', t.talentId))
+				.unique();
+			if (!exists) await ctx.db.insert('talentInfo', t);
+		}
+		for (const c of newSpecs) {
+			const exists = await ctx.db
+				.query('classSpecs')
+				.withIndex('by_class', (q) => q.eq('classId', c.classId))
+				.unique();
+			if (!exists) await ctx.db.insert('classSpecs', c);
+		}
 		const now = Date.now();
 
 		for (const icon of newIcons) {
@@ -212,7 +282,10 @@ export const apply = internalMutation({
 						ilvlAverage: { from: prev.ilvlAverage, to: s.ilvlAverage },
 						achievementPoints: s.achievementPoints - prev.achievementPoints,
 						counters: counterDeltas(prev.counters, s.counters),
-						professions: professionUps(prevDetails?.professions, u.details.professions)
+						professions: professionUps(prevDetails?.professions, u.details.professions),
+						...(prev.talentBuild && s.talentBuild && prev.talentBuild !== s.talentBuild
+							? { talentBuild: { from: prev.talentBuild, to: s.talentBuild }, talentSpec: s.talentSpec ?? null }
+							: {})
 					}
 				});
 			}

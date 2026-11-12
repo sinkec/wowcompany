@@ -49,6 +49,9 @@ async function visibility(ctx: QueryCtx) {
 /** Identiteta je vedno vidna (brez nje strani ni mogoče prikazati). */
 const ALWAYS = new Set(['_id', 'playerId', 'slug', 'name', 'surname', 'updatedAt']);
 
+/** Ključ povzetka -> polje vidnosti (večina ključev je kar polje samo). */
+const fieldOf = (k: string) => (k === 'talentBuild' || k === 'talentSpec' ? 'talents' : k);
+
 /** Stolpec zgodovine -> polje povzetka, ki določa njegovo vidnost. */
 const HISTORY_FIELD = {
 	level: 'level',
@@ -98,7 +101,7 @@ export const list = query({
 				slug: p.slug,
 				displayName: p.displayName,
 				addedAt: p.addedAt,
-				summary: s ? pick(s, (k) => ALWAYS.has(k) || allowed(k)) : null,
+				summary: s ? pick(s, (k) => ALWAYS.has(k) || allowed(fieldOf(k))) : null,
 				// tedenske razlike razkrivajo zasebne številke -> po istih pravilih
 				week: week ? pick(week, (k) => allowed(k === 'ilvl' ? 'ilvlEquipped' : k)) : null
 			});
@@ -137,7 +140,7 @@ export const get = query({
 		return {
 			private: privateOk,
 			player: { id: player._id, slug: player.slug, displayName: player.displayName, addedAt: player.addedAt },
-			summary: s ? pick(s, (k) => ALWAYS.has(k) || allowed(k)) : null,
+			summary: s ? pick(s, (k) => ALWAYS.has(k) || allowed(fieldOf(k))) : null,
 			week: week ? pick(week, (k) => allowed(k === 'ilvl' ? 'ilvlEquipped' : k)) : null,
 			details: d
 				? {
@@ -147,6 +150,7 @@ export const get = query({
 						professions: allowed('professions') ? d.professions : null,
 						counters: allowed('counters') ? d.counters : null,
 						allStats: allowed('allStats') ? d.allStats : null,
+						talents: allowed('talents') ? (d.talents ?? []) : null,
 						updatedAt: d.updatedAt
 					}
 				: null,

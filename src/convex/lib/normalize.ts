@@ -15,6 +15,57 @@ export type Item = {
 export type Stats = Record<string, number | string>;
 export type Profession = { name: string; primary: boolean; skill: number; max: number };
 export type StatLine = { category: string; name: string; value: number };
+export type Talent = { id: number; name: string; rank: number; maxRank: number | null; icon: string | null; description: string };
+export type TalentTree = { id: number; name: string; spent: number; talents: Talent[] };
+export type TalentCache = {
+	info: Map<number, { maxRank: number; icon: string | null }>;
+	specs: { id: number; name: string }[] | null;
+};
+
+/** Aktivna skupina talentov iz odgovora /specializations. */
+function activeTalentSpecs(raw: RawCharacter): any[] {
+	const groups = raw.specializations?.specialization_groups ?? [];
+	return (groups.find((g: any) => g.is_active) ?? groups[0])?.specializations ?? [];
+}
+
+/** Talenti (id + spell id) za predpomnilnik. */
+export function talentRefs(raw: RawCharacter): { talentId: number; spellId: number | null }[] {
+	return activeTalentSpecs(raw).flatMap((sp: any) =>
+		(sp.talents ?? []).map((t: any) => ({ talentId: num(t.talent?.id), spellId: t.spell_tooltip?.spell?.id ?? null }))
+	).filter((t: { talentId: number }) => t.talentId > 0);
+}
+
+function talents(raw: RawCharacter, cache: TalentCache): { trees: TalentTree[]; build?: string; spec?: string } {
+	const active = activeTalentSpecs(raw);
+	if (!raw.specializations) return { trees: [] };
+	const byId = new Map(active.map((sp: any) => [num(sp.specialization?.id), sp]));
+	// vrstni red iz razreda (vključno z drevesi brez točk); sicer samo drevesa iz profila
+	const order = cache.specs ?? active.map((sp: any) => ({ id: num(sp.specialization?.id), name: str(sp.specialization_name) }));
+	const trees: TalentTree[] = order.map((o) => {
+		const sp: any = byId.get(o.id);
+		return {
+			id: o.id,
+			name: str(sp?.specialization_name) || o.name,
+			spent: num(sp?.spent_points),
+			talents: (sp?.talents ?? []).map((t: any) => {
+				const id = num(t.talent?.id);
+				const info = cache.info.get(id);
+				return {
+					id,
+					name: str(t.talent?.name),
+					rank: num(t.talent_rank),
+					maxRank: info?.maxRank ?? null,
+					icon: info?.icon ?? null,
+					description: str(t.spell_tooltip?.description)
+				};
+			})
+		};
+	});
+	const spent = trees.reduce((a, t) => a + t.spent, 0);
+	if (!spent) return { trees };
+	const top = [...trees].sort((a, b) => b.spent - a.spent)[0];
+	return { trees, build: trees.map((t) => t.spent).join('/'), spec: top.name };
+}
 
 /** (naš ključ, ime statistike v Blizzard en_GB) */
 export const COUNTERS: [string, string][] = [
@@ -48,7 +99,12 @@ export function itemIds(raw: RawCharacter): number[] {
 	return (raw.equipment?.equipped_items ?? []).map((it: any) => num(it.item?.id)).filter((id: number) => id > 0);
 }
 
-export function normalize(slug: string, raw: RawCharacter, icons: Map<number, string | null>) {
+export function normalize(
+	slug: string,
+	raw: RawCharacter,
+	icons: Map<number, string | null>,
+	talentCache: TalentCache = { info: new Map(), specs: null }
+) {
 	const p = raw.profile;
 	const media = (key: string) => optStr((raw.media?.assets ?? []).find((a: any) => a.key === key)?.value);
 
@@ -115,6 +171,8 @@ export function normalize(slug: string, raw: RawCharacter, icons: Map<number, st
 
 	const equipment: Item[] = (raw.equipment?.equipped_items ?? []).map((it: any) => item(it, icons));
 
+	const tal = talents(raw, talentCache);
+
 	const summary = {
 		slug,
 		name: str(p.name),
@@ -137,9 +195,10 @@ export function normalize(slug: string, raw: RawCharacter, icons: Map<number, st
 		deaths: counters.deaths,
 		quests: counters.quests,
 		honorableKills: num(raw.pvp?.honorable_kills),
-		counters
+		counters,
+		...(tal.build ? { talentBuild: tal.build, talentSpec: tal.spec } : {})
 	};
-	const details = { render: media('main-raw'), equipment, stats, professions, counters, allStats };
+	const details = { render: media('main-raw'), equipment, stats, professions, counters, allStats, talents: tal.trees };
 	return { summary, details };
 }
 

@@ -6,19 +6,21 @@ const S: BotSummary = {
 	slug: 'chugga-zugga', name: 'Chugga', surname: 'Zugga', level: 36, experience: 12345, classId: 1, className: 'Warrior',
 	race: 'Orc', faction: 'Horde', gender: 'Female', guild: 'zadna runda', ruleset: 'PvP', ilvlEquipped: 30, ilvlAverage: 32,
 	achievementPoints: 77, avatar: 'https://x/avatar.jpg', lastLogin: 1_700_000_000_000, kills: 7519, deaths: 41, quests: 209,
-	honorableKills: 39, counters: { food: 94, falling_deaths: 3, hearthed: 9 }
+	honorableKills: 39, counters: { food: 94, falling_deaths: 3, hearthed: 9 },
+	talentBuild: '0/31/0', talentSpec: 'Fury'
 };
 const D = {
 	render: 'https://x/render.png',
 	equipment: [{ name: 'Tusken Helm', quality: 'RARE', slot: 'Head', ilvl: 34 }],
 	stats: { health: 1741, strength: 149, agility: 53, stamina: 140, intellect: 22, spirit: 58, armor: 1863, attackPower: 396, spellPower: 0, meleeCrit: 1.89 },
 	professions: [{ name: 'Tailoring', primary: true, skill: 57, max: 150 }],
-	allStats: [1, 2, 3]
+	allStats: [1, 2, 3],
+	talents: [{ name: 'Fury', spent: 31, talents: [{ name: 'Cruelty', rank: 5, maxRank: 5 }] }]
 };
 const H = { firstAt: 1_690_000_000_000, firstLevel: 30, changes: 5 };
 const ALL = ['level', 'classId', 'className', 'race', 'faction', 'guild', 'avatar', 'ilvlEquipped', 'experience', 'gender', 'ruleset',
 	'ilvlAverage', 'achievementPoints', 'lastLogin', 'kills', 'deaths', 'quests', 'honorableKills', 'counters', 'equipment', 'stats',
-	'professions', 'allStats', 'history'];
+	'professions', 'allStats', 'history', 'talents'];
 const text = (o: unknown) => {
 	const { color: _c, ...rest } = o as Record<string, unknown>;
 	return JSON.stringify(rest);
@@ -31,7 +33,8 @@ const HERO: Record<string, string> = {
 	avatar: 'render.png', ilvlEquipped: '"ilvl"', ilvlAverage: 'Best ilvl', achievementPoints: '77 pts', experience: '12,345',
 	lastLogin: '<t:1700000000:R>', kills: '7,519', deaths: 'Corpse Runner', quests: '209', honorableKills: '"HKs"',
 	counters: 'Food stuffed', equipment: 'Tusken Helm', stats: 'Armor 1,863', professions: 'Tailoring', allStats: '3 more numbers',
-	history: 'Since we started watching'
+	history: 'Since we started watching',
+	talents: 'Cruelty 5/5'
 };
 
 describe('/hero', () => {

@@ -11,8 +11,9 @@
 	import GossipFeed from '#lib/components/wow/GossipFeed.svelte';
 	import ItemSlot from '#lib/components/wow/ItemSlot.svelte';
 	import LineChart from '#lib/components/wow/LineChart.svelte';
+	import TalentTree from '#lib/components/wow/TalentTree.svelte';
 	import Locked from '#lib/components/wow/Locked.svelte';
-	import type { Item, Profession, StatLine } from '#lib/types.js';
+	import type { Item, Profession, StatLine, TalentTree as Tree } from '#lib/types.js';
 	import {
 		COUNTER_LABELS,
 		SLOTS_BOTTOM,
@@ -39,6 +40,8 @@
 	const bySlot = $derived(Object.fromEntries((equipment ?? []).map((i) => [i.slotType, i])));
 	const stats = $derived((d?.stats ?? null) as Record<string, number | string> | null);
 	const professions = $derived((d?.professions ?? null) as Profession[] | null);
+	const talentTrees = $derived((d?.talents ?? null) as Tree[] | null);
+	const topTree = $derived(talentTrees?.length ? [...talentTrees].sort((a, b) => b.spent - a.spent)[0] : null);
 	const kd = $derived(s?.kills != null && s?.deaths != null ? s.kills / Math.max(1, s.deaths) : null);
 
 	let statFilter = $state('');
@@ -104,7 +107,7 @@
 						{#if s}
 							<p class="text-lg">Level {s.level} {s.race ?? ''} {s.className ?? ''}</p>
 							<p class="text-sm text-muted-foreground">
-								{[s.guild ? `<${s.guild}>` : null, s.faction, s.ruleset, s.lastLogin ? `last seen ${ago(s.lastLogin)}` : null]
+								{[s.talentBuild ? `${s.talentSpec} ${s.talentBuild}` : null, s.guild ? `<${s.guild}>` : null, s.faction, s.ruleset, s.lastLogin ? `last seen ${ago(s.lastLogin)}` : null]
 									.filter(Boolean)
 									.join(' · ')}
 							</p>
@@ -143,6 +146,7 @@
 			<Tabs.Root value="gear">
 				<Tabs.List class="flex-wrap">
 					<Tabs.Trigger value="gear">Gear & Guts</Tabs.Trigger>
+					<Tabs.Trigger value="talents">Talents</Tabs.Trigger>
 					<Tabs.Trigger value="progress">Progress</Tabs.Trigger>
 					<Tabs.Trigger value="prof">Professions</Tabs.Trigger>
 					<Tabs.Trigger value="all">Every Stat Ever</Tabs.Trigger>
@@ -186,6 +190,25 @@
 							<Locked what="their pathetic stats" />
 						{/if}
 					</section>
+				</Tabs.Content>
+
+				<!-- talents -->
+				<Tabs.Content value="talents" class="mt-4 space-y-3">
+					{#if talentTrees == null}
+						<Locked what="their talent choices (questionable, we assume)" />
+					{:else if !talentTrees.some((t) => t.spent)}
+						<p class="wow-frame rounded-lg p-8 text-center text-muted-foreground italic">
+							No talent points spent. Either under level 10 or saving them for a special occasion.
+						</p>
+					{:else}
+						<p class="text-sm text-muted-foreground">
+							Build <span class="font-semibold text-foreground">{s.talentBuild ?? talentTrees.map((t) => t.spent).join('/')}</span>
+							· mostly <span class="text-primary">{topTree?.name}</span>. Hover a talent for what it does. Gold = maxed.
+						</p>
+						<div class="grid gap-4 lg:grid-cols-3">
+							{#each talentTrees as tree (tree.id)}<TalentTree {tree} top={tree.id === topTree?.id} />{/each}
+						</div>
+					{/if}
 				</Tabs.Content>
 
 				<!-- progress -->

@@ -28,7 +28,10 @@ export const summaryFields = {
 	quests: v.number(),
 	honorableKills: v.number(),
 	/** zabavni števci za lestvice (hrana, smrti zaradi padca ...) */
-	counters: v.optional(v.record(v.string(), v.number()))
+	counters: v.optional(v.record(v.string(), v.number())),
+	/** talenti: "5/22/0" in drevo z največ točkami (vidnost: polje 'talents') */
+	talentBuild: v.optional(v.string()),
+	talentSpec: v.optional(v.string())
 };
 
 /** Veliki podatki za stran lika. */
@@ -38,7 +41,8 @@ export const detailFields = {
 	stats: v.any(), // Stats | null
 	professions: v.any(), // Profession[]
 	counters: v.record(v.string(), v.number()),
-	allStats: v.any() // StatLine[]
+	allStats: v.any(), // StatLine[]
+	talents: v.optional(v.any()) // TalentTree[] (glej lib/normalize.ts)
 };
 
 export default defineSchema({
@@ -157,6 +161,19 @@ export default defineSchema({
 		guildId: v.optional(v.string()),
 		updatedAt: v.number()
 	}).index('by_key', ['key']),
+
+	// Trajni predpomnilnik talentov (največji rang + ikona) – en Blizzard klic na talent za vedno.
+	talentInfo: defineTable({
+		talentId: v.number(),
+		maxRank: v.number(),
+		icon: v.union(v.string(), v.null())
+	}).index('by_talent', ['talentId']),
+
+	// Drevesa talentov po razredih (vrstni red + imena, tudi drevesa brez točk).
+	classSpecs: defineTable({
+		classId: v.number(),
+		specs: v.array(v.object({ id: v.number(), name: v.string() }))
+	}).index('by_class', ['classId']),
 
 	// Trajni predpomnilnik ikon predmetov.
 	itemIcons: defineTable({

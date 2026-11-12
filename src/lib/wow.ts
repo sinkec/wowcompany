@@ -125,6 +125,7 @@ export const FIELD_LABELS: Record<string, string> = {
 	quests: 'Quests',
 	honorableKills: 'Honorable kills',
 	counters: 'Fun counters (food, falls, hearth…)',
+	talents: 'Talent build',
 	equipment: 'Gear & tooltips',
 	stats: 'Character stats',
 	professions: 'Professions',

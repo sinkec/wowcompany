@@ -25,6 +25,8 @@ export type BotSummary = {
 	quests: number;
 	honorableKills: number;
 	counters?: Record<string, number>;
+	talentBuild?: string;
+	talentSpec?: string;
 };
 export type BotDetails = {
 	render?: string;
@@ -32,6 +34,7 @@ export type BotDetails = {
 	stats?: Record<string, number | string> | null;
 	professions?: { name: string; primary: boolean; skill: number; max: number }[];
 	allStats?: unknown[];
+	talents?: { name: string; spent: number; talents: { name: string; rank: number; maxRank: number | null }[] }[];
 };
 /** Prvi zapis zgodovine + število vseh sprememb. */
 export type BotHistory = { firstAt: number; firstLevel: number; changes: number };
@@ -96,6 +99,15 @@ export function heroEmbed(s: BotSummary, d: BotDetails | null, history: BotHisto
 	if (ok('achievementPoints')) inline('Cheevos', `${fmt(s.achievementPoints)} pts`);
 	if (ok('experience')) inline('XP', fmt(s.experience));
 	if (ok('lastLogin') && s.lastLogin) inline('Last seen', ts(s.lastLogin));
+
+	if (ok('talents') && s.talentBuild) {
+		const top = [...(d?.talents ?? [])].sort((a, b) => b.spent - a.spent)[0];
+		const picks = (top?.talents ?? [])
+			.slice(0, 5)
+			.map((t) => `${t.name} ${t.rank}${t.maxRank ? `/${t.maxRank}` : ''}`)
+			.join(' · ');
+		out.push({ name: 'Talents', value: `**${s.talentSpec ?? '?'}** ${s.talentBuild}${picks ? `\n${picks}` : ''}` });
+	}
 
 	if (ok('professions') && d?.professions?.length)
 		out.push({ name: 'Day jobs', value: d.professions.map((p) => `${p.name} **${p.skill}**/${p.max}`).join('\n') });

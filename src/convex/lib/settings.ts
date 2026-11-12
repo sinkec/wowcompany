@@ -31,7 +31,8 @@ export const ALL_SUMMARY_FIELDS = [
 	'deaths',
 	'quests',
 	'honorableKills',
-	'counters'
+	'counters',
+	'talents'
 ];
 
 /** Sekcije strani lika, ki so lahko javne. */

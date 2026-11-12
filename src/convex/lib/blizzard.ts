@@ -74,6 +74,7 @@ export type RawCharacter = {
 	professions?: any;
 	pvp?: any;
 	achievementStats?: any;
+	specializations?: any;
 };
 
 const SUBS = [
@@ -82,7 +83,8 @@ const SUBS = [
 	['media', 'character-media'],
 	['professions', 'professions'],
 	['pvp', 'pvp-summary'],
-	['achievementStats', 'achievements/statistics']
+	['achievementStats', 'achievements/statistics'],
+	['specializations', 'specializations']
 ] as const;
 
 /** Pod-endpointi lika (vzporedno). Napake posameznih se ignorirajo – Forever API je nepopoln. */
@@ -106,6 +108,25 @@ export async function itemIcon(itemId: number): Promise<string | null> {
 	if (r.status !== 200) return null;
 	const a = (r.body.assets ?? []).find((x: any) => x.key === 'icon');
 	return a?.value ?? null;
+}
+
+/** Največji rang talenta + ikona njegovega uroka (shrani se za vedno). */
+export async function talentInfo(talentId: number, spellId: number | null): Promise<{ maxRank: number; icon: string | null }> {
+	const t = await get(['data', 'wow', 'talent', String(talentId)], staticNs());
+	const maxRank = t.status === 200 ? (t.body.rank_descriptions?.length ?? 1) : 1;
+	let icon: string | null = null;
+	if (spellId) {
+		const m = await get(['data', 'wow', 'media', 'spell', String(spellId)], staticNs());
+		if (m.status === 200) icon = (m.body.assets ?? []).find((a: any) => a.key === 'icon')?.value ?? null;
+	}
+	return { maxRank, icon };
+}
+
+/** Drevesa talentov razreda v pravilnem vrstnem redu (npr. Affliction, Demonology, Destruction). */
+export async function classSpecs(classId: number): Promise<{ id: number; name: string }[] | null> {
+	const r = await get(['data', 'wow', 'playable-class', String(classId)], staticNs());
+	if (r.status !== 200) return null;
+	return (r.body.specializations ?? []).map((s: any) => ({ id: Number(s.id), name: String(s.name) }));
 }
 
 /** Izvede `fn` nad elementi z omejeno sočasnostjo. */

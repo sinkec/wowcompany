@@ -12,7 +12,7 @@ export const QUALITY_EMOJI: Record<string, string> = {
 /** Polja, ki se lahko pokažejo v objavi seje (ostala delujejo samo v slash ukazih). */
 export const POST_FIELDS = [
 	'lastLogin', 'level', 'classId', 'className', 'race', 'faction', 'guild', 'avatar', 'ilvlEquipped', 'ilvlAverage',
-	'achievementPoints', 'kills', 'deaths', 'quests', 'honorableKills', 'counters', 'equipment', 'professions'
+	'achievementPoints', 'kills', 'deaths', 'quests', 'honorableKills', 'counters', 'equipment', 'professions', 'talents'
 ];
 
 /** Števci, ki imajo že svoje polje (ne ponavljamo jih med "shenanigans"). */
@@ -40,6 +40,8 @@ export type Payload = {
 	achievementPoints?: number;
 	counters?: Record<string, number>;
 	professions?: { name: string; from: number; to: number; max: number }[];
+	talentBuild?: { from: string; to: string };
+	talentSpec?: string | null;
 };
 
 /** Payload po Discord vidnosti: skrito = null (ne 0, da šale ne lažejo, npr. "didn't die once"). */
@@ -62,6 +64,8 @@ export type Shown = {
 	achievementPoints: number | null;
 	counters: Record<string, number> | null;
 	professions: NonNullable<Payload['professions']> | null;
+	talentBuild: { from: string; to: string } | null;
+	talentSpec: string | null;
 };
 
 export function filterPayload(p: Payload, fields: string[]): Shown {
@@ -85,7 +89,9 @@ export function filterPayload(p: Payload, fields: string[]): Shown {
 		ilvlAverage: pick('ilvlAverage', p.ilvlAverage),
 		achievementPoints: pick('achievementPoints', p.achievementPoints),
 		counters: pick('counters', p.counters),
-		professions: pick('professions', p.professions)
+		professions: pick('professions', p.professions),
+		talentBuild: pick('talents', p.talentBuild),
+		talentSpec: pick('talents', p.talentSpec ?? undefined)
 	};
 }
 
@@ -116,6 +122,11 @@ export function sessionEmbed(e: { id: string; at: number; slug: string | null; p
 		fields.push({
 			name: 'Day jobs',
 			value: p.professions.map((x) => `${x.name} ${x.from} → **${x.to}**${x.max ? `/${x.max}` : ''}`).join('\n')
+		});
+	if (p.talentBuild)
+		fields.push({
+			name: 'Respec',
+			value: `${p.talentBuild.from} → **${p.talentBuild.to}**${p.talentSpec ? ` (${p.talentSpec})` : ''} — *commitment issues*`
 		});
 	const shenanigans = Object.entries(p.counters ?? {})
 		.filter(([k, v]) => v > 0 && !COUNTERS_WITH_OWN_FIELD.has(k))
@@ -162,5 +173,7 @@ export const SAMPLE_PAYLOAD: Payload = {
 	ilvlAverage: { from: 32, to: 35 },
 	achievementPoints: 10,
 	counters: { food: 4, drinks: 9, falling_deaths: 1, hearthed: 2 },
-	professions: [{ name: 'Tailoring', from: 57, to: 63, max: 150 }]
+	professions: [{ name: 'Tailoring', from: 57, to: 63, max: 150 }],
+	talentBuild: { from: '5/22/0', to: '0/0/27' },
+	talentSpec: 'Destruction'
 };

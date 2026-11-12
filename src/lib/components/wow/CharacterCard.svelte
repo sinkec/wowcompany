@@ -37,6 +37,7 @@
 			<div class="truncate font-display text-lg font-semibold" style="color: var(--cc)">{c.displayName}</div>
 			{#if s}
 				<div class="truncate text-sm text-muted-foreground">{s.race ?? ''} {s.className ?? ''}</div>
+				{#if s.talentBuild}<div class="truncate text-xs text-primary/90">{s.talentSpec} · {s.talentBuild}</div>{/if}
 				{#if s.guild}<div class="truncate text-xs text-muted-foreground/80">&lt;{s.guild}&gt;</div>{/if}
 			{:else}
 				<div class="text-sm text-muted-foreground italic">awaiting Blizzard's blessing…</div>

@@ -44,7 +44,8 @@ export const recent = query({
 				deaths: allowed('deaths') ? (p.deaths ?? 0) : null,
 				quests: allowed('quests') ? (p.quests ?? 0) : null,
 				honorableKills: allowed('honorableKills') ? (p.honorableKills ?? 0) : null,
-				newItems: allowed('equipment') ? (p.newItems ?? []) : []
+				newItems: allowed('equipment') ? (p.newItems ?? []) : [],
+				talentBuild: allowed('talents') ? (p.talentBuild ?? null) : null
 			});
 			if (out.length >= n) break;
 		}

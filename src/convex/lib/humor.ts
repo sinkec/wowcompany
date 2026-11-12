@@ -11,6 +11,7 @@ export type SessionLike = {
 	achievementPoints?: number | null;
 	counters?: Record<string, number> | null;
 	professions?: unknown[] | null;
+	talentBuild?: { from: string; to: string } | null;
 };
 
 const pick = <T>(arr: T[], seed: number) => arr[Math.abs(seed) % arr.length];
@@ -63,6 +64,7 @@ export function isNewsworthy(e: SessionLike): boolean {
 		(e.achievementPoints ?? 0) > 0 ||
 		(e.newItems?.length ?? 0) > 0 ||
 		(e.professions?.length ?? 0) > 0 ||
+		!!e.talentBuild ||
 		Object.values(e.counters ?? {}).some((v) => v > 0)
 	);
 }

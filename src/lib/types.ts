@@ -21,3 +21,5 @@ export type Item = {
 };
 export type Profession = { name: string; primary: boolean; skill: number; max: number };
 export type StatLine = { category: string; name: string; value: number };
+export type Talent = { id: number; name: string; rank: number; maxRank: number | null; icon: string | null; description: string };
+export type TalentTree = { id: number; name: string; spent: number; talents: Talent[] };

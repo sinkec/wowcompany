@@ -28,7 +28,8 @@ const EXPECT: Record<string, string> = {
 	honorableKills: 'HKs',
 	counters: 'Lost fights with gravity',
 	equipment: 'Pants of Questionable Origin',
-	professions: 'Tailoring 57 → **63**'
+	professions: 'Tailoring 57 → **63**',
+	talents: 'Respec'
 };
 
 describe('Discord objava sledi stikalom', () => {
