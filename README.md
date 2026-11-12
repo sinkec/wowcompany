@@ -4,7 +4,7 @@ Tracks a group of friends' **WoW Forever** heroes (EU): levels, gear, stats and 
 Web: SvelteKit 3 + Tailwind + shadcn-svelte on Vercel · Backend: Convex (DB, cron, actions) ·
 Auth: Better Auth + Google · Discord: webhook posts + HTTP slash commands · Data: Battle.net API.
 
-See [PLAN.md](PLAN.md) for architecture, free-tier budget and phases.
+See [PLAN.md](PLAN.md) – section 0 is the current status and how to continue; the rest covers architecture, free-tier budget and phases.
 
 ## Local development
 
@@ -25,9 +25,11 @@ bun run env:push -- --prod # production (uses *_PROD overrides, e.g. SITE_URL_PR
 
 ```bash
 bun run check              # svelte-check + types
-bun run test               # unit tests (Discord visibility)
+bun run test               # unit tests (Discord posts + slash commands visibility)
 bun run check:visibility   # public/private filtering against the dev deployment
 ```
+
+Discord commands: `bun run discord:register` (or **Register commands** in Portal Room).
 
 ## Deploy
 

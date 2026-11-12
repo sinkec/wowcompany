@@ -6,6 +6,45 @@ Vse mora delovati znotraj **brezplačnih paketov**.
 
 ---
 
+## 0. Stanje projekta (13. 11. 2026) – kje nadaljujemo
+
+**V produkciji in deluje:** https://wowcompany.vercel.app · GitHub `sinkec/wowcompany` (zaseben) · Convex projekt `wowcompany` (dev + prod).
+
+| Področje | Stanje |
+|---|---|
+| Poller (Convex cron 1 min, If-Modified-Since → 304) | ✅ prod teče · **dev poller je USTAVLJEN** (da Discord objave niso podvojene; za razvoj vklopi v dev adminu → Settings) |
+| Spletna stran (EN, WoW slog, šaljiv/črn humor) | ✅ seznam, lestvice (Glory / This Week / Hall of Shame), stran lika (Gear & Guts, **Talents**, Progress, Professions, Every Stat Ever), Tavern Gossip feed |
+| Prijava (Better Auth + Google) | ✅ prvi prijavljeni = admin (prod admin = lastnik) · Google aplikacija je še v **Testing** (odprto: *Publish app*, priporočilo **brez logotipa**, ker logotip sproži brand verification) |
+| Prošnje + admin "Guild Master's Office" | ✅ Petitions, Heroes, Visibility (Website + Discord, select/deselect all), Settings & Budget, **Portal Room**, Members |
+| Discord objave (webhook) | ✅ povzetek seje ob odjavi (identiteta, level, ilvl, best ilvl, kills, deaths, errands, HKs, cheevos, day jobs, shenanigans, respec, loot); prazne seje se preskočijo |
+| Discord slash ukazi (HTTP interactions) | ✅ `/roster`, `/hero` (autocomplete), `/leaderboard` (15 lestvic) |
+| Discord nastavitve prek spleta | ✅ Portal Room: webhook URL + bot token (write-only, tabela `secrets`), App ID / Public Key / Server ID samodejno; env samo rezerva (prod ima trenutno še env vrednosti) |
+| Talenti | ✅ drevesa, rangi x/max, ikone, build "5/22/0", respec v objavah, polje vidnosti `talents` |
+| Ikona, Privacy, Terms | ✅ `static/icon.svg` (+ `icon-120.png` za Google, `icon-512.png` za Discord avatar), `/privacy`, `/terms` |
+
+**Naslednji koraki (predlogi):**
+1. Google Auth Platform → Branding izpolniti (home `/`, `/privacy`, `/terms`, authorized domain `wowcompany.vercel.app`) → Audience → **Publish app** (brez logotipa).
+2. Po ~1 tednu: Convex dashboard → Usage (primerjaj z razdelkom 8) in izmeri zakasnitev Blizzarda po odjavi.
+3. Opcijsko: Blizzard ključi nastavljivi prek Portal Room (kot Discord); Discord bot avatar = `static/icon-512.png`; bot viden med člani (`bot` scope brez pravic).
+
+**Upravljanje (ukazi):**
+```bash
+bunx convex dev                     # dev funkcije (pusti teči); za CLI: export CONVEX_TMPDIR=$PWD/node_modules/.convex-tmp
+bun run dev                         # http://localhost:5173
+bun run check                       # tipi (svelte-check)
+bun run test                        # 53 enotskih testov (Discord objave + slash ukazi po vidnosti)
+bun run check:visibility            # ~1500 preverjanj javno/zasebno na dev deploymentu
+bun run env:push [-- --prod]        # .env -> Convex env (vrednosti *_PROD za produkcijo)
+bun run discord:register            # registracija slash ukazov iz .env (ali gumb v Portal Room)
+bunx convex run [--prod] admin:refetchAll && bunx convex run [--prod] poll:run '{"force":true}'   # ponovni prenos vseh likov
+bunx convex run [--prod] players:addByName '{"name":"Ime Priimek"}'                              # ročno dodajanje
+git push origin main                # Vercel samodejno: convex deploy (prod) + build
+```
+
+**Pomembne odločitve:** UI v angleščini, odgovori v slovenščini · ilvl samo od Blizzarda (brez lastnih izračunov) · Bun · Convex inicializiran v `src/hooks.ts` (SvelteKit 3 način) namesto `setupConvex()` · slash ukazi angleški · interakcije: SvelteKit pot posreduje Convex HTTP akciji (podpis + interne poizvedbe) · poizvedbe ne berejo ure (`since` pošlje brskalnik).
+
+---
+
 ## 1. Kaj sistem zna (in česa ne)
 
 | Dogodek                                                    | Ali ga zaznamo?                    | Zakasnitev                          |
@@ -103,7 +142,7 @@ Filtriranje se izvaja **v Convex poizvedbah na strežniku**, nikoli v brskalniku
 
 ---
 
-## 6. Convex shema (osnutek)
+## 6. Convex shema
 
 | Tabela                     | Namen                      | Ključna polja                                                                                           |
 | -------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -120,7 +159,7 @@ Filtriranje se izvaja **v Convex poizvedbah na strežniku**, nikoli v brskalniku
 | `itemIcons`                | trajni predpomnilnik ikon  | `itemId`, `url`                                                                                         |
 | `guildRoster`              | en dokument, 1× na dan     | `fetchedAt`, `members[]`                                                                                |
 
-**Javnost:** vsako polje statistike ima ključ (npr. `level`, `equipment`, `deaths`). V `settings.publicFields` admin označi, katera so javna. Poizvedbe za obiskovalce vrnejo samo ta polja.
+**Javnost:** vsako polje ima ključ (npr. `level`, `equipment`, `deaths`, `talents`). V `settings.publicFields` admin označi, kaj vidijo obiskovalci na spletu, v `settings.discordFields` pa, kaj gre v Discord. Ime, priimek in povezava so vedno javni. Feed (Tavern Gossip) je javen samo, če je `lastLogin` javen (razkrije čas odjave); v Discordu je `lastLogin` glavno stikalo za objave.
 
 ---
 
