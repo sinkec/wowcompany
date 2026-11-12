@@ -128,7 +128,7 @@ Filtriranje se izvaja **v Convex poizvedbah na strežniku**, nikoli v brskalniku
 
 - **Objave ob spremembah:** Convex akcija → webhook. Povzetek seje ob odjavi, level up, nov epic/rare predmet, mejniki (npr. 1000 ubitih).
 - **Slash ukazi** (HTTP Interactions, brez websocket bota): `/roster`, `/hero name`, `/leaderboard category`.
-  - Pot `/api/discord/interactions` v SvelteKitu preveri Ed25519 podpis z Discord public key; neveljavno → 401.
+  - Pot `/api/discord/interactions` v SvelteKitu posreduje zahtevo Convex HTTP akciji `/discord/interactions`, ki preveri Ed25519 podpis (tweetnacl) in odgovori iz internih poizvedb; neveljavno → 401. Zasebni podatki tako nikoli ne gredo skozi javno poizvedbo.
   - Odgovor v 3 s; če ne gre, odloženi odgovor (type 5) in nato dopolnitev prek webhooka interakcije.
 - Registracija ukazov: bun skripta, ki jih pošlje v Discord API (guild ukazi, takoj vidni).
 
@@ -208,18 +208,18 @@ Po prvem tednu primerjaj ocene z Convex nadzorno ploščo; interval je nastavlji
 
 ### Faza 8 – Discord slash ukazi
 
-- [ ] `/api/discord/interactions` s preverjanjem podpisa
-- [ ] `/roster`, `/hero`, `/leaderboard`; skripta za registracijo ukazov
+- [x] `/api/discord/interactions` s preverjanjem podpisa
+- [x] `/roster`, `/hero`, `/leaderboard`; skripta za registracijo ukazov
 
 ### Faza 9 – Objava
 
 - [x] Convex production deployment + env
 - [x] Vercel projekt iz GitHuba + env
-- [ ] Discord Interactions Endpoint URL → Vercel
+- [x] Discord Interactions Endpoint URL → Vercel
 
 ### Faza 10 – Preizkus
 
-- [ ] Javni pogled brez prijave, prijava, zahteva → accept, slash ukaz, objava ob odjavi
+- [x] Javni pogled brez prijave, prijava, zahteva → accept, slash ukaz, objava ob odjavi
 - [ ] Poraba v Convex nadzorni plošči po 1 tednu
 
 ---
