@@ -240,7 +240,7 @@
 						events={feed.data ?? []}
 						showTitle={false}
 						locked={!allowed('lastLogin')}
-						class="max-h-[28rem] min-h-0 flex-1 overflow-y-auto overscroll-contain lg:max-h-none"
+						class="wow-scroll max-h-[28rem] min-h-0 flex-1 overflow-y-auto overscroll-contain lg:max-h-none"
 					/>
 				</div>
 			</aside>

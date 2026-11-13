@@ -12,6 +12,7 @@
 		class: klass = ''
 	}: { events: FeedEvent[]; title?: string; showTitle?: boolean; locked?: boolean; class?: string } = $props();
 
+	const plural = (n: number, word: string) => `${fmt(n)} ${word}${n === 1 ? '' : 's'}`;
 	const headline = (e: FeedEvent) => sessionHeadline(e, [...e.id].reduce((a, c) => a + c.charCodeAt(0), 0));
 </script>
 
@@ -39,9 +40,9 @@
 						</p>
 						<p class="text-xs text-muted-foreground">
 							{ago(e.at)}
-							{#if e.kills}· {fmt(e.kills)} kills{/if}
-							{#if e.quests}· {fmt(e.quests)} quests{/if}
-							{#if e.deaths}· {fmt(e.deaths)} deaths{/if}
+							{#if e.kills}· {plural(e.kills, 'kill')}{/if}
+							{#if e.quests}· {plural(e.quests, 'quest')}{/if}
+							{#if e.deaths}· {plural(e.deaths, 'death')}{/if}
 						</p>
 						{#if e.newItems.length}
 							<p class="mt-0.5 text-xs">

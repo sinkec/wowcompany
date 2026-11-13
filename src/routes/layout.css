@@ -126,3 +126,32 @@
 		border: 1px solid oklch(0.75 0.02 260 / 60%);
 	}
 }
+
+/* Drsnik v WoW slogu (Tavern Gossip in druga drsna območja). */
+@layer components {
+	.wow-scroll {
+		scrollbar-width: thin; /* Firefox + Chromium 121+ */
+		scrollbar-color: oklch(0.7 0.12 85 / 70%) oklch(0.14 0.01 60 / 60%);
+		scrollbar-gutter: stable;
+	}
+	/* Safari in starejši Chromium */
+	.wow-scroll::-webkit-scrollbar {
+		width: 10px;
+	}
+	.wow-scroll::-webkit-scrollbar-track {
+		background: oklch(0.14 0.01 60 / 60%);
+		border-left: 1px solid oklch(0.55 0.08 80 / 25%);
+		border-radius: 0 0.5rem 0.5rem 0;
+	}
+	.wow-scroll::-webkit-scrollbar-thumb {
+		background: linear-gradient(180deg, #ffe9a3, #e3b04b 45%, #9a6a1f);
+		border: 2px solid oklch(0.14 0.01 60);
+		border-radius: 999px;
+	}
+	.wow-scroll::-webkit-scrollbar-thumb:hover {
+		background: linear-gradient(180deg, #fff3c9, #f0c25e 45%, #b07a24);
+	}
+	.wow-scroll::-webkit-scrollbar-corner {
+		background: transparent;
+	}
+}
