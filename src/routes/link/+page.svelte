@@ -9,6 +9,7 @@
 	import { authClient } from '#lib/auth-client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import DevicesList from '#lib/components/wow/DevicesList.svelte';
+	import GetApp from '#lib/components/wow/GetApp.svelte';
 
 	const auth = useAuth();
 	const client = useConvexClient();
@@ -45,7 +46,7 @@
 	}
 </script>
 
-<svelte:head><title>Link Companion — WowCompany</title></svelte:head>
+<svelte:head><title>Companion App — WowCompany</title></svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-8">
 	<section class="space-y-2">
@@ -55,6 +56,9 @@
 			Link it to your account here. Members only — strangers can watch their own deaths in private.
 		</p>
 	</section>
+
+	<!-- pri povezovanju (koda v URL-ju) je prenos odveč – aplikacija že teče -->
+	{#if !code}<GetApp />{/if}
 
 	{#if auth.isLoading}
 		<div class="h-40 animate-pulse rounded-lg bg-muted"></div>

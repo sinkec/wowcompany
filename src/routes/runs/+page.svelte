@@ -23,7 +23,8 @@
 				whoever was snitching, judged by everyone. Click a run for the full autopsy.
 			</p>
 		</div>
-		<a href="/link" class="shrink-0 text-sm text-primary hover:underline">Get the Companion app →</a
+		<a href="/link#download" class="shrink-0 text-sm text-primary hover:underline"
+			>Get the Companion app →</a
 		>
 	</section>
 

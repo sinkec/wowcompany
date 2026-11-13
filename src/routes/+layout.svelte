@@ -7,8 +7,8 @@
 	import Swords from '@lucide/svelte/icons/swords';
 	import Users from '@lucide/svelte/icons/users';
 	import UserMenu from '#lib/components/wow/UserMenu.svelte';
+	import { GITHUB_URL } from '#lib/site.js';
 
-	const GITHUB_URL = 'https://github.com/sinkec/wowcompany';
 	const NAV = [
 		{
 			href: '/',

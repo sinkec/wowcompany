@@ -1,0 +1,76 @@
+# WowCompany Companion: Windows + Linux build → GitHub Release (COMPANION.md §11).
+# Sprožilec: oznaka `companion-vX.Y.Z` (verzija mora biti enaka kot v desktop/src-tauri/tauri.conf.json)
+#   git tag companion-v0.1.0 && git push origin companion-v0.1.0
+name: Companion release
+
+on:
+  push:
+    tags: ['companion-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: companion-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: --bundles nsis
+          - platform: ubuntu-22.04
+            args: --bundles appimage,deb
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev libssl-dev patchelf
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: '. -> target'
+          key: companion
+
+      - name: Install frontend dependencies
+        working-directory: desktop
+        run: bun install --frozen-lockfile
+
+      - name: Test parser + run detector
+        if: runner.os == 'Linux'
+        run: cargo test -p wowlog -p wowrun
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          tauriScript: bunx tauri
+          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: 'WowCompany Companion v__VERSION__'
+          releaseBody: |
+            Dungeon run tracker for WowCompany. Reads your WoW combat log, uploads party stats to the portal.
+
+            **Windows:** download `WowCompany-Companion_*_windows_x64-setup.exe`. Windows SmartScreen will whine
+            ("unknown publisher") – click *More info → Run anyway*. We're friends, not a corporation.
+            **Linux:** `.AppImage` (chmod +x and run) or `.deb` (`sudo apt install ./file.deb`).
+
+            In game: type `/combatlog` every session. Then link the app on https://wowcompany.vercel.app/link
+          releaseDraft: false
+          prerelease: false
+          releaseAssetNamePattern: 'WowCompany-Companion_[version]_[platform]_[arch][setup][ext]'
+          uploadWorkflowArtifacts: ${{ github.ref_type != 'tag' }}

@@ -370,7 +370,9 @@
 									uploads your shame.
 								</p>
 							</div>
-							<a href="/link" class="text-sm text-primary hover:underline">How to link the app →</a>
+							<a href="/link#download" class="text-sm text-primary hover:underline"
+								>Download & link the app →</a
+							>
 						</div>
 						<DevicesList />
 					</section>
