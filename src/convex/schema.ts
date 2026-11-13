@@ -1,8 +1,25 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import {
+	award,
+	death,
+	endReason,
+	linkStatus,
+	partyMember,
+	playerSummary,
+	recorder,
+	runResult,
+	segment,
+	timeline,
+	zone
+} from './lib/companionSchema.js';
 
 export const roleValidator = v.union(v.literal('admin'), v.literal('member'));
-export const claimStatus = v.union(v.literal('pending'), v.literal('accepted'), v.literal('rejected'));
+export const claimStatus = v.union(
+	v.literal('pending'),
+	v.literal('accepted'),
+	v.literal('rejected')
+);
 
 /** Polja povzetka lika (normalizirano iz Blizzarda). */
 export const summaryFields = {
@@ -194,5 +211,75 @@ export default defineSchema({
 				classId: v.number()
 			})
 		)
-	}).index('by_key', ['key'])
+	}).index('by_key', ['key']),
+
+	// ---- WowCompany Companion (namizna aplikacija, glej COMPANION.md §7–8) ----
+
+	// Povezane naprave. Žeton naprave hranimo samo kot SHA-256 (hex).
+	devices: defineTable({
+		userId: v.string(),
+		name: v.string(),
+		tokenHash: v.string(),
+		appVersion: v.optional(v.string()),
+		createdAt: v.number(),
+		lastSeenAt: v.optional(v.number()),
+		revokedAt: v.optional(v.number())
+	})
+		.index('by_token_hash', ['tokenHash'])
+		.index('by_user', ['userId']),
+
+	// Kratkotrajne zahteve za povezavo (koda v brskalniku, aplikacija polla s skrivnim pollHash).
+	deviceLinks: defineTable({
+		code: v.string(),
+		pollHash: v.string(),
+		status: linkStatus,
+		deviceName: v.string(),
+		appVersion: v.optional(v.string()),
+		userId: v.optional(v.string()),
+		createdAt: v.number(),
+		expiresAt: v.number()
+	})
+		.index('by_code', ['code'])
+		.index('by_poll_hash', ['pollHash'])
+		.index('by_expires_at', ['expiresAt']),
+
+	// Dungeon runi: majhen dokument za sezname (podrobnosti v runDetails).
+	runs: defineTable({
+		runKey: v.string(),
+		schema: v.number(),
+		zone,
+		startedAt: v.number(),
+		endedAt: v.number(),
+		durationMs: v.number(),
+		endReason,
+		result: runResult,
+		party: v.array(partyMember),
+		recordedBy: v.array(recorder),
+		awards: v.array(award),
+		/** popolnost posnetka – ob združevanju obdržimo boljšega */
+		score: v.number(),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_run_key', ['runKey'])
+		.index('by_started_at', ['startedAt']),
+
+	// Analiza runa (en dokument na run, ~5–100 KB; bere se samo na strani runa).
+	runDetails: defineTable({
+		runId: v.id('runs'),
+		players: v.array(playerSummary),
+		segments: v.array(segment),
+		deaths: v.array(death),
+		timeline
+	}).index('by_run', ['runId']),
+
+	// Kdo je bil v runu (za zavihek Runs na strani junaka).
+	runParticipants: defineTable({
+		runId: v.id('runs'),
+		slug: v.string(),
+		playerId: v.optional(v.id('players')),
+		startedAt: v.number()
+	})
+		.index('by_run', ['runId'])
+		.index('by_slug_and_started_at', ['slug', 'startedAt'])
 });

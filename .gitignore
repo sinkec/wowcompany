@@ -23,5 +23,8 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 # vzorci combat logov (vsebujejo imena igralcev)
-wowlog/
-samples/
+/wowlog/
+/samples/
+
+# Rust (Companion)
+/target/

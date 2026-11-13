@@ -2,7 +2,7 @@
 
 > Samostojen dokument: vsebuje vse, kar je potrebno za nadaljevanje dela brez prejšnjega pogovora.
 > Povezan z [PLAN.md](PLAN.md) (portal: SvelteKit + Convex + Vercel, že v produkciji).
-> Datum: 13. 11. 2026 · Stanje: **načrt potrjen, koda še ni napisana**.
+> Datum: 13. 11. 2026 · Stanje: **C1–C4 končane** (parser, detektor+analizator, Convex API + /link, Tauri aplikacija za Linux), naslednja C5 (portal Dungeon Runs).
 
 ---
 
@@ -65,6 +65,25 @@ Vzorec: `wowlog/WoWCombatLog-111326_173926.txt` (2,1 MB, 9.726 vrstic, 15 min v 
 - Imena igralcev: `Ime-Priimek-PvP-EU` → neposredno se ujema s portalskim `slug` (`ime-priimek`).
 - GUID: `Player-<server>-<hex>`, `Creature-0-…-<npcId>-…`.
 - Zastavice (unit flags): `0x511` = jaz, `0x518` = zunanji igralec. Party/raid zastavice (`0x512`/`0x514`) v vzorcu **ni** (ni bilo skupine).
+- **Postavitev polj (preverjeno s parserjem, vseh 9.726 vrstic brez napake):**
+  - Osnova vsake enotske vrstice: `source GUID, "ime", flags, raidFlags, dest GUID, "ime", flags, raidFlags` (+ urok `id, "ime", šola` pri `SPELL_*`/`RANGE_*`).
+  - **Napredni blok = 19 polj:** infoGUID, ownerGUID, curHP, maxHP, AP, SP, armor, absorb, **?, ?** (vedno 0), powerType, curPower, maxPower, powerCost, X, Y, uiMapID, facing, level
+    (pri igralcih verjetno ilvl). Kateri enoti pripada, pove `infoGUID`: pri `SPELL_DAMAGE`/`RANGE`/`PERIODIC` in `SWING_DAMAGE_LANDED` je to **cilj**, pri `SWING_DAMAGE`/`SPELL_HEAL`/`CAST_SUCCESS` **izvor**.
+  - Damage suffix: `amount, baseAmount, overkill(-1 = ni), school, resisted, blocked, absorbed, crit, glancing, crushing` + pri urokih `ST`/`AOE`.
+    `baseAmount` = pred zmanjšanjem (oklep, crit). Za DPS štejemo `amount`.
+  - Heal: `amount, baseAmount, overheal, absorbed, crit`. Energize: `amount, over, powerType, maxPower`. Miss: `tip, offHand[, amount][, ST]`.
+  - `ENVIRONMENTAL_DAMAGE`: napredni blok, nato tip (`Falling`, `Fire`, `Lava` …), nato damage suffix.
+  - `SWING_DAMAGE_LANDED` je **dodatna** kopija swinga z vidika cilja (35 vs 62 v vzorcu – ni 1:1) → v DPS se ne šteje.
+  - Zastavica `0x1118` = ljubljenček tujega igralca (pet + outsider); `0x1111`/`0x1112` bi bil moj/party pet.
+- **Daljši pravi log (13. 11. 2026, 106 min, 46.356 vrstic, brez dungeona) – preverjeno s parserjem, 0 slabih vrstic:**
+  - `/console advancedCombatLogging 1` → glava `ADVANCED_LOG_ENABLED,1`; `/reload` **ne** ustvari nove datoteke (v isto datoteko se zapiše nova glava `COMBAT_LOG_VERSION`).
+  - `ZONE_CHANGE` v odprtem svetu nosi ID kontinenta (`0` Eastern Kingdoms, `1` Kalimdor) + ime cone; vsak prehod cone ga zapiše.
+  - `SPELL_ABSORBED`: 19 polj (melee) / 22 polj (z napadalnim urokom) – ustreza parserju.
+  - `SPELL_AURA_BROKEN_SPELL`: šola drugega uroka je **decimalna** (`64`), ne hex – parser popravljen.
+  - Prisotni še: `DAMAGE_SHIELD` (z `AOE`), `SPELL_CAST_FAILED` (z razlogom), `SPELL_DRAIN`, `SPELL_CREATE`, `SPELL_EXTRA_ATTACKS`.
+- **Mapa Logs na Linuxu (preverjeno):** Battle.net kot non-Steam igra v Steamu (Proton):
+  `~/.steam/debian-installation/steamapps/compatdata/<id>/pfx/drive_c/Program Files (x86)/World of Warcraft/_forever_/Logs`
+  (`~/.steam/root` je povezava nanjo). Flavor mapa za Forever je **`_forever_`**.
 - **Še ni preverjeno** (potreben vzorec iz dungeona s partyjem):
   `ENCOUNTER_START/END` (boss segmenti), `ZONE_CHANGE` ob vstopu v instanco (instance ID/tip), party zastavice,
   `COMBATANT_INFO` (oprema/talenti ob pullu – zahteva `/console advancedCombatLogging 1`), `SPELL_ABSORBED`, `SPELL_INTERRUPT`, `SPELL_DISPEL`.
@@ -193,6 +212,25 @@ Portal (SvelteKit na Vercelu): /runs, /runs/[id]  ·  Discord objava runa (faza 
 
 ---
 
+### 5.4 Izvedba (C4, 13. 11. 2026)
+- `desktop/` – Svelte 5 + Vite 8 + Tailwind 4 (brez SvelteKita), `desktop/src-tauri/` – Tauri 2.12 (član Cargo workspace), lib `companion_lib`.
+- Moduli: `settings.rs` (nastavitve JSON + žeton v datoteki **0600** – keyring kasneje), `locate.rs` (Steam/Proton vse knjižnice iz
+  `libraryfolders.vdf`, Flatpak/Snap Steam, Lutris `~/Games`, Bottles, `~/.wine`; Windows diski C–Z; `_forever_` ima prednost),
+  `tail.rs` (polling 0,5 s, delne vrstice, menjava/skrajšanje datoteke, ob zagonu ignorira loge starejše od 12 h, dokler se ne spremenijo),
+  `queue.rs` (SQLite `runs.sqlite`: pending/uploaded/failed, backoff 30 s → 1 h), `api.rs` (ureq 3 + rustls; 401/403 → ponovna povezava,
+  429/5xx/omrežje → ponovni poskus, drugi 4xx → "Rejected"), `engine.rs` (niti watcher/uploader/linker + `Pipeline`), `commands.rs`, `lib.rs` (tray, single-instance).
+- **Strežnik:** privzeto prod `https://laudable-crane-432.eu-west-1.convex.site`; povozi `WOWCOMPANY_API` (env ob zagonu ali buildu) ali Settings → Advanced.
+- **Čas:** `utc_offset_ms` iz lokalne časovne cone (chrono) ob zagonu cevovoda.
+- **Ponoven zagon:** log se prebere od začetka (run v teku se obnovi), že znani runi se po `runKey` ne podvojijo.
+- **Razvoj:** `cd desktop && bun install && bunx tauri dev`; build `bunx tauri build --debug --no-bundle`.
+  UI brez Tauri: `bun run dev` → `http://localhost:1420/mock.html?tab=live|runs|settings&linked=0&pending=1` (mockIPC, `src/mock.ts`).
+- **Testi:** `cargo test -p wowcompany-companion` (11) + E2E proti dev:
+  `WOWCOMPANY_API=<dev>.convex.site cargo test -p wowcompany-companion --test api_dev -- --ignored`.
+- **Preizkus prave aplikacije (dev):** samodejno najdena mapa Logs, branje pravega loga (46k vrstic), povezava naprave
+  (koda → odobritev → žeton 0600 → glavni zasloni), sintetični run → zaznan → zaprt zaradi neaktivnosti → naložen na dev.
+
+---
+
 ## 6. Zaznavanje runa in analitika
 
 ### 6.1 Run
@@ -200,6 +238,24 @@ Portal (SvelteKit na Vercelu): /runs, /runs/[id]  ·  Discord objava runa (faza 
 - **Konec:** izstop iz instance **ali** 10 min neaktivnosti **ali** ročno. Če je log zaprt med runom → run se zaključi ob zadnjem dogodku.
 - **runKey:** `hash(zoneId, zaokrožen začetek, urejen seznam GUID-ov partyja)` → idempotenca in združevanje.
 - **Segmenti:** boss (`ENCOUNTER_START/END`, če obstaja; sicer smrt znanega boss NPC-ja) in trash med njimi.
+
+### 6.1a Izvedba v `crates/wowrun` (C2, preverjeno samo na sintetičnih logih)
+- **Začetek runa** = prvi boj skupine (damage/miss med group enoto in ne-group enoto) po `ZONE_CHANGE` v dungeon iz tabele 3.1.
+  Rezervi za vstop: `MAP_CHANGE` z imenom dungeona, `ENCOUNTER_START` z instanceID.
+- **Corpse run:** izhod (`ZONE_CHANGE` drugam) run samo "parkira"; povratek v isti dungeon v **15 min** (`rejoin_grace_ms`) ga nadaljuje.
+- **Reset instance:** uid kopije instance iz GUID-a sovražnih NPC-jev (`Creature-0-server-instance-<uid>-npc-spawn`, peti/guardiani
+  izključeni). Če je po povratku uid drugačen → stari run `instanceReset`, začne se nov.
+- **Konec:** `leftInstance` (grace potekel), `newInstance`, `instanceReset`, `inactivity` (10 min brez boja; konec = zadnja aktivnost),
+  `endOfLog`, `manual`; `inProgress` = živi posnetek (`Detector::snapshot()` za meter v aplikaciji). `Detector::tick(now)` zapre run brez novih vrstic.
+- **Solo farmanje se zavrže:** run z manj kot `min_players` = 2 igralcema skupine se ne pošlje.
+- **runKey** (FNV-1a 64, hex): `instanceID | uid | lokalni dan` → enak za vse snemalce istega runa (strežnik združi); brez uid:
+  `instanceID | začetek/5 min | GUID-i skupine`.
+- **Peti:** lastnik iz `SPELL_SUMMON` ali `ownerGUID` v naprednem bloku; damage peta šteje lastniku (`SpellStat.pet = true`).
+- **Swingi:** `SWING_DAMAGE_LANDED` se šteje samo, če v 500 ms pred njim ni enakega `SWING_DAMAGE` (izvor+cilj+znesek).
+- **Zasebnost:** v povzetku samo igralci skupine; tuji igralci kot `"Stranger"` / `"Stranger's pet"` (ubijalec, recap).
+- **Čas:** `startedAt`/`endedAt` = UTC ms (lokalni čas loga − `utc_offset_ms`, ki ga poda aplikacija); odmiki v runu relativni na začetek.
+- **Shema za upload** (`schema: 1`, camelCase JSON) = `crates/wowrun/src/summary.rs` → osnova za Convex validator v C3.
+  Sintetični run s 5 segmenti ≈ 2–6 KB (pod oceno 50–300 KB iz razdelka 10).
 
 ### 6.2 Analiza (kaj se pošlje)
 - Na igralca: damage done/taken, healing done (+ overheal), DPS/HPS (aktivni čas), smrti, prekinitve, dispeli, top 10 urokov, crit %.
@@ -245,6 +301,27 @@ Omejitve Convexa: dokument ≤ 1 MiB, polja ≤ 1024, globina ≤ 16, array ≤ 
 - `POST /companion/runs` (gzip JSON, max ~2 MB) → validacija (verzija sheme, velikost, samo party), združevanje po `runKey`, zapis.
 - `POST /companion/live` (faza 2)
 - Vse s CORS izključenim (ni brskalniški API), rate limit po napravi.
+
+### 8.2a Izvedba (C3, 13. 11. 2026 – deployano na **dev**, prod ob naslednjem pushu)
+- Datoteke: `src/convex/companion.ts` (mutacije/poizvedbe), `companionHttp.ts` (HTTP), `lib/companion.ts` (čiste funkcije: `checkRun`,
+  `runScore`, `computeAwards`, kode), `lib/companionSchema.ts` (validatorji = `summary.rs`, `SCHEMA_VERSION = 1`), stran `src/routes/link/+page.svelte`.
+- **Tabele (sprememba glede na 8.1):** namesto `runPlayers` + `runSegments` je **en `runDetails` dokument na run** (players, segments, deaths,
+  timeline; 5–100 KB, meja 1 MiB) + `runParticipants` (slug → run, indeks `by_slug_and_started_at` za zavihek Runs na strani junaka).
+  `runs` je majhen (seznam): zone, čas, rezultat, party (slug, ime, playerId, dmg/heal/deaths), `recordedBy[]`, `awards[]`, `score`.
+- **Povezava:** `POST /companion/link/start {deviceName, appVersion?}` → `{code "MURLOC-4821", pollToken, linkUrl, expiresAt}` (10 min);
+  `POST /companion/link/poll {pollToken}` → `pending | approved {token "wcc_…", deviceId} | claimed | denied | expired | unknown`.
+  Žeton se vrne **samo enkrat**; v bazi sta samo SHA-256 žetona in poll skrivnosti. Odobritev na `/link?code=…` (samo član/admin), tam tudi **My devices** + Revoke.
+- **Upload:** `POST /companion/runs`, `Authorization: Bearer wcc_…`, telo = RunSummary (navaden JSON, **brez gzip**, max 2 MB).
+  Odgovori: 201 nov run, 200 obstoječ (`recorderAdded`, `replaced`), 400 (shema/validator/`checkRun` z razlogom), 401 neznan žeton,
+  403 preklicana naprava / ni več član, 429 + `Retry-After`. En upload = 1 HTTP akcija + 1 mutacija.
+- **Združevanje:** po `runKey`; snemalec se doda po napravi (idempotentno); če ima nov posnetek višji `runScore`
+  (trajanje + 10 min na ubitega bossa + segmenti), zamenja podrobnosti in party.
+- **Nagrade (strežnik):** Main Character, Floor Inspector, Pyromaniac, Bullet Sponge, Overhealer Supreme, Shut Up Button, Pacifist.
+- **Rate limit** (`@convex-dev/rate-limiter` 0.4.3): link/start 30/h za vse, poll 40/min na povezavo, upload 30/h (burst 10) na napravo.
+- **Cron:** `companion link cleanup` dnevno ob 4:30 (zahteve starejše od 1 dneva).
+- **CLI (interno):** `companion:approveLinkAs`, `companion:deleteRun`, `companion:deleteDevice`.
+- **Testi:** `bun test` (`tests/companion.test.ts`, 21 testov) + `bun run check:companion` = E2E na dev (26 preverjanj, za sabo pobriše).
+- **Še ni:** poizvedbe za portal (`/runs`) in vidnost (8.3) → C5; Discord objava → C7.
 
 ### 8.3 Vidnost
 - Nova polja vidnosti: `runs` (seznam runov), `runDetails` (meter/analiza), `runDeaths`. Ločeno za **Website** in **Discord** kot obstoječa stikala.
@@ -316,23 +393,29 @@ WowCompany/
 - [ ] Pot do mape `Logs` na Linuxu (Proton) in na Windows (če kdo igra na Windows)
 - [ ] Linux build odvisnosti (`sudo apt install …`, razdelek 5.1)
 
-### Faza C1 – Parser (`crates/wowlog`)
-- [ ] Parser vrstic + tipi dogodkov, napredni parametri
-- [ ] Testi na `wowlog/` vzorcih (število dogodkov, damage vsote, smrti)
-- [ ] CLI `wowlog-dump` za razvoj (povzetek datoteke)
+### Faza C1 – Parser (`crates/wowlog`) ✅ (13. 11. 2026)
+- [x] Parser vrstic + tipi dogodkov, napredni parametri (brez zunanjih odvisnosti, Rust 2024)
+- [x] Testi: enotski + sintetični dungeon `tests/fixtures/synthetic_rfc.txt` (izmišljena imena) + pravi vzorec (preskoči se, če ga ni)
+- [x] CLI `wowlog-dump <datoteka> [--group] [--deaths N]` (dogodki, cone, encounterji, damage/heal po igralcu, smrti) – vzorec v ~10 ms
 
-### Faza C2 – Detektor runa + analizator
-- [ ] Party iz zastavic, vstop/izstop instance, segmenti
-- [ ] Agregati, časovnica, smrti, nagrade (vhod: vzorec dungeona)
+### Faza C2 – Detektor runa + analizator ✅ na sintetičnih podatkih (13. 11. 2026)
+- [x] Party iz zastavic, vstop/izstop instance, corpse run, reset, segmenti (boss/trash), runKey (`crates/wowrun`, razdelek 6.1a)
+- [x] Agregati, top uroki, 10-s časovnica, smrti z recapom, prekinitve, dispeli, shieldi, okoljska škoda
+- [x] CLI `wowrun <log> [--compact] [--utc-offset-min N] [--min-players N]` → JSON runov
+- [ ] Potrditev na **pravem dungeon vzorcu** (ZONE_CHANGE ob vstopu, ENCOUNTER_*, party zastavice, swing pravilo, `level` polje)
+- [ ] Nagrade (*Floor Inspector* …) – po načrtu na strežniku (C3)
 
-### Faza C3 – Convex
-- [ ] Tabele, prijava naprave (`/companion/link/*`), portal stran `/link`, My devices
-- [ ] `POST /companion/runs` (validacija, združevanje, vidnost)
+### Faza C3 – Convex ✅ na dev (13. 11. 2026, razdelek 8.2a)
+- [x] Tabele, prijava naprave (`/companion/link/*`), portal stran `/link`, My devices + Revoke
+- [x] `POST /companion/runs` (validacija, združevanje, nagrade, rate limit), E2E na dev
+- [ ] Deploy na prod (git push) in E2E povezave z resnično Google prijavo (§14 D1)
+- [ ] Vidnost runov → C5
 
-### Faza C4 – Tauri aplikacija (MVP)
-- [ ] Skelet Tauri 2 + Svelte + WoW tema
-- [ ] Link account, Setup (iskanje mape), Live meter, Runs, Settings, tray
-- [ ] Uploader s čakalno vrsto
+### Faza C4 – Tauri aplikacija (MVP) ✅ Linux (13. 11. 2026, razdelek 5.4)
+- [x] Skelet Tauri 2 + Svelte 5 + Tailwind v4 + WoW tema (`desktop/`)
+- [x] Link account, iskanje mape Logs, Live meter, Runs, Settings, tray (zapiranje okna = v tray), single instance
+- [x] Uploader s čakalno vrsto (SQLite) in backoffom; preizkušeno proti dev (Rust E2E + prava aplikacija)
+- [ ] Windows build in preizkus (C6)
 
 ### Faza C5 – Portal Dungeon Runs
 - [ ] `/runs`, `/runs/[id]`, zavihek Runs na strani junaka, vidnost Website/Discord
@@ -348,12 +431,52 @@ WowCompany/
 
 ---
 
-## 14. Odprta vprašanja
-- Ali Forever zapiše `ENCOUNTER_START/END`? (vzorec dungeona)
-- Kako se v logu pokaže vstop v dungeon (ime/ID instance)? Seznam Forever dungeonov.
-- Ali `/chatlog` v Forever zapisuje loot sproti?
-- Ali addon v Forever sme klicati `LoggingCombat(true)`?
-- Ime izvršljive datoteke / ikona: predlog **"WowCompany Companion"**, ikona = `static/icon-512.png`.
+## 14. Kontrolni seznam za 100 % delovanje (kaj je še NEPREVERJENO)
+
+Vse do zdaj je testirano samo na **solo vzorcu** (Tirisfal) in **sintetičnih** logih. Pred izdajo mora biti vsaka točka ✅.
+Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
+
+**A. Pravi dungeon log s partyjem** (`/console advancedCombatLogging 1`, `/combatlog`, `/chatlog`; najbolje 2 člana snemata isti run)
+- [ ] A1 `ZONE_CHANGE` ob vstopu v dungeon: instanceID se ujema s tabelo 3.1? (sicer rezerva `MAP_CHANGE` ime) – `dungeons.rs`
+- [ ] A2 Ali se `ZONE_CHANGE` zapiše tudi ob izhodu / ob releasu na graveyard (corpse run logika, grace 15 min)?
+- [ ] A3 `ENCOUNTER_START/END` obstajata? Format (`instanceID` na koncu START, `fightTime` na koncu END)? encounterID-ji iz tabele 3.1 pravilni?
+- [ ] A4 Party zastavice `0x512` (party) / `0x514` (raid) pri soigralcih; `0x511` samo jaz
+- [ ] A5 Peti partyja: zastavice (`0x1112`?), GUID oblika (`Pet-…`/`Creature-…`), ali `ownerGUID` v naprednem bloku
+- [ ] A6 Uid kopije instance v GUID-u NPC-jev (5. del) – enak za vse člane in drugačen po resetu?
+- [ ] A7 `runKey` pri dveh snemalcih istega runa enak (obe datoteki skozi `wowrun`)
+- [ ] A8 Swing pravilo: `SWING_DAMAGE` vs `SWING_DAMAGE_LANDED` – vsota za igralca primerjana z in-game metrom (Details!, če obstaja)
+- [ ] A9 Polje `level` v naprednem bloku: level ali ilvl? (primerjaj s portalom)
+- [ ] A10 `COMBATANT_INFO` (oprema/talenti ob pullu) – format
+- [ ] A11 `SPELL_INTERRUPT`, `SPELL_DISPEL` – postavitev polj (zdaj po retail). ✅ `SPELL_ABSORBED`, `SPELL_AURA_BROKEN_SPELL`, `DAMAGE_SHIELD`, `SPELL_CAST_FAILED` potrjeni na pravem logu
+- [ ] A12 DPS/HPS iz `wowrun` ≈ in-game meter (±5 %)
+- [ ] A13 Smrt: `UNIT_DIED` za igralca + recap smiseln; Feign Death/Soulstone/rezi
+- [ ] A14 Ali se logiranje po prijavi izklopi? (`/reload` ✅ ostane v isti datoteki z novo glavo.) Nova datoteka sredi runa → tail preklopi (✅ testirano sintetično)
+- [ ] A15 Časovni žig: lokalni čas PC-ja (preveri UTC offset, poletni čas)
+- [ ] A16 Scarlet Monastery / Dire Maul / Stratholme / BRD – več kril na enem instanceID: en run ali več?
+
+**B. Chat log (faza 2)**
+- [ ] B1 `/chatlog` v Forever zapisuje loot sproti (`WoWChatLog.txt`), format vrstic
+
+**C. Okolje / distribucija**
+- [x] C1 Pot do mape `Logs` v Proton prefiksu (Steam) – ✅ najdena samodejno (razdelek 3). Lutris/Bottles/Windows: le predvideno
+- [ ] C2 Tauri build: ✅ Linux debug (WebKitGTK 2.52); Windows + release paketi (AppImage/deb/NSIS) → C6
+- [ ] C3 Branje loga, medtem ko ga igra piše (Windows file locking, Wine)
+- [ ] C4 Keyring (Secret Service / Windows Credential Manager) – **zdaj datoteka 0600** (`device-token` v config mapi); `keyring` 4 ima nov API
+- [ ] C6 Tray ikona v GNOME (potrebuje razširitev AppIndicator) in KDE – ni vizualno preverjeno; zapiranje okna skrije v tray
+- [ ] C7 UI v pravi aplikaciji: Live meter med pravim dungeonom, gumbi End run / Retry / Browse… / Save (preverjeni samo v mock pogledu)
+- [ ] C8 Dev `SITE_URL` = `http://localhost:5173` → povezava iz aplikacije proti dev odpre lokalni portal (mora teči `bun run dev`)
+- [ ] C5 Addon: sme klicati `LoggingCombat(true)` (Interface 16001)?
+
+**D. Strežnik / portal (C3+)**
+- [ ] D1 Povezava naprave od začetka do konca z **resnično Google prijavo** na `/link` (dev E2E je odobritev simuliral z interno mutacijo) in na prod
+- [ ] D1a Stran `/link` vizualno (prijavljen član, nečlan, potekla koda, My devices) – do zdaj preverjen le izris za neprijavljenega
+- [ ] D1b `SITE_URL` v Convex env na dev/prod pravilen (od njega sta odvisna `linkUrl` in `url` v odgovoru)
+- [ ] D2 Upload **pravega** runa (dev E2E je uporabil sintetičnega): velikost, validacija, združevanje dveh snemalcev z dveh PC-jev
+- [ ] D2a Ali je gzip potreben (pravi run > ~300 KB?) – strežnik ga zdaj ne podpira
+- [ ] D3 Poraba Convex po 1 tednu (klici, DB I/O, prostor) vs ocena v razdelku 10
+- [ ] D4 Vidnost (Website/Discord) za obiskovalca vs člana
+
+**Ostalo odprto:** ime/ikona aplikacije – predlog **"WowCompany Companion"**, ikona = `static/icon-512.png`.
 
 ---
 
@@ -368,19 +491,47 @@ WowCompany/
 
 ## 16. Kako nadaljevati po čiščenju spomina (handoff)
 
-**Stanje 13. 11. 2026:** načrt potrjen (Tauri 2 + Svelte, Windows + Linux, objava ob koncu runa, prijava prek portala).
-Koda za Companion še **ne obstaja**. Portal (PLAN.md) je v produkciji in nespremenjen.
+**Stanje 13. 11. 2026 (konec C1):** Cargo workspace v korenu (`Cargo.toml`, `rustfmt.toml` max_width 120, `/target/` v `.gitignore`),
+crate `crates/wowlog` je končan in testiran. Portal (PLAN.md) je nespremenjen (svelte-check 0 napak, 53 testov OK).
 
-**Prvi koraki (faza C1 – parser), v tem vrstnem redu:**
-1. Preberi ta dokument (razdelki 3, 3.1, 5, 6) in `PLAN.md` razdelek 0.
-2. Preveri trenutne verzije: `cargo search tauri`, `bun pm view @tauri-apps/cli version`, `cargo search notify` (uporabi stabilne, ne alfa/rc).
-3. Ustvari Cargo workspace v korenu (`Cargo.toml` z `members = ["crates/wowlog"]`, kasneje `desktop/src-tauri`).
-   Pazi: koren je tudi Bun/SvelteKit projekt – `target/` dodaj v `.gitignore`.
-4. `crates/wowlog`: tip `Event` + parser vrstice (`MM/DD/YYYY HH:MM:SS.ffff␠␠EVENT,csv…`, narekovaji, `nil`, hex zastavice),
-   podpora za vse dogodke iz razdelka 3, neznani dogodki → `Event::Other`.
-5. Testi: na `wowlog/WoWCombatLog-111326_173926.txt` (lokalno, ni v gitu – test naj se preskoči, če datoteke ni) +
-   **sintetične** vrstice v `crates/wowlog/tests/fixtures/` (brez pravih imen): `ENCOUNTER_START/END`, party zastavice (`0x512`, `0x514`), `ZONE_CHANGE` v instanco 389 (Ragefire Chasm).
-6. CLI `wowlog-dump <datoteka>`: število dogodkov po tipu, damage/heal po igralcu, smrti → ročna primerjava z vzorcem.
+**Struktura `crates/wowlog`:**
+- `fields.rs` – razbijanje CSV (narekovaji, `()`/`[]` skupine), pretvorbe polj, `is_guid`.
+- `time.rs` – `MM/DD/YYYY HH:MM:SS.ffff` → naivne ms od 1970 (lokalni čas igre, brez cone).
+- `unit.rs` – `Unit` (`is_group()` = mine/party/raid, `is_pet`, `npc_id()`, `player_slug()` = portalski slug), `Spell`, `Advanced`, `flags`.
+- `event.rs` – `parse_line(&str) -> Result<Record, ParseError>`; `Record { timestamp, event, source, dest, kind: Kind }`;
+  `Kind` = Damage/Missed/Heal/Absorbed/Energize/Aura/Cast/Interrupt/Dispel/Summon/Resurrect/Instakill/ExtraAttacks/Died/PartyKill/
+  ZoneChange/MapChange/EncounterStart/EncounterEnd/CombatantInfo (surovo)/CombatLogVersion/Other (neznano – nič se ne izgubi).
+- `reader.rs` – `wowlog::open(path)` iterator (lossy UTF-8, prazne vrstice preskoči, slabe vrstice kot `Err(BadLine)`).
+
+**Ukazi:**
+```bash
+cargo test                                   # vsi testi parserja
+cargo clippy --all-targets && cargo fmt      # lint + format
+cargo run --release --bin wowlog-dump -- wowlog/WoWCombatLog-*.txt [--group]
+```
+
+**Pasti:** vzorec `/wowlog/` v `.gitignore` mora biti **zasidran na koren** (brez `/` je ignoriral tudi `crates/wowlog/`).
+V testih/fixturih samo izmišljena imena in GUID-i (pravi vzorec vsebuje imena tujih igralcev).
+
+**Crate `crates/wowrun` (C2, končano na sintetičnih podatkih):** odvisen od `wowlog`, `serde`, `serde_json`.
+- `dungeons.rs` – tabela 3.1 (instanceID → ime, encounterji, število bossov; NEPREVERJENO).
+- `analyzer.rs` – `Config` (privzetki: 2 igralca, 10 min neaktivnost, 15 min grace, 10-s kanglice, recap 10, top 10 urokov), `RunAcc` (en run).
+- `detector.rs` – `Detector::{push, tick, finish, end_manual, snapshot}`, `run_key()`.
+- `summary.rs` – shema JSON, ki gre na strežnik (`schema: 1`).
+- Testi: `tests/common/mod.rs` = generator sintetičnih logov (pravi format vrstic, izmišljena imena) → `tests/runs.rs` (13 scenarijev:
+  poln RFC run s corpse runom, wipe+kill, pet, dedupe swingov, solo, neaktivnost, reset, nov dungeon, snapshot, tick, runKey dveh snemalcev,
+  fixture iz `wowlog`, pravi solo vzorec → 0 runov).
+- Ukaz: `cargo run --bin wowrun -- <log> [--compact]`.
+
+**C3 (Convex) in C4 (Tauri aplikacija) sta končana** – podrobnosti v razdelkih 8.2a in 5.4.
+Ukazi: `cargo test`, `bun test tests/`, `bun run check:companion` (E2E HTTP na dev), Rust E2E (`--test api_dev -- --ignored`, razdelek 5.4).
+
+**Naslednji korak – faza C5 (portal Dungeon Runs), predlog:**
+1. Poizvedbe `runs.list` (paginirano po `by_started_at`, desc), `runs.get` (run + `runDetails`), `runs.forHero` (`runParticipants.by_slug_and_started_at`).
+2. Vidnost (razdelek 8.3): nova polja `runs`, `runDetails`, `runDeaths` v Website/Discord stikalih; obiskovalec vidi samo seznam.
+3. Strani `/runs` in `/runs/[id]` (meter, časovnica – en niz na graf, smrti z recapom, segmenti, nagrade) + zavihek Runs na strani junaka.
+   `url` v odgovoru uploada že kaže na `/runs/<id>`.
+4. Admin → Portal Room: sekcija Companion (navodila, povezava za prenos – C6, seznam naprav vseh članov).
 
 **Kaj potrebujemo od uporabnika (še odprto):**
 - Pravi log iz dungeona s partyjem (`/console advancedCombatLogging 1`, `/combatlog`, `/chatlog`) → `wowlog/`.

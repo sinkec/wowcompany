@@ -1,0 +1,28 @@
+[package]
+name = "wowcompany-companion"
+version = "0.1.0"
+description = "WowCompany Companion – dungeon run tracker for WoW Forever"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+default-run = "wowcompany-companion"
+
+[lib]
+name = "companion_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+wowlog = { path = "../../crates/wowlog" }
+wowrun = { path = "../../crates/wowrun" }
+tauri = { version = "2.12.5", features = ["tray-icon"] }
+tauri-plugin-opener = "2.7.3"
+tauri-plugin-dialog = "2.8.4"
+tauri-plugin-single-instance = "2.5.5"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+ureq = { version = "3.5.2", features = ["json"] }
+rusqlite = { version = "0.42.0", features = ["bundled"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }

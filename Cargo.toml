@@ -1,0 +1,8 @@
+[workspace]
+resolver = "3"
+members = ["crates/wowlog", "crates/wowrun", "desktop/src-tauri"]
+
+[workspace.package]
+edition = "2024"
+license = "UNLICENSED"
+publish = false

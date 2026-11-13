@@ -1,0 +1,13 @@
+[package]
+name = "wowlog"
+version = "0.1.0"
+description = "Parser for WoW (Forever / Classic-style v22) combat log files"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[[bin]]
+name = "wowlog-dump"
+path = "src/bin/wowlog-dump.rs"

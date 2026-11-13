@@ -9,4 +9,7 @@ crons.interval('poll players', { minutes: 1 }, internal.poll.run, {});
 // Guild roster za predloge imen: 1 klic na dan.
 crons.cron('guild roster', '0 5 * * *', internal.roster.refresh, {});
 
+// Companion: stare zahteve za povezavo naprave (1 klic na dan).
+crons.cron('companion link cleanup', '30 4 * * *', internal.companion.cleanupLinks, {});
+
 export default crons;

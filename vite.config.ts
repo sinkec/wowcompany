@@ -4,6 +4,8 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	// Rust buildi (target/) in namizna aplikacija nista del portala – ne opazuj ju.
+	server: { watch: { ignored: ['**/target/**', '**/desktop/**', '**/crates/**'] } },
 	plugins: [
 		tailwindcss(),
 		sveltekit({

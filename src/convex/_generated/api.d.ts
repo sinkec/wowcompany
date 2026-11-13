@@ -12,6 +12,8 @@ import type * as admin from "../admin.js";
 import type * as auth from "../auth.js";
 import type * as bot from "../bot.js";
 import type * as claims from "../claims.js";
+import type * as companion from "../companion.js";
+import type * as companionHttp from "../companionHttp.js";
 import type * as crons from "../crons.js";
 import type * as discord from "../discord.js";
 import type * as events from "../events.js";
@@ -19,6 +21,8 @@ import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
 import type * as lib_access from "../lib/access.js";
 import type * as lib_blizzard from "../lib/blizzard.js";
+import type * as lib_companion from "../lib/companion.js";
+import type * as lib_companionSchema from "../lib/companionSchema.js";
 import type * as lib_discordBot from "../lib/discordBot.js";
 import type * as lib_discordConfig from "../lib/discordConfig.js";
 import type * as lib_discordEmbed from "../lib/discordEmbed.js";
@@ -41,6 +45,8 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   bot: typeof bot;
   claims: typeof claims;
+  companion: typeof companion;
+  companionHttp: typeof companionHttp;
   crons: typeof crons;
   discord: typeof discord;
   events: typeof events;
@@ -48,6 +54,8 @@ declare const fullApi: ApiFromModules<{
   integrations: typeof integrations;
   "lib/access": typeof lib_access;
   "lib/blizzard": typeof lib_blizzard;
+  "lib/companion": typeof lib_companion;
+  "lib/companionSchema": typeof lib_companionSchema;
   "lib/discordBot": typeof lib_discordBot;
   "lib/discordConfig": typeof lib_discordConfig;
   "lib/discordEmbed": typeof lib_discordEmbed;
@@ -88,4 +96,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
 };
