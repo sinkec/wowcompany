@@ -6,7 +6,7 @@
 //! * **linker** – one short-lived thread per "Sign in with Google" (polls the portal).
 
 use crate::api::{Api, Poll, Upload};
-use crate::locate::{self, Candidate};
+use crate::locate::{self, Candidate, LogKind};
 use crate::queue::{self, Counts, Queue};
 use crate::settings::{Settings, TokenStore};
 use crate::tail::LogTail;
@@ -44,6 +44,10 @@ pub struct Pipeline {
     det: Detector,
     pub lines: u64,
     pub bad_lines: u64,
+    /// From the `COMBAT_LOG_VERSION` header (`/console advancedCombatLogging 1`).
+    pub advanced: Option<bool>,
+    pub chat_lines: u64,
+    pub loot_lines: u64,
 }
 
 impl Pipeline {
@@ -57,17 +61,34 @@ impl Pipeline {
             det: Detector::new(cfg),
             lines: 0,
             bad_lines: 0,
+            advanced: None,
+            chat_lines: 0,
+            loot_lines: 0,
         }
     }
 
     pub fn feed(&mut self, line: &str) -> Vec<RunSummary> {
         self.lines += 1;
         match wowlog::parse_line(line) {
-            Ok(rec) => self.det.push(&rec),
+            Ok(rec) => {
+                if let wowlog::Kind::CombatLogVersion { advanced, .. } = rec.kind {
+                    self.advanced = Some(advanced);
+                }
+                self.det.push(&rec)
+            }
             Err(_) => {
                 self.bad_lines += 1;
                 Vec::new()
             }
+        }
+    }
+
+    /// A chat log line; only loot lines matter. `year` = current year (chat logs have none).
+    pub fn feed_chat(&mut self, line: &str, year: i64) {
+        self.chat_lines += 1;
+        if let Some(loot) = wowlog::parse_loot_line(line, year) {
+            self.loot_lines += 1;
+            self.det.push_loot(&loot);
         }
     }
 
@@ -117,6 +138,16 @@ pub struct WatchStatus {
     pub last_line_at: Option<i64>,
     pub discarded_solo: u32,
     pub error: Option<String>,
+    /// `Some(true)` when the combat log header says advanced logging is on.
+    pub advanced: Option<bool>,
+    /// Chat log (`/chatlog`) for loot.
+    pub chat_file: Option<String>,
+    pub chat_last_line_at: Option<i64>,
+    pub loot_lines: u64,
+    /// Full paths of the files currently followed (cleanup protects them during a run).
+    #[serde(skip)]
+    pub active_files: Vec<PathBuf>,
+    pub last_cleanup: Option<crate::cleanup::CleanupReport>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -272,6 +303,7 @@ impl Core {
 
     fn watcher(self: Arc<Self>, rx: mpsc::Receiver<Cmd>) {
         let mut tail: Option<LogTail> = None;
+        let mut chat: Option<LogTail> = None;
         let mut pipe = Pipeline::new(self.settings().min_players, utc_offset_ms());
         let mut last_scan = None;
         let mut last_tick = Instant::now();
@@ -281,6 +313,7 @@ impl Core {
                     Cmd::Reconfigure => {
                         // Start over on the new folder; replaying the log rebuilds any run in progress.
                         tail = None;
+                        chat = None;
                         last_scan = None;
                         pipe = Pipeline::new(self.settings().min_players, utc_offset_ms());
                         *self.live.lock().expect("live lock") = None;
@@ -300,6 +333,7 @@ impl Core {
                         w.logs_dir_auto = auto;
                         w.error = (!dir.is_dir()).then(|| "Logs folder does not exist.".to_string());
                         drop(w);
+                        chat = Some(LogTail::of_kind(dir.clone(), MAX_LOG_AGE_AT_START, LogKind::Chat));
                         tail = Some(LogTail::new(dir, MAX_LOG_AGE_AT_START));
                     }
                     None => {
@@ -337,6 +371,27 @@ impl Core {
                 }
             }
 
+            // chat log: loot lines (read after the combat batch so the run already exists)
+            if let Some(c) = chat.as_mut() {
+                match c.poll() {
+                    Ok(batch) => {
+                        more |= batch.more;
+                        let year = chrono::Datelike::year(&chrono::Local::now()) as i64;
+                        for line in &batch.lines {
+                            pipe.feed_chat(line, year);
+                        }
+                        let mut w = self.watch.lock().expect("watch lock");
+                        w.chat_file = c
+                            .current()
+                            .map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string());
+                        if !batch.lines.is_empty() {
+                            w.chat_last_line_at = Some(wall_ms());
+                        }
+                    }
+                    Err(e) => self.watch.lock().expect("watch lock").error = Some(format!("Cannot read chat log: {e}")),
+                }
+            }
+
             if last_tick.elapsed() >= Duration::from_secs(2) {
                 last_tick = Instant::now();
                 let runs = pipe.tick(local_naive_ms());
@@ -350,6 +405,13 @@ impl Core {
                 w.dungeon = pipe.dungeon();
                 w.run_in_progress = pipe.run_in_progress();
                 w.discarded_solo = pipe.discarded();
+                w.advanced = pipe.advanced;
+                w.loot_lines = pipe.loot_lines;
+                w.active_files = tail
+                    .iter()
+                    .chain(chat.iter())
+                    .filter_map(|t| t.current().map(Path::to_path_buf))
+                    .collect();
             }
             *self.live.lock().expect("live lock") = pipe.snapshot();
 
@@ -503,6 +565,31 @@ impl Core {
         Ok(())
     }
 
+    /// Deletes combat/chat logs in the Logs folder (see `cleanup` for what is kept).
+    pub fn cleanup_logs(&self) -> Result<crate::cleanup::CleanupReport, String> {
+        let (dir, protect) = {
+            let w = self.watch.lock().expect("watch lock");
+            let dir = w.logs_dir.clone().ok_or("No Logs folder yet.")?;
+            let protect = if w.run_in_progress {
+                w.active_files.clone()
+            } else {
+                Vec::new()
+            };
+            (PathBuf::from(dir), protect)
+        };
+        let mut report = crate::cleanup::cleanup_logs(&dir, &protect, Duration::from_secs(120), SystemTime::now());
+        report.at = wall_ms();
+        self.watch.lock().expect("watch lock").last_cleanup = Some(report.clone());
+        Ok(report)
+    }
+
+    /// Called when the app quits (tray → Quit, OS shutdown).
+    pub fn on_exit(&self) {
+        if self.settings().delete_logs_on_exit {
+            let _ = self.cleanup_logs();
+        }
+    }
+
     pub fn candidates(&self) -> Vec<Candidate> {
         locate::candidates()
     }
@@ -541,6 +628,30 @@ mod tests {
             runs[0].started_at,
             wowlog::time::parse("11/20/2026 19:00:10.000").unwrap()
         );
+    }
+
+    #[test]
+    fn pipeline_reads_advanced_flag_and_chat_loot() {
+        let mut p = Pipeline::new(2, 0);
+        assert_eq!(p.advanced, None);
+        let text = fixture();
+        let lines: Vec<&str> = text.lines().collect();
+        // up to (and including) the boss kill, still inside the dungeon
+        let cut = lines.iter().position(|l| l.contains("ENCOUNTER_END")).unwrap() + 1;
+        for l in &lines[..cut] {
+            p.feed(l);
+        }
+        assert_eq!(p.advanced, Some(true));
+        p.feed_chat("11/20 20:00:18.5000  You receive loot: [Oggleflint's Ugly Hat].", 2026);
+        p.feed_chat("11/20 20:00:18.6000  [Party] Fizzle: gz on the hat lol", 2026);
+        assert_eq!((p.chat_lines, p.loot_lines), (2, 1));
+        for l in &lines[cut..] {
+            p.feed(l);
+        }
+        let runs = p.finish();
+        assert_eq!(runs[0].loot.len(), 1);
+        assert_eq!(runs[0].loot[0].item, "Oggleflint's Ugly Hat");
+        assert_eq!(runs[0].loot[0].slug.as_deref(), Some("tankus-maximus"));
     }
 
     #[test]

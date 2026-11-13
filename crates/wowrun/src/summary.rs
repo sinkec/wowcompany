@@ -6,7 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
-pub const SCHEMA_VERSION: u32 = 1;
+/// 1 = C2–C5, 2 = + `loot` (chat log).
+pub const SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +28,24 @@ pub struct RunSummary {
     pub segments: Vec<Segment>,
     pub deaths: Vec<Death>,
     pub timeline: Timeline,
+    /// Items looted during the run (from `/chatlog`; empty when the chat log is off).
+    #[serde(default)]
+    pub loot: Vec<LootDrop>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LootDrop {
+    /// Party member's slug when the chat name could be matched, else `None`.
+    pub slug: Option<String>,
+    /// Name as shown (party display name, or the raw chat name).
+    pub looter: String,
+    pub item: String,
+    pub item_id: Option<u32>,
+    /// 0 poor … 5 legendary (from the item link colour), `None` if unknown.
+    pub quality: Option<u8>,
+    pub count: u32,
+    pub at_ms: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

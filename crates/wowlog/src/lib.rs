@@ -13,12 +13,14 @@
 //! The crate has no dependencies and no I/O besides [`open`]; the desktop app
 //! tails the file itself and feeds lines into [`parse_line`].
 
+pub mod chat;
 pub mod event;
 pub mod fields;
 pub mod reader;
 pub mod time;
 pub mod unit;
 
+pub use chat::{Loot, parse_loot_line};
 pub use event::{
     AuraChange, AuraType, CastPhase, Damage, DamageSource, DeathKind, Heal, Kind, Miss, ParseError, Record, parse_line,
 };

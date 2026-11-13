@@ -147,12 +147,37 @@ pub fn is_combat_log(name: &str) -> bool {
     name.starts_with("WoWCombatLog") && name.ends_with(".txt")
 }
 
+/// Is this a chat log file name? (`WoWChatLog.txt`)
+pub fn is_chat_log(name: &str) -> bool {
+    name.starts_with("WoWChatLog") && name.ends_with(".txt")
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogKind {
+    Combat,
+    Chat,
+}
+
+impl LogKind {
+    pub fn matches(self, name: &str) -> bool {
+        match self {
+            LogKind::Combat => is_combat_log(name),
+            LogKind::Chat => is_chat_log(name),
+        }
+    }
+}
+
 /// Newest `WoWCombatLog*.txt` in `dir` by modification time.
 pub fn newest_combat_log(dir: &Path) -> Option<(PathBuf, SystemTime)> {
+    newest_log(dir, LogKind::Combat)
+}
+
+/// Newest log of a kind in `dir` by modification time.
+pub fn newest_log(dir: &Path, kind: LogKind) -> Option<(PathBuf, SystemTime)> {
     fs::read_dir(dir)
         .ok()?
         .filter_map(Result::ok)
-        .filter(|e| is_combat_log(&e.file_name().to_string_lossy()))
+        .filter(|e| kind.matches(&e.file_name().to_string_lossy()))
         .filter_map(|e| {
             let m = e.metadata().ok()?;
             m.is_file()

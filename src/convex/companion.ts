@@ -309,11 +309,13 @@ export const ingestRun = internalMutation({
 			.withIndex('by_run_key', (q) => q.eq('runKey', s.runKey))
 			.first();
 
+		const loot = s.loot ?? [];
 		const details = {
 			players: s.players,
 			segments: s.segments,
 			deaths: s.deaths,
-			timeline: s.timeline
+			timeline: s.timeline,
+			loot
 		};
 		const runFields = {
 			schema: s.schema,
@@ -323,7 +325,8 @@ export const ingestRun = internalMutation({
 			durationMs: s.durationMs,
 			endReason: s.endReason,
 			result: s.result,
-			awards: computeAwards(s.players),
+			awards: computeAwards(s.players, loot),
+			lootCount: loot.reduce((n, l) => n + l.count, 0),
 			score
 		};
 

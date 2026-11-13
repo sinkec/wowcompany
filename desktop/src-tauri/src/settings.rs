@@ -23,6 +23,8 @@ pub struct Settings {
     pub min_players: usize,
     /// Name shown in "My devices".
     pub device_name: String,
+    /// Delete WoWCombatLog/WoWChatLog files when the app quits (active files are kept).
+    pub delete_logs_on_exit: bool,
 }
 
 impl Default for Settings {
@@ -33,6 +35,7 @@ impl Default for Settings {
             uploads_enabled: true,
             min_players: 2,
             device_name: default_device_name(),
+            delete_logs_on_exit: true,
         }
     }
 }

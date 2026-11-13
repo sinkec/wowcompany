@@ -449,3 +449,66 @@ fn real_solo_sample_has_no_runs() {
     assert!(det.finish().is_empty());
     assert_eq!(det.discarded(), 0);
 }
+
+#[test]
+fn loot_from_chat_log_is_attached_to_the_run() {
+    let c = cast();
+    let m = mob("Ragefire Trogg", 11318, 7001, "000000BBBB");
+    let mut l = Log::new();
+    let mut chat: Vec<String> = Vec::new();
+    l.zone(RFC, "Ragefire Chasm").wait(1000);
+    chat.push(l.chat("You receive loot: [Too Early]."));
+    l.wait(60_001 + 1000);
+    l.spell(&c.me, &m, 133, "Fireball", 100, false)
+        .spell(&c.lock, &m, 686, "Shadow Bolt", 100, false);
+    l.wait(2000);
+    chat.push(l.chat("You receive loot: [Linen Cloth]x2."));
+    chat.push(l.chat("Fizzle receives loot: |cff0070dd|Hitem:2084::::|h[Darksteel Bastard Sword]|h|r."));
+    chat.push(l.chat("Mendy-Bandage-PvP-EU receives loot: [Silk Cloth]."));
+    chat.push(l.chat("Bob receives loot: [Mystery Meat]."));
+    l.wait(5000);
+    chat.push(l.chat("Fizzle Boom receives loot: [Boss Trophy]."));
+    l.wait(500).zone(1, "Orgrimmar").wait(1000);
+    chat.push(l.chat("You receive loot: [Vendor Junk]."));
+
+    // feed both streams in time order
+    let mut det = Detector::new(Config::default());
+    let mut events: Vec<(i64, Result<wowlog::Record, wowlog::Loot>)> = l
+        .records()
+        .into_iter()
+        .map(|r| (r.timestamp, Ok(r)))
+        .chain(chat.iter().map(|t| {
+            let x = wowlog::parse_loot_line(t, 2026).expect(t);
+            (x.timestamp, Err(x))
+        }))
+        .collect();
+    events.sort_by_key(|e| e.0);
+    let mut runs = Vec::new();
+    for (_, e) in &events {
+        match e {
+            Ok(r) => runs.extend(det.push(r)),
+            Err(x) => det.push_loot(x),
+        }
+    }
+    runs.extend(det.finish());
+    assert_eq!(runs.len(), 1);
+    let loot: Vec<_> = runs[0]
+        .loot
+        .iter()
+        .map(|x| (x.slug.as_deref(), x.looter.as_str(), x.item.as_str(), x.count))
+        .collect();
+    assert_eq!(
+        loot,
+        vec![
+            (Some("grobos-stinkfoot"), "Grobos Stinkfoot", "Linen Cloth", 2),
+            (Some("fizzle-boom"), "Fizzle Boom", "Darksteel Bastard Sword", 1),
+            (None, "Mendy-Bandage-PvP-EU", "Silk Cloth", 1), // healer never fought → not in the party list
+            (None, "Bob", "Mystery Meat", 1),
+            (Some("fizzle-boom"), "Fizzle Boom", "Boss Trophy", 1),
+        ]
+    );
+    assert_eq!(runs[0].loot[1].quality, Some(3));
+    assert_eq!(runs[0].loot[1].item_id, Some(2084));
+    let json = serde_json::to_string(&runs[0]).unwrap();
+    assert!(json.contains("\"schema\":2") && json.contains("\"itemId\":2084"));
+}

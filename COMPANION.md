@@ -483,7 +483,8 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 - [ ] A16 Scarlet Monastery / Dire Maul / Stratholme / BRD – več kril na enem instanceID: en run ali več?
 
 **B. Chat log (faza 2)**
-- [ ] B1 `/chatlog` v Forever zapisuje loot sproti (`WoWChatLog.txt`), format vrstic
+- [ ] B1 `/chatlog` v Forever zapisuje loot sproti (`WoWChatLog.txt`), format vrstic – **parser že obstaja (v0.1.1), a je napisan po splošnem WoW formatu**: preveri ime datoteke, čas (z letnico?), `You receive loot` / `X receives loot`, ali so v vrsticah link kode, kako je zapisano ime člana (samo ime? ime-priimek?)
+- [ ] B2 Brisanje logov ob izhodu na Windows (igra drži datoteko odprto → ostane) in Linux (ohrani aktivno datoteko)
 
 **C. Okolje / distribucija**
 - [x] C1 Pot do mape `Logs` v Proton prefiksu (Steam) – ✅ najdena samodejno (razdelek 3). Lutris/Bottles/Windows: le predvideno
@@ -567,6 +568,18 @@ Ukazi: `cargo test`, `bun test tests/`, `bun run check:companion` (E2E HTTP na d
 - Pravi log iz dungeona s partyjem (`/console advancedCombatLogging 1`, `/combatlog`, `/chatlog`) → `wowlog/`.
 - `sudo apt install libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev build-essential libssl-dev` (pred fazo C4).
 - Pot do mape `Logs` v Proton prefiksu (za `locate` modul).
+
+**v0.1.1 (13. 11. 2026) – loot, navodila, pospravljanje logov:**
+- `wowlog::chat` (`parse_loot_line`): `You receive loot: [X]x2.` / `Name receives loot: |cff…|Hitem:ID…|h[X]|h|r.`, čas z/brez letnice
+  (`time::parse_with_year`). **Format v Forever NEPREVERJEN** (§14 B1) – parser je toleranten, potrebujemo pravi `WoWChatLog.txt`.
+- `wowrun`: `Detector::push_loot` (samo v dungeonu med runom, od 60 s pred začetkom), ime iz chata → član partyja
+  (polno ime ali enoličen prvi del imena), sicer `slug: null` + surovo ime. **Shema 2** = `loot[]`; strežnik sprejme 1 in 2.
+- Aplikacija: druga sled za `WoWChatLog*.txt`; zavihek **How to log** s sprotnimi preverjanji (mapa, combat log teče, napredni log iz glave
+  `COMBAT_LOG_VERSION`, chat log + št. loot vrstic) in koraki vklop / izklop / pospravljanje; Live kaže loot.
+- **Brisanje logov ob izhodu** (`cleanup.rs`, nastavitev `deleteLogsOnExit`, privzeto vklopljeno) + gumb *Delete logs now*:
+  briše samo `WoWCombatLog*.txt` in `WoWChatLog*.txt`; ohrani datoteko teočega runa in datoteke, v katere je igra pisala v zadnjih 2 min.
+  Kavelj: `tauri::RunEvent::Exit` (tray → Quit / zaustavitev OS).
+- Portal: zavihek **Loot** (`?tab=loot`), »🎒 N items looted« na kartici, nagrada **Loot Goblin** (≥ 3 predmeti), polje vidnosti `runLoot`.
 
 **Stvari, ki ostajajo iz portala (ne pozabi):**
 - Dev Convex baza ima 20 testnih junakov (člani guilda) – po želji odstrani (dev admin → Heroes).

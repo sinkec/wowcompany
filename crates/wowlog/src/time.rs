@@ -5,13 +5,18 @@
 
 /// Parses `11/13/2026 17:39:26.5751` (year optional: `11/13 17:39:26.575` → year 0).
 pub fn parse(s: &str) -> Option<i64> {
+    parse_with_year(s, 0)
+}
+
+/// Like [`parse`], but a timestamp without year gets `default_year` (chat logs).
+pub fn parse_with_year(s: &str, default_year: i64) -> Option<i64> {
     let (date, time) = s.trim().split_once(' ')?;
     let mut d = date.split('/');
     let month: u32 = d.next()?.parse().ok()?;
     let day: u32 = d.next()?.parse().ok()?;
     let year: i64 = match d.next() {
         Some(y) => y.parse().ok()?,
-        None => 0,
+        None => default_year,
     };
     if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return None;

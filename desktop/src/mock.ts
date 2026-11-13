@@ -15,7 +15,8 @@ const status: Status = {
 		apiUrl: '',
 		uploadsEnabled: true,
 		minPlayers: 2,
-		deviceName: 'battlestation (Linux)'
+		deviceName: 'battlestation (Linux)',
+		deleteLogsOnExit: true
 	},
 	auth: {
 		linked: q.get('linked') !== '0',
@@ -36,12 +37,57 @@ const status: Status = {
 		runInProgress: q.get('tab') === 'live',
 		lastLineAt: now - 1500,
 		discardedSolo: 1,
-		error: null
+		error: null,
+		advanced: true,
+		chatFile: q.get('chat') === '0' ? null : 'WoWChatLog.txt',
+		chatLastLineAt: now - 30_000,
+		lootLines: 7,
+		lastCleanup: {
+			deleted: ['WoWCombatLog-111226_201500.txt', 'WoWChatLog.txt'],
+			kept: [['WoWCombatLog-111326_180000.txt', 'the game is still writing to it']],
+			freedBytes: 23_456_789,
+			at: now - 3_600_000
+		}
 	},
 	upload: { lastError: null, lastUploadAt: now - 120000, blocked: false },
 	queue: { pending: 1, uploaded: 2, failed: 1 },
 	runsVersion: 1,
-	live: q.get('tab') === 'live' ? { ...run, endReason: 'inProgress' } : null
+	live:
+		q.get('tab') === 'live'
+			? {
+					...run,
+					endReason: 'inProgress',
+					loot: [
+						{
+							slug: 'fizzle-boom',
+							looter: 'Fizzle Boom',
+							item: 'Darksteel Bastard Sword',
+							itemId: 2084,
+							quality: 3,
+							count: 1,
+							atMs: 9000
+						},
+						{
+							slug: 'tankus-maximus',
+							looter: 'Tankus Maximus',
+							item: 'Linen Cloth',
+							itemId: null,
+							quality: 1,
+							count: 2,
+							atMs: 12000
+						},
+						{
+							slug: null,
+							looter: 'Mendy',
+							item: 'Cracked Pottery',
+							itemId: null,
+							quality: 0,
+							count: 1,
+							atMs: 15000
+						}
+					]
+				}
+			: null
 };
 
 const rows: RunRow[] = [
@@ -116,7 +162,7 @@ await import('./main');
 const tab = q.get('tab');
 if (tab && tab !== 'live') {
 	setTimeout(() => {
-		const label = tab === 'runs' ? 'Runs' : 'Settings';
+		const label = tab === 'runs' ? 'Runs' : tab === 'guide' ? 'How to log' : 'Settings';
 		[...document.querySelectorAll('nav button')]
 			.find((b) => b.textContent?.startsWith(label))
 			?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

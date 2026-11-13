@@ -161,6 +161,17 @@ pub struct RunAcc {
     deaths: Vec<Death>,
     killed: BTreeSet<u32>,
     wipes: u32,
+    loot: Vec<LootDrop>,
+}
+
+/// Max loot entries kept per run (document size guard).
+const MAX_LOOT: usize = 400;
+
+/// Chat name → comparable key: `Mendy-Bandage-PvP-EU` / `Mendy Bandage` → `mendy bandage`.
+fn name_key(name: &str) -> String {
+    let lower = name.to_lowercase().replace('-', " ");
+    let trimmed = lower.trim_end_matches(" pvp eu").trim_end_matches(" pvp us");
+    trimmed.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 impl RunAcc {
@@ -179,7 +190,46 @@ impl RunAcc {
             deaths: Vec::new(),
             killed: BTreeSet::new(),
             wipes: 0,
+            loot: Vec::new(),
         }
+    }
+
+    /// Adds a loot line from the chat log (only once the run has started).
+    pub fn push_loot(&mut self, l: &wowlog::Loot) {
+        let Some(start) = self.started_at else { return };
+        if l.timestamp < start - 60_000 || self.loot.len() >= MAX_LOOT {
+            return;
+        }
+        let player = match &l.looter {
+            None => self.players.values().find(|p| p.mine),
+            Some(raw) => {
+                let key = name_key(raw);
+                self.players.values().find(|p| name_key(&p.name) == key).or_else(|| {
+                    // only a first name in chat → unique first-name match
+                    let first = key.split(' ').next().unwrap_or_default();
+                    let mut hits = self
+                        .players
+                        .values()
+                        .filter(|p| name_key(&p.name).split(' ').next() == Some(first));
+                    match (hits.next(), hits.next()) {
+                        (Some(p), None) => Some(p),
+                        _ => None,
+                    }
+                })
+            }
+        };
+        self.loot.push(LootDrop {
+            slug: player.map(|p| p.slug.clone()),
+            looter: player
+                .map(|p| p.name.clone())
+                .or_else(|| l.looter.clone())
+                .unwrap_or_else(|| "You".into()),
+            item: l.item.clone(),
+            item_id: l.item_id,
+            quality: l.quality,
+            count: l.count,
+            at_ms: l.timestamp - start,
+        });
     }
 
     pub fn is_started(&self) -> bool {
@@ -714,6 +764,8 @@ impl RunAcc {
             segments,
             deaths: self.deaths.clone(),
             timeline,
+            // loot after the last kill (boss corpse) belongs to the run too
+            loot: self.loot.clone(),
         }
     }
 

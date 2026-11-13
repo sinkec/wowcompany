@@ -50,6 +50,22 @@
 		await save();
 	}
 
+	let deleting = $state(false);
+	async function deleteNow() {
+		if (!confirm('Delete old combat and chat logs from the Logs folder now?')) return;
+		deleting = true;
+		error = null;
+		try {
+			const r = await api.deleteLogsNow();
+			saved = `Deleted ${r.deleted.length} file${r.deleted.length === 1 ? '' : 's'}.`;
+			setTimeout(() => (saved = null), 3000);
+		} catch (e) {
+			error = errText(e);
+		} finally {
+			deleting = false;
+		}
+	}
+
 	async function unlink() {
 		if (!confirm('Unlink this PC? Runs will stay here but stop uploading until you link again.'))
 			return;
@@ -104,10 +120,53 @@
 			{/if}
 		{/if}
 		<p class="text-xs text-muted-foreground">
-			Reminder: type <code class="text-primary">/combatlog</code> in game every session. For richer
-			data also run
-			<code class="text-primary">/console advancedCombatLogging 1</code> once.
+			Reminder: type <code class="text-primary">/combatlog</code> (and
+			<code class="text-primary">/chatlog</code>
+			for loot) in game every session. Full steps in <b>How to log</b>.
 		</p>
+	</section>
+
+	<section class="wow-frame space-y-3 rounded-lg p-5">
+		<h2 class="text-lg font-bold text-primary">Log files</h2>
+		<label class="flex items-center gap-3 text-sm">
+			<input
+				type="checkbox"
+				bind:checked={draft.deleteLogsOnExit}
+				onchange={() => save({ ...status.settings, deleteLogsOnExit: draft.deleteLogsOnExit })}
+				class="size-4 accent-[var(--primary)]"
+			/>
+			Delete combat and chat logs when the app quits
+		</label>
+		<p class="text-xs text-muted-foreground">
+			Only <code>WoWCombatLog*.txt</code> and <code>WoWChatLog*.txt</code>. A file is kept if a run
+			is still being recorded from it, or if WoW wrote to it in the last 2 minutes (still logging).
+			Finished runs are already saved in the app, so nothing is lost.
+		</p>
+		<div class="flex flex-wrap items-center gap-3">
+			<button
+				class="btn btn-outline"
+				onclick={deleteNow}
+				disabled={deleting || !status.watch.logsDir}
+			>
+				{deleting ? 'Shredding…' : 'Delete logs now'}
+			</button>
+			{#if status.watch.lastCleanup}
+				{@const c = status.watch.lastCleanup}
+				<span class="text-xs text-muted-foreground">
+					Last cleanup {ago(c.at)}: {c.deleted.length} deleted ({(c.freedBytes / 1_048_576).toFixed(
+						1
+					)} MB){#if c.kept.length},
+						{c.kept.length} kept{/if}.
+				</span>
+			{/if}
+		</div>
+		{#if status.watch.lastCleanup?.kept.length}
+			<ul class="text-xs text-muted-foreground">
+				{#each status.watch.lastCleanup.kept as [file, why] (file)}
+					<li><span class="font-mono">{file}</span> — {why}</li>
+				{/each}
+			</ul>
+		{/if}
 	</section>
 
 	<section class="wow-frame space-y-4 rounded-lg p-5">

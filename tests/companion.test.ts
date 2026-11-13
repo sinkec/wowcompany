@@ -135,3 +135,35 @@ describe('link codes & recorders', () => {
 		expect(addRecorder(a.list, { deviceId: 'd2', userId: 'u2' }).list).toHaveLength(2);
 	});
 });
+
+describe('loot (schema 2)', () => {
+	const L = (slug: string | null, item = 'Linen Cloth', count = 1) => ({
+		slug,
+		looter: slug ?? 'Bob',
+		item,
+		itemId: null,
+		quality: 1,
+		count,
+		atMs: 1000
+	});
+	test('schema 2 run with loot is accepted, absurd loot is not', () => {
+		expect(checkRun(RUN({ schema: 2, loot: [L('fizzle-boom')] }), NOW)).toBeNull();
+		expect(
+			checkRun(RUN({ schema: 2, loot: Array.from({ length: 401 }, () => L('fizzle-boom')) }), NOW)
+		).toContain('too much loot');
+		expect(checkRun(RUN({ schema: 2, loot: [L('fizzle-boom', '')] }), NOW)).toBe('bad loot entry');
+		expect(checkRun(RUN({ schema: 2, loot: [L('fizzle-boom', 'x', 0)] }), NOW)).toBe(
+			'bad loot entry'
+		);
+	});
+	test('Loot Goblin goes to the greediest (3+ items, matched slugs only)', () => {
+		const party = [P('a', { damage: 1 }), P('b', { damage: 1 })];
+		const loot = [L('a'), L('b'), L('b'), L('b'), L(null), L(null), L(null), L(null)];
+		const goblin = computeAwards(party, loot).find((x) => x.key === 'lootGoblin');
+		expect(goblin?.slug).toBe('b');
+		expect(goblin?.detail).toContain('3 items');
+		expect(
+			computeAwards(party, [L('a'), L('a')]).find((x) => x.key === 'lootGoblin')
+		).toBeUndefined();
+	});
+});

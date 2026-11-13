@@ -67,7 +67,7 @@ export const get = query({
 		const run = runId ? await ctx.db.get('runs', runId) : null;
 		if (!run) return null;
 		const details =
-			allowed('runDetails') || allowed('runDeaths')
+			allowed('runDetails') || allowed('runDeaths') || allowed('runLoot')
 				? await ctx.db
 						.query('runDetails')
 						.withIndex('by_run', (q) => q.eq('runId', run._id))

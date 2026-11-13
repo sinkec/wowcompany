@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { api, fmtDuration, fmtNum, type Status } from './api';
+	import { api, fmtDuration, fmtNum, qualityColor, type Status } from './api';
 
 	let { status }: { status: Status } = $props();
 	const live = $derived(status.live);
@@ -104,6 +104,27 @@
 					</span>
 				{/each}
 			</div>
+		{/if}
+
+		{#if live.loot.length}
+			<div class="space-y-1">
+				<p class="text-sm text-muted-foreground">Loot so far ({live.loot.length}):</p>
+				<div class="flex flex-wrap gap-1.5 text-xs">
+					{#each live.loot.slice(-12).reverse() as l, i (i)}
+						<span class="rounded border border-border/60 px-2 py-0.5">
+							<span style="color: {qualityColor(l.quality)}">[{l.item}]</span>{l.count > 1
+								? ` ×${l.count}`
+								: ''}
+							<span class="text-muted-foreground">→ {l.looter}</span>
+						</span>
+					{/each}
+				</div>
+			</div>
+		{:else if !status.watch.chatFile}
+			<p class="text-xs text-muted-foreground">
+				No loot tracking — type <code class="text-primary">/chatlog</code> in game to see who grabbed
+				what.
+			</p>
 		{/if}
 
 		{#if lastDeath}

@@ -123,6 +123,16 @@ impl Detector {
         out
     }
 
+    /// A loot line from the chat log. Counted only inside the dungeon during a run.
+    pub fn push_loot(&mut self, loot: &wowlog::Loot) {
+        if !self.inside {
+            return;
+        }
+        if let Some(run) = self.run.as_mut() {
+            run.push_loot(loot);
+        }
+    }
+
     /// Time passes without new lines (the app calls this e.g. every few seconds with
     /// the current time converted to log-local milliseconds).
     pub fn tick(&mut self, now: i64) -> Vec<RunSummary> {

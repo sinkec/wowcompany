@@ -8,7 +8,7 @@ import { ConvexError } from 'convex/values';
 import { internal } from './_generated/api.js';
 import { httpAction } from './_generated/server.js';
 import { makeLinkCode, MAX_BODY_BYTES } from './lib/companion.js';
-import { SCHEMA_VERSION } from './lib/companionSchema.js';
+import { SCHEMA_VERSION, SUPPORTED_SCHEMAS } from './lib/companionSchema.js';
 
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
 	new Response(JSON.stringify(body), {
@@ -142,7 +142,7 @@ export const uploadRun = httpAction(async (ctx, req) => {
 	const body = await readJson(req, MAX_BODY_BYTES);
 	if (body instanceof Response) return body;
 	if (!isObj(body)) return json({ error: 'body must be an object' }, 400);
-	if (body.schema !== SCHEMA_VERSION)
+	if (typeof body.schema !== 'number' || !SUPPORTED_SCHEMAS.includes(body.schema))
 		return json(
 			{
 				error: `unsupported schema ${String(body.schema)}, server speaks ${SCHEMA_VERSION}`,

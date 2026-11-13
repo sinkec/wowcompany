@@ -2,18 +2,25 @@
 	import { onMount } from 'svelte';
 	import { api, errText, type Status } from './lib/api';
 	import LinkPanel from './lib/LinkPanel.svelte';
+	import Guide from './lib/Guide.svelte';
 	import Live from './lib/Live.svelte';
 	import Runs from './lib/Runs.svelte';
 	import SettingsView from './lib/Settings.svelte';
 
 	let status = $state<Status | null>(null);
 	let error = $state<string | null>(null);
-	let tab = $state<'live' | 'runs' | 'settings'>('live');
+	let tab = $state<'live' | 'runs' | 'guide' | 'settings'>('live');
+	let pickedTab = false;
 	let skipLink = $state(false);
 
 	async function refresh() {
 		try {
 			status = await api.status();
+			// prvič brez combat loga → najprej navodila
+			if (!pickedTab && status) {
+				pickedTab = true;
+				if (!status.watch.file) tab = 'guide';
+			}
 			error = null;
 		} catch (e) {
 			error = errText(e);
@@ -41,12 +48,12 @@
 				{:else if status.watch.runInProgress}⏸ Run paused — corpse run? We'll wait 15 min.
 				{:else if status.watch.dungeon}In {status.watch.dungeon}. Pull something already.
 				{:else if status.watch.file}Watching {status.watch.file}. Go find a dungeon.
-				{:else}No combat log yet. Type <code>/combatlog</code> in game.{/if}
+				{:else}No combat log yet. Type <code>/combatlog</code> in game (see How to log).{/if}
 			</p>
 		</div>
 		{#if status && !needsLink}
 			<nav class="ml-auto flex gap-1">
-				{#each [['live', 'Live'], ['runs', `Runs${status.queue.pending ? ` (${status.queue.pending}⏳)` : ''}`], ['settings', 'Settings']] as [key, label] (key)}
+				{#each [['live', 'Live'], ['runs', `Runs${status.queue.pending ? ` (${status.queue.pending}⏳)` : ''}`], ['guide', 'How to log'], ['settings', 'Settings']] as [key, label] (key)}
 					<button
 						class="btn {tab === key
 							? 'bg-primary/15 text-primary'
@@ -107,6 +114,8 @@
 				<Live {status} />
 			{:else if tab === 'runs'}
 				<Runs {status} />
+			{:else if tab === 'guide'}
+				<Guide {status} ongo={(t) => (tab = t)} />
 			{:else}
 				<SettingsView {status} />
 			{/if}

@@ -53,7 +53,18 @@ const DETAILS: DetailsLike = {
 	players: [P('tank-a'), P('mage-b')],
 	segments: [],
 	deaths: [{ slug: 'mage-b', atMs: 10, killer: 'Oggleflint', killingBlow: 'Fireball', recap: [] }],
-	timeline: { bucketMs: 10_000, players: [] }
+	timeline: { bucketMs: 10_000, players: [] },
+	loot: [
+		{
+			slug: 'mage-b',
+			looter: 'Mage B',
+			item: 'Shiny Stick',
+			itemId: 1,
+			quality: 3,
+			count: 1,
+			atMs: 5
+		}
+	]
 };
 const classOf = new Map([['tank-a', 1]]);
 const only =
@@ -99,7 +110,7 @@ describe('detail', () => {
 		expect(d.players!.every((p) => p.deaths === null)).toBe(true);
 		expect(d.deaths).toBeNull();
 		expect(d.totalDeaths).toBeNull();
-		expect(d.access).toEqual({ details: true, deaths: false });
+		expect(d.access).toEqual({ details: true, deaths: false, loot: false });
 	});
 	test('runDeaths without runDetails: autopsies yes, meter no', () => {
 		const d = runDetail(RUN, DETAILS, classOf, only('runs', 'runDeaths'));
@@ -116,5 +127,31 @@ describe('detail', () => {
 		const d = runDetail(RUN, null, classOf, all);
 		expect(d.players).toBeNull();
 		expect(d.deaths).toBeNull();
+	});
+});
+
+describe('loot visibility', () => {
+	test('runLoot hidden → no loot and no count, even for numbers-allowed viewers', () => {
+		const d = runDetail(
+			{ ...RUN, lootCount: 1 },
+			DETAILS,
+			classOf,
+			only('runs', 'runDetails', 'runDeaths')
+		);
+		expect(d.loot).toBeNull();
+		expect(d.lootCount).toBeNull();
+		expect(d.access.loot).toBe(false);
+		expect(JSON.stringify(d)).not.toContain('Shiny Stick');
+	});
+	test('runLoot alone shows the loot list', () => {
+		const d = runDetail({ ...RUN, lootCount: 1 }, DETAILS, classOf, only('runs', 'runLoot'));
+		expect(d.loot).toHaveLength(1);
+		expect(d.lootCount).toBe(1);
+		expect(d.players).toBeNull();
+	});
+	test('old runs without loot field → empty list', () => {
+		const { loot: _l, ...noLoot } = DETAILS;
+		expect(runDetail(RUN, noLoot, classOf, all).loot).toEqual([]);
+		expect(runListItem(RUN, classOf, all).lootCount).toBe(0);
 	});
 });

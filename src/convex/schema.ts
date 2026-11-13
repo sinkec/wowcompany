@@ -5,6 +5,7 @@ import {
 	death,
 	endReason,
 	linkStatus,
+	lootDrop,
 	partyMember,
 	playerSummary,
 	recorder,
@@ -267,6 +268,8 @@ export default defineSchema({
 		party: v.array(partyMember),
 		recordedBy: v.array(recorder),
 		awards: v.array(award),
+		/** število pobranih predmetov (za seznam; podrobnosti v runDetails.loot) */
+		lootCount: v.optional(v.number()),
 		/** popolnost posnetka – ob združevanju obdržimo boljšega */
 		score: v.number(),
 		createdAt: v.number(),
@@ -281,7 +284,8 @@ export default defineSchema({
 		players: v.array(playerSummary),
 		segments: v.array(segment),
 		deaths: v.array(death),
-		timeline
+		timeline,
+		loot: v.optional(v.array(lootDrop))
 	}).index('by_run', ['runId']),
 
 	// Kdo je bil v runu (za zavihek Runs na strani junaka).

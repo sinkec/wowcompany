@@ -236,6 +236,13 @@ impl Log {
         self.raw(&line)
     }
 
+    /// A chat log line at the current time (chat logs have no year).
+    pub fn chat(&self, text: &str) -> String {
+        let st = self.stamp();
+        let (date, rest) = st.split_once(' ').unwrap();
+        format!("{} {}  {}", &date[..5], rest, text)
+    }
+
     pub fn text(&self) -> String {
         self.lines.join("\n") + "\n"
     }

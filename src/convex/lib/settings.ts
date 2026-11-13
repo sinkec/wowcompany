@@ -52,7 +52,7 @@ export const DEFAULT_SETTINGS = {
 };
 
 /** Dungeon Runs (Companion): seznam, analiza, smrti. Samo splet – Discord objave runov pridejo v C7. */
-export const RUN_FIELDS = ['runs', 'runDetails', 'runDeaths'];
+export const RUN_FIELDS = ['runs', 'runDetails', 'runDeaths', 'runLoot'];
 
 /** Vsa polja, ki jih lahko admin vklopi (splet ali Discord). */
 export const ALL_FIELDS = [

@@ -3,7 +3,7 @@
 //   runDetails  → številke: meter, uroki, segmenti, časovnica, nagrade
 //   runDeaths   → smrti (števci in recapi)
 //   classId     → barve razredov (obstoječe polje)
-import type { Award, PlayerSummary } from './companionSchema.js';
+import type { Award, LootDrop, PlayerSummary } from './companionSchema.js';
 
 export type Allowed = (field: string) => boolean;
 
@@ -28,6 +28,7 @@ export type RunDocLike = {
 	party: PartyMember[];
 	recordedBy: Recorder[];
 	awards: Award[];
+	lootCount?: number;
 };
 
 export type DetailsLike = {
@@ -60,6 +61,7 @@ export type DetailsLike = {
 		bucketMs: number;
 		players: { slug: string; damage: number[]; healing: number[]; taken: number[] }[];
 	};
+	loot?: LootDrop[];
 };
 
 /** Ime iz partyja za slug (snemalec je vedno v partyju; rezerva = slug). */
@@ -91,6 +93,8 @@ export function runListItem(run: RunDocLike, classOf: Map<string, number>, allow
 		/** Combat log ne pove, kdo je vodja skupine (pride z addonom / chat logom – COMPANION.md §14). */
 		leader: null as string | null,
 		totalDeaths: deaths ? run.party.reduce((n, p) => n + p.deaths, 0) : null,
+		/** null = skrito (runLoot); 0 = ni podatka ali nič pobranega */
+		lootCount: allowed('runLoot') ? (run.lootCount ?? 0) : null,
 		awards: nums ? run.awards : null
 	};
 }
@@ -106,7 +110,11 @@ export function runDetail(
 	const deaths = allowed('runDeaths') && !!details;
 	return {
 		...base,
-		access: { details: allowed('runDetails'), deaths: allowed('runDeaths') },
+		access: {
+			details: allowed('runDetails'),
+			deaths: allowed('runDeaths'),
+			loot: allowed('runLoot')
+		},
 		endedAt: run.endedAt,
 		// guid ne gre v brskalnik (ni potreben)
 		players: nums
@@ -118,7 +126,8 @@ export function runDetail(
 			: null,
 		segments: nums ? details!.segments : null,
 		timeline: nums ? details!.timeline : null,
-		deaths: deaths ? details!.deaths : null
+		deaths: deaths ? details!.deaths : null,
+		loot: allowed('runLoot') && details ? (details.loot ?? []) : null
 	};
 }
 

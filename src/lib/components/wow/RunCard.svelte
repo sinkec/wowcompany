@@ -82,6 +82,9 @@
 				{run.totalDeaths} death{run.totalDeaths === 1 ? '' : 's'}</span
 			>
 		{/if}
+		{#if run.lootCount}
+			<span>🎒 {run.lootCount} item{run.lootCount === 1 ? '' : 's'} looted</span>
+		{/if}
 		{#if run.awards?.length}
 			<span class="truncate"
 				>🏆 {run.awards

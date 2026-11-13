@@ -275,10 +275,27 @@ function makeRun(
 					: []
 		};
 	});
+	const items: [string, number][] = [
+		['Linen Cloth', 1], ['Wool Cloth', 1], ['Ragged Leather Scraps', 0], ['Searing Blade', 3], ['Cracked Bone', 0],
+		['Silk Cloth', 1], ['Embrace of the Lycan', 3], ['Spirit Bracers', 2], ['Coarse Stone', 1], ['Mageflame Cloak', 3],
+		['Gloves of the Moon', 2], ['Rough Bronze Shoulders', 2], ['Heavy Hide', 1], ['Ancient Lavender Fluff', 4]
+	];
+	const loot = items.slice(0, 6 + Math.floor(rnd() * 8)).map(([item, quality], i) => {
+		const h = p[Math.floor(rnd() * p.length)];
+		return {
+			slug: h.slug,
+			looter: `${h.name} ${h.surname}`,
+			item,
+			itemId: null,
+			quality,
+			count: quality <= 1 ? 1 + Math.floor(rnd() * 4) : 1,
+			atMs: Math.floor(((i + 1) / 15) * durationMs)
+		};
+	});
 	const killed = new Set(segments.filter((s) => s.result === 'kill').map((s) => s.encounterId))
 		.size;
 	return {
-		schema: 1,
+		schema: 2,
 		runKey: key(),
 		zone: { instanceId: zone.id, name: zone.name, difficultyId: 1, instanceUid: 7000 + zone.id },
 		startedAt,
@@ -295,7 +312,8 @@ function makeRun(
 		players,
 		segments,
 		deaths,
-		timeline: { bucketMs: bucket, players: tl }
+		timeline: { bucketMs: bucket, players: tl },
+		loot
 	};
 }
 

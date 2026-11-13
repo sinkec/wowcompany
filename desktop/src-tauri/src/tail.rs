@@ -3,7 +3,7 @@
 //! Polling (every ~0.5 s) instead of inotify: robust for files inside Wine prefixes and
 //! on Windows, and cheap (one `stat` + read of new bytes).
 
-use crate::locate::newest_combat_log;
+use crate::locate::{LogKind, newest_log};
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -24,6 +24,7 @@ pub struct Batch {
 
 pub struct LogTail {
     dir: PathBuf,
+    kind: LogKind,
     /// Files older than this at start-up are ignored (the run they contain is long over).
     max_age_at_start: Duration,
     started: bool,
@@ -37,8 +38,13 @@ pub struct LogTail {
 
 impl LogTail {
     pub fn new(dir: impl Into<PathBuf>, max_age_at_start: Duration) -> Self {
+        Self::of_kind(dir, max_age_at_start, LogKind::Combat)
+    }
+
+    pub fn of_kind(dir: impl Into<PathBuf>, max_age_at_start: Duration, kind: LogKind) -> Self {
         LogTail {
             dir: dir.into(),
+            kind,
             max_age_at_start,
             started: false,
             skipped: None,
@@ -64,7 +70,7 @@ impl LogTail {
     pub fn poll(&mut self) -> io::Result<Batch> {
         let mut batch = Batch::default();
 
-        if let Some((newest, mtime)) = newest_combat_log(&self.dir)
+        if let Some((newest, mtime)) = newest_log(&self.dir, self.kind)
             && self.current.as_deref() != Some(newest.as_path())
         {
             let skip = if self.started {

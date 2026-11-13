@@ -3,7 +3,9 @@
 // dvigni SCHEMA_VERSION na obeh straneh.
 import { v, type Infer } from 'convex/values';
 
-export const SCHEMA_VERSION = 1;
+/** Najnovejša shema (Rust `SCHEMA_VERSION`). 1 = brez loota (aplikacija v0.1.0), 2 = + loot. */
+export const SCHEMA_VERSION = 2;
+export const SUPPORTED_SCHEMAS = [1, 2];
 
 const nullableNumber = v.union(v.number(), v.null());
 const nullableString = v.union(v.string(), v.null());
@@ -106,9 +108,19 @@ export const runResult = v.object({
 	cleared: v.boolean()
 });
 
+export const lootDrop = v.object({
+	slug: nullableString,
+	looter: v.string(),
+	item: v.string(),
+	itemId: nullableNumber,
+	quality: nullableNumber,
+	count: v.number(),
+	atMs: v.number()
+});
+
 /** Kar pošlje aplikacija (POST /companion/runs). */
 export const runSummary = v.object({
-	schema: v.literal(SCHEMA_VERSION),
+	schema: v.union(v.literal(1), v.literal(2)),
 	runKey: v.string(),
 	zone,
 	startedAt: v.number(),
@@ -120,7 +132,8 @@ export const runSummary = v.object({
 	players: v.array(playerSummary),
 	segments: v.array(segment),
 	deaths: v.array(death),
-	timeline
+	timeline,
+	loot: v.optional(v.array(lootDrop))
 });
 
 export const award = v.object({
@@ -156,3 +169,4 @@ export const linkStatus = v.union(
 export type RunSummary = Infer<typeof runSummary>;
 export type PlayerSummary = Infer<typeof playerSummary>;
 export type Award = Infer<typeof award>;
+export type LootDrop = Infer<typeof lootDrop>;

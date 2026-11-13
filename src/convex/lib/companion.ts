@@ -1,11 +1,12 @@
 // Čiste funkcije za Companion (brez ctx) – testirane v tests/companion.test.ts.
-import type { Award, PlayerSummary, RunSummary } from './companionSchema.js';
+import type { Award, LootDrop, PlayerSummary, RunSummary } from './companionSchema.js';
 
 export const LINK_TTL_MS = 10 * 60_000;
 export const MAX_BODY_BYTES = 2 * 1024 * 1024;
 export const MAX_PLAYERS = 10;
 export const MAX_RUN_MS = 6 * 3_600_000;
 export const MAX_AGE_MS = 30 * 86_400_000;
+export const MAX_LOOT = 400;
 
 const WORDS = [
 	'MURLOC',
@@ -65,6 +66,14 @@ export function checkRun(s: RunSummary, now: number): string | null {
 	if (slugs.size !== s.players.length || [...slugs].some((x) => !/^[\p{L}\p{N}'-]{2,64}$/u.test(x)))
 		return 'bad slugs';
 	if (s.recorder !== null && !slugs.has(s.recorder)) return 'recorder not in party';
+	const loot = s.loot ?? [];
+	if (loot.length > MAX_LOOT) return `too much loot (max ${MAX_LOOT})`;
+	if (
+		loot.some(
+			(l) => !l.item || l.item.length > 120 || l.looter.length > 64 || l.count < 1 || l.count > 1000
+		)
+	)
+		return 'bad loot entry';
 	return null;
 }
 
@@ -77,7 +86,7 @@ function top<T>(list: T[], key: (t: T) => number): T | null {
 }
 
 /** Šaljive nagrade runa (angleško, WoW ton). */
-export function computeAwards(players: PlayerSummary[]): Award[] {
+export function computeAwards(players: PlayerSummary[], loot: LootDrop[] = []): Award[] {
 	const out: Award[] = [];
 	if (players.length === 0) return out;
 
@@ -133,6 +142,18 @@ export function computeAwards(players: PlayerSummary[]): Award[] {
 			title: 'Shut Up Button',
 			slug: kicker.slug,
 			detail: `Interrupted ${kicker.interrupts} casts. Nobody gets to finish a sentence.`
+		});
+
+	// Loot Goblin: največ pobranih predmetov (vsaj 3).
+	const grabbed = new Map<string, number>();
+	for (const l of loot) if (l.slug) grabbed.set(l.slug, (grabbed.get(l.slug) ?? 0) + 1);
+	const goblin = [...grabbed].sort((a, b) => b[1] - a[1])[0];
+	if (goblin && goblin[1] >= 3)
+		out.push({
+			key: 'lootGoblin',
+			title: 'Loot Goblin',
+			slug: goblin[0],
+			detail: `Grabbed ${goblin[1]} items. Bags full, morals empty.`
 		});
 
 	// Pacifist: najnižji DPS med ne-healerji (vsaj 2 taka v partyju).

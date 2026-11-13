@@ -135,8 +135,18 @@
 				Open the app → <b class="text-foreground">Sign in with Google</b> → approve the code on this page.
 			</li>
 			<li>
-				In game, every session: <code class="text-primary">/combatlog</code>. Then go die in a
-				dungeon.
+				In game, <b class="text-foreground">once ever</b>:
+				<code class="text-primary">/console advancedCombatLogging 1</code> (better death recaps).
+			</li>
+			<li>
+				<b class="text-foreground">Every session, before the dungeon:</b>
+				<code class="text-primary">/combatlog</code>, and
+				<code class="text-primary">/chatlog</code> if you want the loot on the portal.
+			</li>
+			<li>
+				<b class="text-foreground">After the dungeon:</b> type both commands again to switch them
+				off. The app deletes the old log files when you quit it (tray → Quit). Full guide in the app
+				under <i>How to log</i>.
 			</li>
 		</ol>
 	{/if}

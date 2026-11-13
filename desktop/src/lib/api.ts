@@ -7,6 +7,24 @@ export type Settings = {
 	uploadsEnabled: boolean;
 	minPlayers: number;
 	deviceName: string;
+	deleteLogsOnExit: boolean;
+};
+
+export type LootDrop = {
+	slug: string | null;
+	looter: string;
+	item: string;
+	itemId: number | null;
+	quality: number | null;
+	count: number;
+	atMs: number;
+};
+
+export type CleanupReport = {
+	deleted: string[];
+	kept: [string, string][];
+	freedBytes: number;
+	at: number;
 };
 
 export type PendingLink = { code: string; linkUrl: string; expiresAt: number };
@@ -62,6 +80,7 @@ export type RunSummary = {
 		result: 'kill' | 'wipe' | 'none';
 	}[];
 	deaths: { slug: string; atMs: number; killer: string | null; killingBlow: string | null }[];
+	loot: LootDrop[];
 };
 
 export type Status = {
@@ -81,6 +100,11 @@ export type Status = {
 		lastLineAt: number | null;
 		discardedSolo: number;
 		error: string | null;
+		advanced: boolean | null;
+		chatFile: string | null;
+		chatLastLineAt: number | null;
+		lootLines: number;
+		lastCleanup: CleanupReport | null;
 	};
 	upload: { lastError: string | null; lastUploadAt: number | null; blocked: boolean };
 	queue: { pending: number; uploaded: number; failed: number };
@@ -122,7 +146,8 @@ export const api = {
 	retryRun: (runKey: string) => invoke<void>('retry_run', { runKey }),
 	deleteRun: (runKey: string) => invoke<void>('delete_run', { runKey }),
 	endRun: () => invoke<void>('end_run'),
-	openUrl: (url: string) => invoke<void>('open_url', { url })
+	openUrl: (url: string) => invoke<void>('open_url', { url }),
+	deleteLogsNow: () => invoke<CleanupReport>('delete_logs_now')
 };
 
 export const fmtNum = (n: number) => Math.round(n).toLocaleString('en-US');
@@ -147,3 +172,16 @@ export function ago(ms: number | null): string {
 
 export const errText = (e: unknown) =>
 	typeof e === 'string' ? e : e instanceof Error ? e.message : JSON.stringify(e);
+
+/** WoW item quality colours (0 poor … 6 artifact). */
+export const QUALITY_COLOR = [
+	'#9d9d9d',
+	'#ffffff',
+	'#1eff00',
+	'#0070dd',
+	'#a335ee',
+	'#ff8000',
+	'#e6cc80'
+];
+export const qualityColor = (q: number | null) =>
+	q == null ? '#e5d9b6' : (QUALITY_COLOR[q] ?? '#e5d9b6');

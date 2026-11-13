@@ -79,3 +79,9 @@ export const ACTIVE_QUIP = (pct: number) =>
 			: pct >= 35
 				? 'Part-time hero'
 				: 'Professional spectator';
+
+/** Barva kvalitete predmeta (0 poor … 6 artifact), kot v igri. */
+const QUALITY_HEX = ['#9d9d9d', '#ffffff', '#1eff00', '#0070dd', '#a335ee', '#ff8000', '#e6cc80'];
+export const lootColor = (q: number | null | undefined) =>
+	q == null ? '#e5d9b6' : (QUALITY_HEX[q] ?? '#e5d9b6');
+export const QUALITY_NAME = ['Poor', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Artifact'];

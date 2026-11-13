@@ -21,6 +21,8 @@
 		fmtNum,
 		fmtRate,
 		fmtWhen,
+		lootColor,
+		QUALITY_NAME,
 		resultBadge
 	} from '#lib/runs.js';
 
@@ -42,12 +44,32 @@
 	const totalDeaths = $derived(run?.totalDeaths ?? null);
 
 	// ?tab=meter|bosses|deaths|timeline|spells → povezava naravnost na zavihek
-	const TABS = ['meter', 'bosses', 'deaths', 'timeline', 'spells'];
-	function initialTab(a: { details: boolean; deaths: boolean }) {
+	const TABS = ['meter', 'bosses', 'deaths', 'loot', 'timeline', 'spells'];
+	function initialTab(a: { details: boolean; deaths: boolean; loot: boolean }) {
 		const t = page.url.searchParams.get('tab') ?? '';
-		if (TABS.includes(t) && (t === 'deaths' ? a.deaths : a.details)) return t;
-		return a.details ? 'meter' : 'deaths';
+		const ok = (x: string) => (x === 'deaths' ? a.deaths : x === 'loot' ? a.loot : a.details);
+		if (TABS.includes(t) && ok(t)) return t;
+		return a.details ? 'meter' : a.deaths ? 'deaths' : 'loot';
 	}
+
+	// loot: po junaku (največ predmetov prvi) in kronološko
+	const loot = $derived(run?.loot ?? []);
+	const lootBy = $derived.by(() => {
+		const m = new Map<string, { name: string; slug: string | null; items: number; best: number }>();
+		for (const l of loot) {
+			const k = l.slug ?? l.looter;
+			const e = m.get(k) ?? {
+				name: names[l.slug ?? ''] ?? l.looter,
+				slug: l.slug,
+				items: 0,
+				best: -1
+			};
+			e.items += l.count;
+			e.best = Math.max(e.best, l.quality ?? -1);
+			m.set(k, e);
+		}
+		return [...m.values()].sort((a, b) => b.items - a.items);
+	});
 
 	let spellsFor = $state<string | null>(null);
 	const spellPlayer = $derived(players.find((p) => p.slug === spellsFor) ?? players[0] ?? null);
@@ -188,7 +210,7 @@
 			</section>
 		{/if}
 
-		{#if !run.access.details && !run.access.deaths}
+		{#if !run.access.details && !run.access.deaths && !run.access.loot}
 			<Locked what="the meter, the bosses and the autopsy reports" />
 		{:else}
 			<Tabs.Root value={initialTab(run.access)}>
@@ -196,6 +218,11 @@
 					<Tabs.Trigger value="meter" disabled={!run.access.details}>The Meter</Tabs.Trigger>
 					<Tabs.Trigger value="bosses" disabled={!run.access.details}>Bosses</Tabs.Trigger>
 					<Tabs.Trigger value="deaths" disabled={!run.access.deaths}>Autopsies</Tabs.Trigger>
+					<Tabs.Trigger value="loot" disabled={!run.access.loot}
+						>Loot{#if loot.length}&nbsp;<span class="text-xs text-muted-foreground"
+								>({loot.length})</span
+							>{/if}</Tabs.Trigger
+					>
 					<Tabs.Trigger value="timeline" disabled={!run.access.details}>Timeline</Tabs.Trigger>
 					<Tabs.Trigger value="spells" disabled={!run.access.details}>Spells</Tabs.Trigger>
 				</Tabs.List>
@@ -448,6 +475,75 @@
 							{/if}
 						</section>
 					{/each}
+				</Tabs.Content>
+
+				<!-- LOOT -->
+				<Tabs.Content value="loot" class="mt-4 space-y-4">
+					{#if !loot.length}
+						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
+							No loot recorded. Either nobody had <code class="text-primary">/chatlog</code> on, or this
+							party walked past every corpse without looting. Animals.
+						</div>
+					{:else}
+						<div class="flex flex-wrap gap-2">
+							{#each lootBy as g (g.slug ?? g.name)}
+								<div class="wow-frame rounded-lg px-3 py-2 text-sm">
+									<span
+										class="font-semibold"
+										style="color: {classColor(classes[g.slug ?? ''] ?? undefined)}">{g.name}</span
+									>
+									<span class="ml-1 text-muted-foreground"
+										>{g.items} item{g.items === 1 ? '' : 's'}</span
+									>
+									{#if g.best >= 0}<span class="ml-1 text-xs" style="color: {lootColor(g.best)}"
+											>· best: {QUALITY_NAME[g.best] ?? '?'}</span
+										>{/if}
+								</div>
+							{/each}
+						</div>
+						<div class="wow-frame overflow-hidden rounded-lg">
+							<table class="w-full text-sm">
+								<thead class="text-xs text-muted-foreground">
+									<tr class="border-b border-border/50">
+										<th class="w-20 px-3 py-2 text-left">When</th>
+										<th class="px-3 py-2 text-left">Item</th>
+										<th class="px-3 py-2 text-left">Grabbed by</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each loot as l, i (i)}
+										<tr class="border-b border-border/30 last:border-0">
+											<td class="px-3 py-1.5 text-muted-foreground tabular-nums"
+												>{fmtDuration(Math.max(0, l.atMs))}</td
+											>
+											<td class="px-3 py-1.5">
+												<span style="color: {lootColor(l.quality)}">[{l.item}]</span>
+												{#if l.count > 1}<span class="text-muted-foreground"> ×{l.count}</span>{/if}
+											</td>
+											<td class="px-3 py-1.5">
+												{#if l.slug && tracked.has(l.slug)}
+													<a
+														href="/c/{l.slug}"
+														class="hover:underline"
+														style="color: {classColor(classes[l.slug] ?? undefined)}"
+														>{names[l.slug] ?? l.looter}</a
+													>
+												{:else}
+													<span style="color: {classColor(classes[l.slug ?? ''] ?? undefined)}"
+														>{l.slug ? (names[l.slug] ?? l.looter) : l.looter}</span
+													>
+												{/if}
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						<p class="text-xs text-muted-foreground">
+							From the uploader's <code>/chatlog</code>. Need/greed rolls aren't tracked yet — only
+							who ended up with it.
+						</p>
+					{/if}
 				</Tabs.Content>
 
 				<!-- TIMELINE -->

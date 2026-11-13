@@ -123,3 +123,11 @@ pub fn open_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
     }
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn delete_logs_now(core: State<'_, Arc<Core>>) -> Result<crate::cleanup::CleanupReport, String> {
+    let core = Arc::clone(&core);
+    tauri::async_runtime::spawn_blocking(move || core.cleanup_logs())
+        .await
+        .map_err(|e| e.to_string())?
+}

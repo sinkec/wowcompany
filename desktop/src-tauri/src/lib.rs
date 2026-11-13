@@ -1,6 +1,7 @@
 //! WowCompany Companion – desktop app (Tauri 2). See COMPANION.md §5 and §8.2a.
 
 pub mod api;
+pub mod cleanup;
 mod commands;
 pub mod engine;
 pub mod locate;
@@ -107,7 +108,16 @@ pub fn run() {
             commands::delete_run,
             commands::end_run,
             commands::open_url,
+            commands::delete_logs_now,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running WowCompany Companion");
+        .build(tauri::generate_context!())
+        .expect("error while building WowCompany Companion")
+        .run(|app, event| {
+            // Quit (tray) / OS shutdown: tidy up the log files if the user wants that.
+            if let tauri::RunEvent::Exit = event
+                && let Some(core) = app.try_state::<Arc<Core>>()
+            {
+                core.on_exit();
+            }
+        });
 }
