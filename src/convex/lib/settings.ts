@@ -36,7 +36,14 @@ export const ALL_SUMMARY_FIELDS = [
 ];
 
 /** Sekcije strani lika, ki so lahko javne. */
-export const DETAIL_SECTIONS = ['equipment', 'stats', 'professions', 'counters', 'allStats', 'history'];
+export const DETAIL_SECTIONS = [
+	'equipment',
+	'stats',
+	'professions',
+	'counters',
+	'allStats',
+	'history'
+];
 
 export const DEFAULT_SETTINGS = {
 	pollIntervalSec: 60,
@@ -44,8 +51,15 @@ export const DEFAULT_SETTINGS = {
 	paused: false
 };
 
+/** Dungeon Runs (Companion): seznam, analiza, smrti. Samo splet – Discord objave runov pridejo v C7. */
+export const RUN_FIELDS = ['runs', 'runDetails', 'runDeaths'];
+
 /** Vsa polja, ki jih lahko admin vklopi (splet ali Discord). */
-export const ALL_FIELDS = [...ALL_SUMMARY_FIELDS, ...DETAIL_SECTIONS.filter((f) => !ALL_SUMMARY_FIELDS.includes(f))];
+export const ALL_FIELDS = [
+	...ALL_SUMMARY_FIELDS,
+	...DETAIL_SECTIONS.filter((f) => !ALL_SUMMARY_FIELDS.includes(f)),
+	...RUN_FIELDS
+];
 
 export async function getSettings(ctx: QueryCtx) {
 	const doc = await ctx.db
@@ -54,5 +68,8 @@ export async function getSettings(ctx: QueryCtx) {
 		.unique();
 	const base = doc ?? { ...DEFAULT_SETTINGS, key: 'main' as const };
 	// Discord je zaseben kanal prijateljev -> privzeto vse
-	return { ...base, discordFields: doc?.discordFields ?? ALL_FIELDS };
+	return {
+		...base,
+		discordFields: doc?.discordFields ?? ALL_FIELDS.filter((f) => !RUN_FIELDS.includes(f))
+	};
 }

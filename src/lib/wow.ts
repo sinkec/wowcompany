@@ -31,7 +31,16 @@ export const qualityColor = (q: string) => QUALITY[q] ?? '#ffffff';
 
 /** Gear slots in in-game order. */
 export const SLOTS_LEFT = ['HEAD', 'NECK', 'SHOULDER', 'BACK', 'CHEST', 'SHIRT', 'TABARD', 'WRIST'];
-export const SLOTS_RIGHT = ['HANDS', 'WAIST', 'LEGS', 'FEET', 'FINGER_1', 'FINGER_2', 'TRINKET_1', 'TRINKET_2'];
+export const SLOTS_RIGHT = [
+	'HANDS',
+	'WAIST',
+	'LEGS',
+	'FEET',
+	'FINGER_1',
+	'FINGER_2',
+	'TRINKET_1',
+	'TRINKET_2'
+];
 export const SLOTS_BOTTOM = ['MAIN_HAND', 'OFF_HAND', 'RANGED'];
 export const SLOT_LABELS: Record<string, string> = {
 	HEAD: 'Head',
@@ -130,7 +139,10 @@ export const FIELD_LABELS: Record<string, string> = {
 	stats: 'Character stats',
 	professions: 'Professions',
 	allStats: 'Every Blizzard statistic',
-	history: 'Progress history (charts)'
+	history: 'Progress history (charts)',
+	runs: 'Dungeon runs list (dungeon, party, duration, who snitched)',
+	runDetails: 'Dungeon run meter (damage, healing, bosses, spells, awards)',
+	runDeaths: 'Dungeon run deaths (counts + last 10 hits before the floor)'
 };
 
 /** Začetek 7-dnevnega okna, zaokrožen na uro (stabilni argumenti -> Convex lahko predpomni poizvedbo). */

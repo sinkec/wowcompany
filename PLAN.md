@@ -23,7 +23,7 @@ Vse mora delovati znotraj **brezplačnih paketov**.
 | Ikona, Privacy, Terms | ✅ `static/icon.svg` (+ `icon-120.png` za Google, `icon-512.png` za Discord avatar), `/privacy`, `/terms` |
 | Glavna stran pri 20+ junakih | ✅ Roster s **fiksno višino**: Cards 2×2 ali List 8 vrstic na stran, iskalnik + listanje ‹ › (izbira pogleda v localStorage, privzeto List pri > 8). **Tavern Gossip** enake višine kot Roster (absolutno v stolpcu), lasten zlat drsnik (`.wow-scroll` v `layout.css`), do 30 dogodkov; obiskovalcu "Members only", če je `lastLogin` skrit. Preverjeno: obe višini 504 px, lestvice vedno na istem mestu. |
 
-**Naslednji velik projekt: WowCompany Companion** (C1–C4 ✅: parser, detektor, Convex API + /link, Tauri aplikacija `desktop/`; naslednja C5 portal Dungeon Runs) (namizna aplikacija Tauri za Windows/Linux, dungeon analitika iz combat loga, prijava prek portala, rubrika Dungeon Runs) – celoten načrt, preverjena dejstva o combat logu in faze so v **[COMPANION.md](COMPANION.md)**.
+**Naslednji velik projekt: WowCompany Companion** (C1–C5 ✅: parser, detektor, Convex API + /link, Tauri aplikacija `desktop/`, portal `/runs`; naslednja C6 distribucija) (namizna aplikacija Tauri za Windows/Linux, dungeon analitika iz combat loga, prijava prek portala, rubrika Dungeon Runs) – celoten načrt, preverjena dejstva o combat logu in faze so v **[COMPANION.md](COMPANION.md)**.
 
 **Dev baza:** vsebuje 20 testnih junakov (člani guilda) iz preizkusa postavitve rosterja – po želji odstrani v dev adminu → Heroes.
 

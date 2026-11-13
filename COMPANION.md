@@ -2,7 +2,7 @@
 
 > Samostojen dokument: vsebuje vse, kar je potrebno za nadaljevanje dela brez prejšnjega pogovora.
 > Povezan z [PLAN.md](PLAN.md) (portal: SvelteKit + Convex + Vercel, že v produkciji).
-> Datum: 13. 11. 2026 · Stanje: **C1–C4 končane** (parser, detektor+analizator, Convex API + /link, Tauri aplikacija za Linux), naslednja C5 (portal Dungeon Runs).
+> Datum: 13. 11. 2026 · Stanje: **C1–C5 končane** (parser, detektor+analizator, Convex API + /link, Tauri aplikacija za Linux, portal Dungeon Runs), naslednja C6 (distribucija).
 
 ---
 
@@ -338,6 +338,20 @@ Omejitve Convexa: dokument ≤ 1 MiB, polja ≤ 1024, globina ≤ 16, array ≤ 
 
 ---
 
+### 9.1 Izvedba (C5, 13. 11. 2026)
+- Backend `src/convex/runs.ts`: `access`, `list` (paginirano, `by_started_at` desc), `get` (run + `runDetails`), `forHero` (`runParticipants`).
+- **Vidnost na enem mestu:** `src/convex/lib/runsView.ts` (testi `tests/runs-view.test.ts`). `runs` = seznam (dungeon, čas, trajanje,
+  party, kdo je objavil, rezultat, wipe); `runDetails` = meter, uroki, segmenti, časovnica, nagrade; `runDeaths` = števci smrti in recapi;
+  barve razredov po obstoječem `classId`. Player GUID-i nikoli ne gredo v brskalnik. Polja runov so samo v stolpcu Website (ne Discord).
+- Strani: `/runs` (kartice: dungeon, rezultat, wipe, trajanje + komentar, party v barvah razredov s ☠, **Snitched by** = kdo je objavil,
+  **Leader** = neznan, smrti, nagrade), `/runs/[id]` (glava + Snitched by / Party leader / Body count, nagrade, zavihki
+  The Meter · Bosses · Autopsies · Timeline · Spells; `?tab=` za povezavo naravnost na zavihek), zavihek na `/c/[slug]`.
+- Komponente: `RunCard.svelte`, `RunTimeline.svelte`; humor/formatiranje `src/lib/runs.ts`.
+- **Razvoj:** `bun scripts/companion-seed.ts` naloži 3 izmišljene rune na DEV (junaki iz dev baze), `--clean` jih pobriše.
+  Posnetki strani v headless Chromu: virtualni čas ne počaka na Convex websocket → uporabi CDP z realnim čakanjem na `vite preview`.
+
+---
+
 ## 10. Brezplačni paketi – izračun
 
 Predpostavka: 10 aktivnih igralcev, ~90 dungeon runov na mesec (≈3 na dan), party 5, aplikacija pri 2–3 članih.
@@ -418,8 +432,11 @@ WowCompany/
 - [x] Uploader s čakalno vrsto (SQLite) in backoffom; preizkušeno proti dev (Rust E2E + prava aplikacija)
 - [ ] Windows build in preizkus (C6)
 
-### Faza C5 – Portal Dungeon Runs
-- [ ] `/runs`, `/runs/[id]`, zavihek Runs na strani junaka, vidnost Website/Discord
+### Faza C5 – Portal Dungeon Runs ✅ (13. 11. 2026, razdelek 9.1)
+- [x] `/runs`, `/runs/[id]`, zavihek Dungeon Runs na strani junaka, navigacija (Heroes · Dungeon Runs), meni → Companion
+- [x] Vidnost (splet): `runs`, `runDetails`, `runDeaths` – privzeto **samo člani** (admin jih odpre v Office → Visibility)
+- [ ] Party leader (combat log ga ne zapiše – §14 A17)
+- [ ] Admin → Portal Room: sekcija Companion (prenos aplikacije, naprave vseh članov) → C6
 
 ### Faza C6 – Distribucija
 - [ ] GitHub Actions build (Windows + Linux), Releases, updater, navodila v Portal Room
@@ -453,6 +470,8 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 - [ ] A13 Smrt: `UNIT_DIED` za igralca + recap smiseln; Feign Death/Soulstone/rezi
 - [ ] A14 Ali se logiranje po prijavi izklopi? (`/reload` ✅ ostane v isti datoteki z novo glavo.) Nova datoteka sredi runa → tail preklopi (✅ testirano sintetično)
 - [ ] A15 Časovni žig: lokalni čas PC-ja (preveri UTC offset, poletni čas)
+- [ ] A17 **Party leader**: combat log ga ne vsebuje. Možnosti: `/chatlog` sistemska sporočila ("X is now the group leader") ali addon
+  (`UnitIsGroupLeader`) → nato polje `leader` v shemi runa (schema 2). Portal zdaj kaže "Unknown".
 - [ ] A16 Scarlet Monastery / Dire Maul / Stratholme / BRD – več kril na enem instanceID: en run ali več?
 
 **B. Chat log (faza 2)**
@@ -528,12 +547,13 @@ V testih/fixturih samo izmišljena imena in GUID-i (pravi vzorec vsebuje imena t
 **C3 (Convex) in C4 (Tauri aplikacija) sta končana** – podrobnosti v razdelkih 8.2a in 5.4.
 Ukazi: `cargo test`, `bun test tests/`, `bun run check:companion` (E2E HTTP na dev), Rust E2E (`--test api_dev -- --ignored`, razdelek 5.4).
 
-**Naslednji korak – faza C5 (portal Dungeon Runs), predlog:**
-1. Poizvedbe `runs.list` (paginirano po `by_started_at`, desc), `runs.get` (run + `runDetails`), `runs.forHero` (`runParticipants.by_slug_and_started_at`).
-2. Vidnost (razdelek 8.3): nova polja `runs`, `runDetails`, `runDeaths` v Website/Discord stikalih; obiskovalec vidi samo seznam.
-3. Strani `/runs` in `/runs/[id]` (meter, časovnica – en niz na graf, smrti z recapom, segmenti, nagrade) + zavihek Runs na strani junaka.
-   `url` v odgovoru uploada že kaže na `/runs/<id>`.
-4. Admin → Portal Room: sekcija Companion (navodila, povezava za prenos – C6, seznam naprav vseh članov).
+**C5 (portal Dungeon Runs) je končan** – razdelek 9.1. Za pregled na dev: `bun scripts/companion-seed.ts` (+ `--clean`).
+
+**Naslednji korak – faza C6 (distribucija), predlog:**
+1. GitHub Actions: build ob oznaki `v*` (Linux AppImage/deb na `ubuntu-22.04`, Windows NSIS/MSI) → GitHub Releases.
+2. Tauri updater (podpisni ključ updaterja v GitHub secrets, `latest.json` na Releases) + preverjanje posodobitev v aplikaciji.
+3. Portal Room / `/link`: povezava za prenos, navodila za `/combatlog`, seznam naprav vseh članov (admin).
+4. Windows preizkus (pot do Logs, branje med pisanjem, SmartScreen).
 
 **Kaj potrebujemo od uporabnika (še odprto):**
 - Pravi log iz dungeona s partyjem (`/console advancedCombatLogging 1`, `/combatlog`, `/chatlog`) → `wowlog/`.
