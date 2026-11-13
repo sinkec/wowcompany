@@ -8,9 +8,9 @@
 	let { rows, allowed }: { rows: RosterEntry[]; allowed: (field: string) => boolean } = $props();
 </script>
 
-<div class="wow-frame overflow-hidden rounded-lg">
+<div class="wow-frame h-full overflow-hidden rounded-lg">
 	<table class="w-full text-sm">
-		<thead class="bg-background/40 text-left text-[11px] tracking-wider text-muted-foreground uppercase">
+		<thead class="h-[34px] bg-background/40 text-left text-[11px] tracking-wider text-muted-foreground uppercase">
 			<tr>
 				<th class="px-3 py-2 font-medium">Hero</th>
 				<th class="px-2 py-2 text-right font-medium">Lvl</th>
@@ -25,8 +25,8 @@
 			{#each rows as c (c.slug)}
 				{@const s = c.summary}
 				{@const color = classColor(s?.classId)}
-				<tr class="group relative border-t border-border/40 transition-colors hover:bg-accent/40">
-					<td class="px-3 py-1.5">
+				<tr class="group relative h-[46px] border-t border-border/40 transition-colors hover:bg-accent/40">
+					<td class="px-3 py-1">
 						<!-- cela vrstica je klikljiva (povezava čez celico) -->
 						<a href="/c/{c.slug}" class="flex min-w-0 items-center gap-2.5 after:absolute after:inset-0 focus-visible:outline-none">
 							{#if s?.avatar}

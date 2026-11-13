@@ -8,6 +8,8 @@
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import List from '@lucide/svelte/icons/list';
 	import Search from '@lucide/svelte/icons/search';
+	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import CharacterCard from '#lib/components/wow/CharacterCard.svelte';
 	import RosterTable from '#lib/components/wow/RosterTable.svelte';
@@ -25,10 +27,11 @@
 
 	// --- prikaz roster: kartice ali kompakten seznam (privzeto seznam pri > 8 junakih)
 	type View = 'cards' | 'list';
-	const CARD_PREVIEW = 6;
+	/** junakov na stran: 2 × 2 kartici ali 8 vrstic tabele (ista višina panela) */
+	const PAGE_SIZE: Record<View, number> = { cards: 4, list: 8 };
 	let viewChoice = $state<View | null>(null);
-	let showAll = $state(false);
 	let query = $state('');
+	let page = $state(0);
 	onMount(() => {
 		try {
 			const v = localStorage.getItem('roster-view');
@@ -39,6 +42,7 @@
 	});
 	function setView(v: View) {
 		viewChoice = v;
+		page = 0;
 		try {
 			localStorage.setItem('roster-view', v);
 		} catch {
@@ -51,6 +55,7 @@
 	const pubSet = $derived(new Set(roster.data?.publicFields ?? []));
 	const allowed = (f: string) => priv || pubSet.has(f);
 	const view = $derived<View>(viewChoice ?? (players.length > 8 ? 'list' : 'cards'));
+	const pageSize = $derived(PAGE_SIZE[view]);
 	const withData = $derived(players.filter((p) => p.summary));
 	const sorted = $derived(
 		[...players]
@@ -66,6 +71,11 @@
 			return (b.summary?.level ?? 0) - (a.summary?.level ?? 0) || (b.summary?.experience ?? 0) - (a.summary?.experience ?? 0);
 		})
 	);
+
+	const pages = $derived(Math.max(1, Math.ceil(sorted.length / pageSize)));
+	const pageIdx = $derived(Math.min(page, pages - 1));
+	const pageRows = $derived(sorted.slice(pageIdx * pageSize, pageIdx * pageSize + pageSize));
+	const go = (d: number) => (page = Math.max(0, Math.min(pages - 1, pageIdx + d)));
 
 	const sum = (f: (c: RosterEntry) => number | null | undefined) => {
 		const vals = withData.map(f).filter((v): v is number => typeof v === 'number');
@@ -138,21 +148,25 @@
 			{/each}
 		</section>
 
-		<div class="grid items-start gap-8 lg:grid-cols-[1fr_340px]">
+		<!--
+			Roster + Tavern Gossip: roster ima fiksno višino (2 × 2 kartici ali 8 vrstic), več junakov = listanje/iskanje.
+			Gossip se raztegne točno na višino rosterja (absolutno pozicioniran znotraj stolpca) in ima lasten drsnik.
+		-->
+		<div class="grid gap-8 lg:grid-cols-[1fr_340px]">
 			<!-- roster -->
-			<section class="min-w-0 space-y-3">
-				<div class="flex min-h-9 flex-wrap items-center justify-between gap-2">
+			<section class="min-w-0 space-y-3" aria-label="Roster">
+				<div class="flex h-9 items-center justify-between gap-2">
 					<h2 class="text-xl font-semibold">
 						The Roster <span class="text-base font-normal text-muted-foreground">({players.length})</span>
 					</h2>
-					<div class="flex flex-wrap items-center gap-2">
-						<div class="flex gap-1 text-sm" role="group" aria-label="Sort">
+					<div class="flex items-center gap-2">
+						<div class="hidden gap-1 text-sm sm:flex" role="group" aria-label="Sort">
 							{#each [['level', 'level'], ['seen', 'last seen'], ['name', 'name']] as [k, l] (k)}
 								<button
 									class="rounded-md px-2.5 py-1 transition-colors {sort === k
 										? 'bg-primary text-primary-foreground'
 										: 'text-muted-foreground hover:bg-accent'}"
-									onclick={() => (sort = k as SortKey)}>{l}</button
+									onclick={() => ((sort = k as SortKey), (page = 0))}>{l}</button
 								>
 							{/each}
 						</div>
@@ -175,46 +189,60 @@
 					</div>
 				</div>
 
-				{#if players.length > 6}
-					<div class="relative">
+				<!-- orodna vrstica: iskanje + listanje (vedno prisotna -> višina se ne spreminja) -->
+				<div class="flex h-9 items-center gap-2">
+					<div class="relative min-w-0 flex-1">
 						<Search class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input bind:value={query} placeholder="Find a hero, class or guild…" class="pl-8" />
+						<Input bind:value={query} oninput={() => (page = 0)} placeholder="Find a hero, class, spec or guild…" class="h-9 pl-8" />
 					</div>
-				{/if}
-
-				{#if sorted.length === 0}
-					<p class="wow-frame rounded-lg p-6 text-center text-sm text-muted-foreground italic">
-						Nobody matches "{query}". Maybe they quit. Maybe they're hiding. Probably hiding.
-					</p>
-				{:else if view === 'list'}
-					<RosterTable rows={sorted} {allowed} />
-				{:else}
-					{@const visible = showAll || query ? sorted : sorted.slice(0, CARD_PREVIEW)}
-					<div class="grid gap-4 sm:grid-cols-2">
-						{#each visible as c (c.slug)}<CharacterCard {c} />{/each}
-					</div>
-					{#if !query && sorted.length > CARD_PREVIEW}
+					<div class="flex shrink-0 items-center gap-1">
 						<button
-							class="w-full rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-							onclick={() => (showAll = !showAll)}
+							class="grid size-9 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+							aria-label="Previous heroes"
+							disabled={pageIdx === 0}
+							onclick={() => go(-1)}><ChevronLeft class="size-4" /></button
 						>
-							{showAll ? 'Show fewer' : `Show all ${sorted.length} heroes (the other ${sorted.length - CARD_PREVIEW} are shy)`}
-						</button>
+						<span class="w-[5.5rem] text-center text-xs text-muted-foreground tabular-nums" aria-live="polite">
+							{#if sorted.length}{pageIdx * pageSize + 1}–{Math.min(sorted.length, (pageIdx + 1) * pageSize)} of {sorted.length}{:else}0 of 0{/if}
+						</span>
+						<button
+							class="grid size-9 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+							aria-label="Next heroes"
+							disabled={pageIdx >= pages - 1}
+							onclick={() => go(1)}><ChevronRight class="size-4" /></button
+						>
+					</div>
+				</div>
+
+				<!-- telo: vedno enaka višina (sm+), na telefonu naravna višina -->
+				<div class="sm:h-[25.5rem]">
+					{#if sorted.length === 0}
+						<p class="wow-frame grid h-full place-items-center rounded-lg p-6 text-center text-sm text-muted-foreground italic">
+							Nobody matches "{query}". Maybe they quit. Maybe they're hiding. Probably hiding.
+						</p>
+					{:else if view === 'list'}
+						<RosterTable rows={pageRows} {allowed} />
+					{:else}
+						<div class="grid h-full gap-4 sm:grid-cols-2 sm:grid-rows-2">
+							{#each pageRows as c (c.slug)}<CharacterCard {c} />{/each}
+						</div>
 					{/if}
-				{/if}
+				</div>
 			</section>
 
-			<!-- gossip: enaka glava kot roster; omejena višina + lasten drsnik, na širokem zaslonu prilepljen -->
-			<aside class="min-w-0 space-y-3 lg:sticky lg:top-20">
-				<div class="flex min-h-9 items-center">
-					<h2 class="text-xl font-semibold">Tavern Gossip</h2>
+			<!-- gossip: na lg točno višina rosterja -->
+			<aside class="relative min-w-0">
+				<div class="flex flex-col gap-3 lg:absolute lg:inset-0">
+					<div class="flex h-9 shrink-0 items-center">
+						<h2 class="text-xl font-semibold">Tavern Gossip</h2>
+					</div>
+					<GossipFeed
+						events={feed.data ?? []}
+						showTitle={false}
+						locked={!allowed('lastLogin')}
+						class="max-h-[28rem] min-h-0 flex-1 overflow-y-auto overscroll-contain lg:max-h-none"
+					/>
 				</div>
-				<GossipFeed
-					events={feed.data ?? []}
-					showTitle={false}
-					locked={!allowed('lastLogin')}
-					class="max-h-[28rem] overflow-y-auto overscroll-contain lg:max-h-[calc(100vh-10rem)]"
-				/>
 			</aside>
 		</div>
 
