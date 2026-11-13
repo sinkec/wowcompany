@@ -22,6 +22,10 @@ Vse mora delovati znotraj **brezplačnih paketov**.
 | Talenti | ✅ drevesa, rangi x/max, ikone, build "5/22/0", respec v objavah, polje vidnosti `talents` |
 | Ikona, Privacy, Terms | ✅ `static/icon.svg` (+ `icon-120.png` za Google, `icon-512.png` za Discord avatar), `/privacy`, `/terms` |
 
+**Naslednji velik projekt: WowCompany Companion** (namizna aplikacija Tauri za Windows/Linux, dungeon analitika iz combat loga, prijava prek portala, rubrika Dungeon Runs) – celoten načrt, preverjena dejstva o combat logu in faze so v **[COMPANION.md](COMPANION.md)**.
+
+**Dev baza:** vsebuje 20 testnih junakov (člani guilda) iz preizkusa postavitve rosterja – po želji odstrani v dev adminu → Heroes.
+
 **Naslednji koraki (predlogi):**
 1. Google Auth Platform → Branding izpolniti (home `/`, `/privacy`, `/terms`, authorized domain `wowcompany.vercel.app`) → Audience → **Publish app** (brez logotipa).
 2. Po ~1 tednu: Convex dashboard → Usage (primerjaj z razdelkom 8) in izmeri zakasnitev Blizzarda po odjavi.
