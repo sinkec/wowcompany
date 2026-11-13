@@ -13,8 +13,8 @@
 <svelte:head><title>Dungeon Runs — WowCompany</title></svelte:head>
 
 <div class="space-y-6">
-	<section class="flex flex-wrap items-end gap-4">
-		<div class="min-w-0 flex-1 space-y-1">
+	<section class="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
+		<div class="min-w-0 space-y-1 sm:flex-1">
 			<h1 class="flex items-center gap-3 text-3xl font-bold text-primary md:text-4xl">
 				<Swords class="size-8" /> Dungeon Runs
 			</h1>
@@ -23,7 +23,8 @@
 				whoever was snitching, judged by everyone. Click a run for the full autopsy.
 			</p>
 		</div>
-		<a href="/link" class="text-sm text-primary hover:underline">Get the Companion app →</a>
+		<a href="/link" class="shrink-0 text-sm text-primary hover:underline">Get the Companion app →</a
+		>
 	</section>
 
 	{#if access.data && !access.data.runs}

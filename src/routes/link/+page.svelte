@@ -6,11 +6,9 @@
 	import MonitorSmartphone from '@lucide/svelte/icons/monitor-smartphone';
 	import Loader from '@lucide/svelte/icons/loader-2';
 	import { api } from '#convex/_generated/api.js';
-	import type { Id } from '#convex/_generated/dataModel.js';
 	import { authClient } from '#lib/auth-client.js';
-	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { ago } from '#lib/wow.js';
+	import DevicesList from '#lib/components/wow/DevicesList.svelte';
 
 	const auth = useAuth();
 	const client = useConvexClient();
@@ -23,7 +21,6 @@
 	const link = useQuery(api.companion.linkInfo, () =>
 		auth.isAuthenticated && code ? { code, now } : 'skip'
 	);
-	const devices = useQuery(api.companion.myDevices, () => (auth.isAuthenticated ? {} : 'skip'));
 
 	const isMember = $derived(me.data?.role === 'admin' || me.data?.role === 'member');
 	let busy = $state(false);
@@ -44,16 +41,6 @@
 			toast.error((e as Error).message.replace(/^.*ConvexError:\s*/, '').replace(/\s+at .*$/s, ''));
 		} finally {
 			busy = false;
-		}
-	}
-
-	async function revoke(deviceId: Id<'devices'>, name: string) {
-		if (!confirm(`Revoke "${name}"? It will stop uploading runs immediately.`)) return;
-		try {
-			await client.mutation(api.companion.revokeDevice, { deviceId });
-			toast.success(`${name} revoked`, { description: 'Exiled. Hearthstone confiscated.' });
-		} catch (e) {
-			toast.error((e as Error).message);
 		}
 	}
 </script>
@@ -140,38 +127,7 @@
 
 		<section class="space-y-3">
 			<h2 class="text-xl font-semibold">My devices</h2>
-			{#if !devices.data?.length}
-				<p class="text-sm text-muted-foreground italic">
-					No devices yet. Install the Companion, click "Sign in with Google" in it, and it will send
-					you here.
-				</p>
-			{:else}
-				<ul class="space-y-2">
-					{#each devices.data as d (d._id)}
-						<li
-							class="wow-frame flex items-center justify-between gap-3 rounded-lg p-3"
-							class:opacity-50={d.revokedAt}
-						>
-							<div class="min-w-0">
-								<div class="truncate font-semibold">{d.name}</div>
-								<div class="text-xs text-muted-foreground">
-									linked {ago(d.createdAt)}
-									{#if d.lastSeenAt}· last upload {ago(d.lastSeenAt)}{:else}· never uploaded
-										anything{/if}
-									{#if d.appVersion}· v{d.appVersion}{/if}
-								</div>
-							</div>
-							{#if d.revokedAt}
-								<Badge variant="secondary">Revoked</Badge>
-							{:else}
-								<Button size="sm" variant="outline" onclick={() => revoke(d._id, d.name)}
-									>Revoke</Button
-								>
-							{/if}
-						</li>
-					{/each}
-				</ul>
-			{/if}
+			<DevicesList />
 		</section>
 	{/if}
 </div>

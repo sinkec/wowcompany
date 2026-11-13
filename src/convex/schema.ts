@@ -104,7 +104,18 @@ export default defineSchema({
 		ownerUserId: v.optional(v.string()),
 		addedAt: v.number(),
 		active: v.boolean()
-	}).index('by_slug', ['slug']),
+	})
+		.index('by_slug', ['slug'])
+		.index('by_owner', ['ownerUserId']),
+
+	// Uporabniški profil (ime/priimek, glavni junak). Better Auth hrani samo Googlovo ime.
+	profiles: defineTable({
+		userId: v.string(),
+		firstName: v.string(),
+		lastName: v.string(),
+		mainSlug: v.optional(v.string()),
+		updatedAt: v.number()
+	}).index('by_user', ['userId']),
 
 	// EN dokument, ki ga cron prebere vsako minuto (majhen -> malo DB I/O).
 	pollState: defineTable({

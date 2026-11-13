@@ -6,6 +6,7 @@ import { query } from './_generated/server.js';
 import { betterAuth, type BetterAuthOptions } from 'better-auth';
 import authConfig from './auth.config.js';
 import { getViewer } from './lib/access.js';
+import { displayNameOf, profileOf } from './lib/profile.js';
 
 const authFunctions: AuthFunctions = internal.auth;
 
@@ -57,12 +58,36 @@ export const me = query({
 	handler: async (ctx) => {
 		const viewer = await getViewer(ctx);
 		if (!viewer) return null;
+		const profile = await profileOf(ctx, viewer.user._id);
+		// glavni junak: izbran v nastavitvah, sicer prvi lastni
+		const mainPlayer = profile?.mainSlug
+			? await ctx.db
+					.query('players')
+					.withIndex('by_slug', (q) => q.eq('slug', profile.mainSlug!))
+					.unique()
+			: await ctx.db
+					.query('players')
+					.withIndex('by_owner', (q) => q.eq('ownerUserId', viewer.user._id))
+					.first();
+		const mainSummary = mainPlayer
+			? await ctx.db
+					.query('summaries')
+					.withIndex('by_player', (q) => q.eq('playerId', mainPlayer._id))
+					.unique()
+			: null;
 		return {
 			id: viewer.user._id,
-			name: viewer.user.name,
+			name: displayNameOf(profile, viewer.user.name ?? viewer.user.email),
 			email: viewer.user.email,
 			image: viewer.user.image ?? null,
-			role: viewer.role
+			role: viewer.role,
+			main: mainPlayer
+				? {
+						slug: mainPlayer.slug,
+						name: mainPlayer.displayName,
+						classId: mainSummary?.classId ?? null
+					}
+				: null
 		};
 	}
 });

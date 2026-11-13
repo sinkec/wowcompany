@@ -29,10 +29,12 @@ import type * as lib_discordEmbed from "../lib/discordEmbed.js";
 import type * as lib_humor from "../lib/humor.js";
 import type * as lib_normalize from "../lib/normalize.js";
 import type * as lib_players from "../lib/players.js";
+import type * as lib_profile from "../lib/profile.js";
 import type * as lib_runsView from "../lib/runsView.js";
 import type * as lib_settings from "../lib/settings.js";
 import type * as players from "../players.js";
 import type * as poll from "../poll.js";
+import type * as profile from "../profile.js";
 import type * as roster from "../roster.js";
 import type * as runs from "../runs.js";
 
@@ -64,10 +66,12 @@ declare const fullApi: ApiFromModules<{
   "lib/humor": typeof lib_humor;
   "lib/normalize": typeof lib_normalize;
   "lib/players": typeof lib_players;
+  "lib/profile": typeof lib_profile;
   "lib/runsView": typeof lib_runsView;
   "lib/settings": typeof lib_settings;
   players: typeof players;
   poll: typeof poll;
+  profile: typeof profile;
   roster: typeof roster;
   runs: typeof runs;
 }>;
