@@ -438,8 +438,16 @@ WowCompany/
 - [ ] Party leader (combat log ga ne zapiše – §14 A17)
 - [ ] Admin → Portal Room: sekcija Companion (prenos aplikacije, naprave vseh članov) → C6
 
-### Faza C6 – Distribucija
-- [ ] GitHub Actions build (Windows + Linux), Releases, updater, navodila v Portal Room
+### Faza C6 – Distribucija (v teku, 13. 11. 2026)
+- [x] Repozitorij `sinkec/wowcompany` je **javen** (pred tem pregledana celotna zgodovina: brez skrivnosti, `.env`, logov; avtor = GitHub noreply)
+- [x] `.github/workflows/companion-release.yml`: oznaka `companion-vX.Y.Z` → Windows NSIS + Linux AppImage/deb → GitHub Release
+  (imena `WowCompany-Companion_[version]_[platform]_[arch][setup][ext]`), na Linuxu pred buildom `cargo test -p wowlog -p wowrun`
+- [x] Portal `/link#download` (komponenta `GetApp.svelte`): zadnja izdaja iz javnega GitHub API, gumb glede na OS, navodila (SmartScreen, chmod, /combatlog)
+- [ ] Tauri updater (podpisni ključ, `latest.json`) + preverjanje posodobitev v aplikaciji
+- [ ] Windows preizkus prave namestitve (§14 C2/C3)
+
+**Nova izdaja:** dvigni `version` v `desktop/src-tauri/tauri.conf.json` (+ `Cargo.toml`, `package.json`), commit, nato
+`git tag companion-vX.Y.Z && git push origin companion-vX.Y.Z`.
 
 ### Faza C7 – Faza 2
 - [ ] Loot iz `/chatlog`, Discord objava runa, živo pošiljanje (stikalo) + živi pogled
@@ -479,7 +487,7 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 
 **C. Okolje / distribucija**
 - [x] C1 Pot do mape `Logs` v Proton prefiksu (Steam) – ✅ najdena samodejno (razdelek 3). Lutris/Bottles/Windows: le predvideno
-- [ ] C2 Tauri build: ✅ Linux debug (WebKitGTK 2.52); Windows + release paketi (AppImage/deb/NSIS) → C6
+- [ ] C2 Tauri build: ✅ Linux debug lokalno; release paketi (NSIS/AppImage/deb) gradi GitHub Actions – Windows namestitev še ni preizkušena na pravem PC-ju
 - [ ] C3 Branje loga, medtem ko ga igra piše (Windows file locking, Wine)
 - [ ] C4 Keyring (Secret Service / Windows Credential Manager) – **zdaj datoteka 0600** (`device-token` v config mapi); `keyring` 4 ima nov API
 - [ ] C6 Tray ikona v GNOME (potrebuje razširitev AppIndicator) in KDE – ni vizualno preverjeno; zapiranje okna skrije v tray
