@@ -1,7 +1,9 @@
 //! `WoWChatLog.txt` (`/chatlog`): only the loot lines are interesting.
 //!
-//! **Not verified on a Forever chat log yet** (COMPANION.md §14 B1) – the parser is
-//! deliberately tolerant:
+//! Verified on a real Forever chat log (13. 11. 2026): plain item names without brackets,
+//! stack count glued on (`Linen Clothx3`), trailing dot only for other players, timestamps
+//! without year (`11/13 18:39:24.307`), looters as `Firstname Surname`. Also accepted
+//! (other WoW versions):
 //! * timestamp with or without year (`11/13 18:00:01.123` or `11/13/2026 18:00:01.1234`),
 //! * item as plain `[Linen Cloth]` or as a raw link `|cff1eff00|Hitem:2589::…|h[Linen Cloth]|h|r`,
 //! * `You receive loot: …` (the log writer) and `Name receives loot: …` (party members),
@@ -36,6 +38,22 @@ fn quality_of(color: &str) -> Option<u8> {
     }
 }
 
+/// `Linen Clothx3` → (`Linen Cloth`, 3); `Linen Cloth` → (`Linen Cloth`, 1).
+fn split_count(s: &str) -> (String, u32) {
+    if let Some(i) = s.rfind('x') {
+        let (name, digits) = (&s[..i], &s[i + 1..]);
+        if !name.is_empty()
+            && !digits.is_empty()
+            && digits.bytes().all(|b| b.is_ascii_digit())
+            && let Ok(n) = digits.parse::<u32>()
+            && n > 0
+        {
+            return (name.trim_end().to_string(), n);
+        }
+    }
+    (s.to_string(), 1)
+}
+
 /// Parses one chat log line; `Some` only for loot lines. `default_year` is used when the
 /// timestamp has no year (pass the year of the file's modification time).
 pub fn parse_loot_line(line: &str, default_year: i64) -> Option<Loot> {
@@ -67,21 +85,29 @@ pub fn parse_loot_line(line: &str, default_year: i64) -> Option<Loot> {
         .and_then(|s| s.split(|c: char| !c.is_ascii_digit()).next())
         .and_then(|d| d.parse().ok());
 
-    let open = rest.find('[')?;
-    let close = rest[open..].find(']')? + open;
-    let item = rest[open + 1..close].trim().to_string();
+    let (item, count) = match rest.find('[') {
+        // bracketed / linked item: "[Linen Cloth]x2." or "|c…|h[Linen Cloth]|h|rx2."
+        Some(open) => {
+            let close = rest[open..].find(']')? + open;
+            let item = rest[open + 1..close].trim().to_string();
+            // count: "x2" somewhere after the closing bracket (link tail "|h|r" may sit in between)
+            let after = &rest[close + 1..];
+            let count = after
+                .find('x')
+                .map(|i| &after[i + 1..])
+                .and_then(|s| s.split(|c: char| !c.is_ascii_digit()).next())
+                .and_then(|d| d.parse::<u32>().ok())
+                .filter(|&n| n > 0)
+                .unwrap_or(1);
+            (item, count)
+        }
+        // Forever (verified 13. 11. 2026): plain name, "x2" glued on, trailing dot only for others:
+        //   "You receive loot: Linen Clothx3" / "Name Surname receives loot: Wool Clothx2."
+        None => split_count(rest.trim().trim_end_matches('.').trim()),
+    };
     if item.is_empty() {
         return None;
     }
-    // count: "x2" somewhere after the closing bracket (link tail "|h|r" may sit in between)
-    let after = &rest[close + 1..];
-    let count = after
-        .find('x')
-        .map(|i| &after[i + 1..])
-        .and_then(|s| s.split(|c: char| !c.is_ascii_digit()).next())
-        .and_then(|d| d.parse::<u32>().ok())
-        .filter(|&n| n > 0)
-        .unwrap_or(1);
 
     Some(Loot {
         timestamp,
@@ -127,6 +153,45 @@ mod tests {
         assert_eq!(
             (c.looter.as_deref(), c.count, c.quality),
             (Some("Mendy-Bandage"), 3, Some(1))
+        );
+    }
+
+    #[test]
+    fn forever_format_plain_names() {
+        // shapes from a real Forever chat log (names/items replaced)
+        let a = parse_loot_line("11/13 18:39:24.307  You receive loot: Warped Leather Bracers", 2026).unwrap();
+        assert_eq!(
+            (a.looter.as_deref(), a.item.as_str(), a.count, a.quality),
+            (None, "Warped Leather Bracers", 1, None)
+        );
+        let b = parse_loot_line("11/13 18:51:10.325  You receive loot: Linen Clothx3", 2026).unwrap();
+        assert_eq!((b.item.as_str(), b.count), ("Linen Cloth", 3));
+        let c = parse_loot_line(
+            "11/13 18:57:03.091  Grobos Stinkfoot receives loot: Wool Clothx2.",
+            2026,
+        )
+        .unwrap();
+        assert_eq!(
+            (c.looter.as_deref(), c.item.as_str(), c.count),
+            (Some("Grobos Stinkfoot"), "Wool Cloth", 2)
+        );
+        let d = parse_loot_line(
+            "11/13 18:57:04.000  Grobos Stinkfoot receives loot: Box of Bolts.",
+            2026,
+        )
+        .unwrap();
+        assert_eq!((d.item.as_str(), d.count), ("Box of Bolts", 1));
+        assert_eq!(split_count("Sphinx"), ("Sphinx".to_string(), 1));
+        assert_eq!(
+            parse_loot_line(
+                "11/13 18:57:05.000  Grobos Stinkfoot creates Heavy Linen Bandage.",
+                2026
+            ),
+            None
+        );
+        assert_eq!(
+            parse_loot_line("11/13 18:57:06.000  Your share of the loot is 7 Silver.", 2026),
+            None
         );
     }
 

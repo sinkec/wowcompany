@@ -483,7 +483,11 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 - [ ] A16 Scarlet Monastery / Dire Maul / Stratholme / BRD – več kril na enem instanceID: en run ali več?
 
 **B. Chat log (faza 2)**
-- [ ] B1 `/chatlog` v Forever zapisuje loot sproti (`WoWChatLog.txt`), format vrstic – **parser že obstaja (v0.1.1), a je napisan po splošnem WoW formatu**: preveri ime datoteke, čas (z letnico?), `You receive loot` / `X receives loot`, ali so v vrsticah link kode, kako je zapisano ime člana (samo ime? ime-priimek?)
+- [x] B1 Format chat loga v Forever (preverjeno 13. 11. 2026 na pravem `WoWChatLog.txt`, 60/60 loot vrstic):
+  `MM/DD HH:MM:SS.mmm` brez letnice; `You receive loot: Linen Clothx3` (brez pike) in `Ime Priimek receives loot: Wool Clothx2.` (s piko);
+  **brez oklepajev in povezav** → kvaliteta in itemID nista znana. Ignorira `X creates …` (crafting) in `Your share of the loot is …`.
+  v0.1.1 je imela napako (zahtevala `[...]`) → popravljeno v **v0.1.2**. Preverjanje: `cargo run -p wowlog --example chat_loot -- <WoWChatLog.txt>`.
+- [ ] B1b Loot v pravem dungeonu s partyjem: ujemanje "Ime Priimek" iz chata s člani partyja iz combat loga
 - [ ] B2 Brisanje logov ob izhodu na Windows (igra drži datoteko odprto → ostane) in Linux (ohrani aktivno datoteko)
 
 **C. Okolje / distribucija**
@@ -571,7 +575,7 @@ Ukazi: `cargo test`, `bun test tests/`, `bun run check:companion` (E2E HTTP na d
 
 **v0.1.1 (13. 11. 2026) – loot, navodila, pospravljanje logov:**
 - `wowlog::chat` (`parse_loot_line`): `You receive loot: [X]x2.` / `Name receives loot: |cff…|Hitem:ID…|h[X]|h|r.`, čas z/brez letnice
-  (`time::parse_with_year`). **Format v Forever NEPREVERJEN** (§14 B1) – parser je toleranten, potrebujemo pravi `WoWChatLog.txt`.
+  (`time::parse_with_year`). Format Forever preverjen v v0.1.2 (§14 B1).
 - `wowrun`: `Detector::push_loot` (samo v dungeonu med runom, od 60 s pred začetkom), ime iz chata → član partyja
   (polno ime ali enoličen prvi del imena), sicer `slug: null` + surovo ime. **Shema 2** = `loot[]`; strežnik sprejme 1 in 2.
 - Aplikacija: druga sled za `WoWChatLog*.txt`; zavihek **How to log** s sprotnimi preverjanji (mapa, combat log teče, napredni log iz glave
