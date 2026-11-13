@@ -69,6 +69,46 @@ Vzorec: `wowlog/WoWCombatLog-111326_173926.txt` (2,1 MB, 9.726 vrstic, 15 min v 
   `ENCOUNTER_START/END` (boss segmenti), `ZONE_CHANGE` ob vstopu v instanco (instance ID/tip), party zastavice,
   `COMBATANT_INFO` (oprema/talenti ob pullu – zahteva `/console advancedCombatLogging 1`), `SPELL_ABSORBED`, `SPELL_INTERRUPT`, `SPELL_DISPEL`.
 
+### 3.1 Javni viri (iskanje 13. 11. 2026)
+- **Javnega vzorca Forever dungeon loga ni.** Orodja za Forever (npr. `mdn87/wow-forever-helper`) navajajo "verified so far: synthetic logs only"
+  in da ni potrjeno, ali Forever v dungeonih zapiše `ENCOUNTER_START/END`. Prav tako poročajo, da je treba logiranje ponovno vklopiti po vsaki prijavi/reloadu.
+- `ENCOUNTER_START` (splošno WoW): `encounterID, "name", difficultyID, groupSize` (dungeon = groupSize 5); `ENCOUNTER_END` doda `success`.
+  Encounter ID je **DungeonEncounterID** (ne Encounter Journal ID).
+- **Seznam Forever dungeonov z ID-ji** (vir: addon `postblink/KwikTip`, `Forever/DungeonData.lua`; avtor sam navaja, da je del
+  "pending validation" → **NEPREVERJENO**, potrditi z našim vzorcem). Format: instanceID · encounterID ime.
+
+| Dungeon | instanceID | Bossi (encounterID ime) |
+|---|---|---|
+| The Hall of Thanes *(novo v Forever)* | 3065 | 3493 Faldrim Anvilmar · 3495 Infurnus · 3494 Plunder · 3496 Durgen Dirgehammer |
+| Ragefire Chasm | 389 | 2732 Oggleflint · 2733 Taragaman the Hungerer · 2734 Jergosh the Invoker · 2735 Bazzalan |
+| Stormwind Stockade | 34 | 2756 Targorr the Dread · 2757 Kam Deepfury · 2758 Hamhock · 2759 Dextren Ward · 2760 Bazil Thredd |
+| Ruins of Lordaeron *(novo)* | 2999 | 3353 Witherfang · 3357 The Abandoned · 3411 Viktor the Vile · 3412 Bjork · 3354 Rath'mael |
+| Excavation Site: Wetlands *(novo)* | 2998 | 3480 Saltspine · 3481 Shadetooth · 3644 Highland Horror · 3482 Relic Guardian |
+| City of Dalaran *(novo)* | 2959 | 3311 Atrexis the Grave Knight · 3310 Lyn the Ignored · 3298 Arcane Anomaly · 3299 Fel Ancient · 3300 Mana Devourer · 3302 Unstable Sentinel · 3303 Shade of the Archmage |
+| Deadmines | 36 | 2741 Rhahk'Zor · 2742 Sneed · 3676 Miner Johnson · 2743 Gilnid · 2745 Mr. Smite · 2744 Captain Greenskin · 2747 Edwin VanCleef · 2746 Cookie |
+| Wailing Caverns | 43 | 585 Lady Anacondra · 586 Lord Cobrahn · 587 Kresh · 588 Lord Pythas · 589 Skum · 590 Lord Serpentis · 591 Verdan the Everliving · 592 Mutanus the Devourer |
+| Shadowfang Keep | 33 | 2748 Rethilgore · 2749 Razorclaw the Butcher · 2750 Baron Silverlaine · 2751 Commander Springvale · 2752 Odo the Blindwatcher · 2753 Fenrus the Devourer · 2754 Wolf Master Nandos · 2755 Archmage Arugal |
+| Blackfathom Deeps | 48 | 2916 Ghamoo-ra · 2915 Lady Sarevess · 2913 Lorgus Jett · 2912 Old Serra'kis · 2911 Twilight Lord Kelris · 2910 Aku'mai |
+| Gnomeregan | 90 | 2768 Grubbis · 2769 Viscous Fallout · 2770 Electrocutioner 6000 · 2771 Crowd Pummeler 9-60 · 2772 Mekgineer Thermaplugg |
+| Razorfen Kraul | 47 | 2773 Roogug · 2774 Aggem Thorncurse · 2775 Death Speaker Jargba · 2776 Overlord Ramtusk · 2777 Agathelos the Raging · 2778 Charlga Razorflank |
+| Uldaman | 70 | 547 Revelosh · 548 The Lost Dwarves · 549 Ironaya · 1887 Obsidian Sentinel · 551 Ancient Stone Keeper · 552 Galgann Firehammer · 553 Grimlok · 554 Archaedas |
+| Razorfen Downs | 129 | 2780 Tuten'kash · 2781 Plaguemaw the Rotting · 2782 Mordresh Fire Eye · 2783 Ragglesnout · 2784 Glutton · 2785 Amnennar the Coldbringer |
+| Scarlet Monastery | 189 | 444 Interrogator Vishas · 2779 Bloodmage Thalnos · 446 Houndmaster Loksey · 447 Arcanist Doan · 448 Herod · 449 High Inquisitor Fairbanks · 450 High Inquisitor Whitemane |
+| Zul'Farrak | 209 | 593–600 (Velratha, Gahz'rilla, Antu'sul, Theka, Zum'rah, Nekrum, Sezz'ziz, Ukorz Sandscalp) |
+| Maraudon | 349 | 422–429 (Noxxion … Princess Theradras) |
+| Sunken Temple | 109 | 3582–3589 (Atal'alarion … Avatar of Hakkar) |
+| Blackrock Depths | 230 | 227–244, 2789, 2790 (… Emperor Dagran Thaurissan) |
+| Dire Maul | 429 | 343–368, 2792–2794 (… King Gordok) |
+| Scholomance | 289 | 2801–2813 (… Darkmaster Gandling) |
+| Stratholme | 329 | 472–484, 2798–2800 (… Baron Rivendare) |
+
+Opombe vira: Scarlet Monastery (189) in Dire Maul (429) si delita karto med krili; Stratholme ne loči strani.
+Naš solo vzorec že vsebuje statistiko "Bazzalan kills (Ragefire Chasm)" → RFC obstaja v Forever.
+
+**Posledica za načrt:** parser začnemo na solo vzorcu + **sintetičnih** testnih vrsticah (`ENCOUNTER_START/END`, party zastavice);
+detektor runa se opira na `ZONE_CHANGE` z instanceID iz tabele, `ENCOUNTER_*` (če obstajajo) in rezervo "smrt znanega boss NPC-ja".
+Pravi dungeon vzorec ostaja potreben za potrditev pred izdajo.
+
 ---
 
 ## 4. Arhitektura (popravljena glede na prvotno idejo)
