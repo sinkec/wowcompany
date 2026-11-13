@@ -1,16 +1,25 @@
 <script lang="ts">
 	import type { FeedEvent } from '#lib/types.js';
 	import { sessionHeadline } from '#convex/lib/humor.js';
+	import Locked from './Locked.svelte';
 	import { ago, classColor, fmt, qualityColor } from '#lib/wow.js';
 
-	let { events, title = 'Tavern Gossip' }: { events: FeedEvent[]; title?: string } = $props();
+	let {
+		events,
+		title = 'Tavern Gossip',
+		showTitle = true,
+		locked = false,
+		class: klass = ''
+	}: { events: FeedEvent[]; title?: string; showTitle?: boolean; locked?: boolean; class?: string } = $props();
 
 	const headline = (e: FeedEvent) => sessionHeadline(e, [...e.id].reduce((a, c) => a + c.charCodeAt(0), 0));
 </script>
 
-<section class="wow-frame rounded-lg p-4">
-	<h3 class="mb-3 text-sm font-semibold text-primary">{title}</h3>
-	{#if events.length === 0}
+<section class="wow-frame rounded-lg p-4 {klass}">
+	{#if showTitle}<h3 class="mb-3 text-sm font-semibold text-primary">{title}</h3>{/if}
+	{#if locked}
+		<Locked what="who did what in the tavern" />
+	{:else if events.length === 0}
 		<p class="py-6 text-center text-sm text-muted-foreground italic">
 			Quiet tavern. Either everyone is online, or everyone is dead.
 		</p>

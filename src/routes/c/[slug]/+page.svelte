@@ -254,7 +254,7 @@
 								<Locked what="the embarrassing numbers" />
 							{/if}
 						</section>
-						<GossipFeed events={feed.data ?? []} title="Recent Shenanigans" />
+						<GossipFeed events={feed.data ?? []} title="Recent Shenanigans" locked={!c.private && !(s && "lastLogin" in s)} />
 					</div>
 				</Tabs.Content>
 

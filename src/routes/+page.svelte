@@ -4,7 +4,13 @@
 	import { api } from '#convex/_generated/api.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import { onMount } from 'svelte';
+	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+	import List from '@lucide/svelte/icons/list';
+	import Search from '@lucide/svelte/icons/search';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import CharacterCard from '#lib/components/wow/CharacterCard.svelte';
+	import RosterTable from '#lib/components/wow/RosterTable.svelte';
 	import GossipFeed from '#lib/components/wow/GossipFeed.svelte';
 	import Leaderboard from '#lib/components/wow/Leaderboard.svelte';
 	import Locked from '#lib/components/wow/Locked.svelte';
@@ -12,16 +18,49 @@
 	import { classColor, fmt, weekSince } from '#lib/wow.js';
 
 	const roster = useQuery(api.players.list, { since: weekSince() });
-	const feed = useQuery(api.events.recent, { limit: 12 });
+	const feed = useQuery(api.events.recent, { limit: 30 });
 
 	type SortKey = 'level' | 'seen' | 'name';
 	let sort = $state<SortKey>('level');
 
+	// --- prikaz roster: kartice ali kompakten seznam (privzeto seznam pri > 8 junakih)
+	type View = 'cards' | 'list';
+	const CARD_PREVIEW = 6;
+	let viewChoice = $state<View | null>(null);
+	let showAll = $state(false);
+	let query = $state('');
+	onMount(() => {
+		try {
+			const v = localStorage.getItem('roster-view');
+			if (v === 'cards' || v === 'list') viewChoice = v;
+		} catch {
+			/* zasebno okno ipd. */
+		}
+	});
+	function setView(v: View) {
+		viewChoice = v;
+		try {
+			localStorage.setItem('roster-view', v);
+		} catch {
+			/* ni pomembno */
+		}
+	}
+
 	const players = $derived(roster.data?.players ?? []);
 	const priv = $derived(roster.data?.private ?? false);
+	const pubSet = $derived(new Set(roster.data?.publicFields ?? []));
+	const allowed = (f: string) => priv || pubSet.has(f);
+	const view = $derived<View>(viewChoice ?? (players.length > 8 ? 'list' : 'cards'));
 	const withData = $derived(players.filter((p) => p.summary));
 	const sorted = $derived(
-		[...players].sort((a, b) => {
+		[...players]
+			.filter((p) => {
+				const q = query.trim().toLowerCase();
+				if (!q) return true;
+				const sm = p.summary;
+				return [p.displayName, sm?.className, sm?.race, sm?.guild, sm?.talentSpec].some((x) => x?.toLowerCase().includes(q));
+			})
+			.sort((a, b) => {
 			if (sort === 'name') return a.displayName.localeCompare(b.displayName);
 			if (sort === 'seen') return (b.summary?.lastLogin ?? 0) - (a.summary?.lastLogin ?? 0);
 			return (b.summary?.level ?? 0) - (a.summary?.level ?? 0) || (b.summary?.experience ?? 0) - (a.summary?.experience ?? 0);
@@ -99,30 +138,83 @@
 			{/each}
 		</section>
 
-		<div class="grid gap-8 lg:grid-cols-[1fr_340px]">
+		<div class="grid items-start gap-8 lg:grid-cols-[1fr_340px]">
 			<!-- roster -->
-			<section class="space-y-3">
-				<div class="flex flex-wrap items-center justify-between gap-2">
-					<h2 class="text-xl font-semibold">The Roster</h2>
-					<div class="flex gap-1 text-sm" role="group" aria-label="Sort">
-						{#each [['level', 'by level'], ['seen', 'last seen'], ['name', 'by name']] as [k, l] (k)}
+			<section class="min-w-0 space-y-3">
+				<div class="flex min-h-9 flex-wrap items-center justify-between gap-2">
+					<h2 class="text-xl font-semibold">
+						The Roster <span class="text-base font-normal text-muted-foreground">({players.length})</span>
+					</h2>
+					<div class="flex flex-wrap items-center gap-2">
+						<div class="flex gap-1 text-sm" role="group" aria-label="Sort">
+							{#each [['level', 'level'], ['seen', 'last seen'], ['name', 'name']] as [k, l] (k)}
+								<button
+									class="rounded-md px-2.5 py-1 transition-colors {sort === k
+										? 'bg-primary text-primary-foreground'
+										: 'text-muted-foreground hover:bg-accent'}"
+									onclick={() => (sort = k as SortKey)}>{l}</button
+								>
+							{/each}
+						</div>
+						<div class="flex rounded-md border border-border p-0.5" role="group" aria-label="View">
 							<button
-								class="rounded-md px-2.5 py-1 transition-colors {sort === k
-									? 'bg-primary text-primary-foreground'
-									: 'text-muted-foreground hover:bg-accent'}"
-								onclick={() => (sort = k as SortKey)}>{l}</button
+								class="rounded p-1 {view === 'cards' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+								aria-label="Cards"
+								aria-pressed={view === 'cards'}
+								title="Cards"
+								onclick={() => setView('cards')}><LayoutGrid class="size-4" /></button
 							>
-						{/each}
+							<button
+								class="rounded p-1 {view === 'list' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+								aria-label="List"
+								aria-pressed={view === 'list'}
+								title="List"
+								onclick={() => setView('list')}><List class="size-4" /></button
+							>
+						</div>
 					</div>
 				</div>
-				<div class="grid gap-4 sm:grid-cols-2">
-					{#each sorted as c (c.slug)}<CharacterCard {c} />{/each}
-				</div>
+
+				{#if players.length > 6}
+					<div class="relative">
+						<Search class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input bind:value={query} placeholder="Find a hero, class or guild…" class="pl-8" />
+					</div>
+				{/if}
+
+				{#if sorted.length === 0}
+					<p class="wow-frame rounded-lg p-6 text-center text-sm text-muted-foreground italic">
+						Nobody matches "{query}". Maybe they quit. Maybe they're hiding. Probably hiding.
+					</p>
+				{:else if view === 'list'}
+					<RosterTable rows={sorted} {allowed} />
+				{:else}
+					{@const visible = showAll || query ? sorted : sorted.slice(0, CARD_PREVIEW)}
+					<div class="grid gap-4 sm:grid-cols-2">
+						{#each visible as c (c.slug)}<CharacterCard {c} />{/each}
+					</div>
+					{#if !query && sorted.length > CARD_PREVIEW}
+						<button
+							class="w-full rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+							onclick={() => (showAll = !showAll)}
+						>
+							{showAll ? 'Show fewer' : `Show all ${sorted.length} heroes (the other ${sorted.length - CARD_PREVIEW} are shy)`}
+						</button>
+					{/if}
+				{/if}
 			</section>
 
-			<!-- gossip -->
-			<aside>
-				<GossipFeed events={feed.data ?? []} />
+			<!-- gossip: enaka glava kot roster; omejena višina + lasten drsnik, na širokem zaslonu prilepljen -->
+			<aside class="min-w-0 space-y-3 lg:sticky lg:top-20">
+				<div class="flex min-h-9 items-center">
+					<h2 class="text-xl font-semibold">Tavern Gossip</h2>
+				</div>
+				<GossipFeed
+					events={feed.data ?? []}
+					showTitle={false}
+					locked={!allowed('lastLogin')}
+					class="max-h-[28rem] overflow-y-auto overscroll-contain lg:max-h-[calc(100vh-10rem)]"
+				/>
 			</aside>
 		</div>
 
