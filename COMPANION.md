@@ -408,7 +408,8 @@ WowCompany/
 ### Faza C3 – Convex ✅ na dev (13. 11. 2026, razdelek 8.2a)
 - [x] Tabele, prijava naprave (`/companion/link/*`), portal stran `/link`, My devices + Revoke
 - [x] `POST /companion/runs` (validacija, združevanje, nagrade, rate limit), E2E na dev
-- [ ] Deploy na prod (git push) in E2E povezave z resnično Google prijavo (§14 D1)
+- [x] Deploy na prod (13. 11. 2026, commit 6fe6c1f; smoke test: 401 brez žetona, /link 200)
+- [ ] E2E povezave z resnično Google prijavo (§14 D1)
 - [ ] Vidnost runov → C5
 
 ### Faza C4 – Tauri aplikacija (MVP) ✅ Linux (13. 11. 2026, razdelek 5.4)
@@ -470,7 +471,8 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 **D. Strežnik / portal (C3+)**
 - [ ] D1 Povezava naprave od začetka do konca z **resnično Google prijavo** na `/link` (dev E2E je odobritev simuliral z interno mutacijo) in na prod
 - [ ] D1a Stran `/link` vizualno (prijavljen član, nečlan, potekla koda, My devices) – do zdaj preverjen le izris za neprijavljenega
-- [ ] D1b `SITE_URL` v Convex env na dev/prod pravilen (od njega sta odvisna `linkUrl` in `url` v odgovoru)
+- [x] D1b `SITE_URL`: prod = `https://wowcompany.vercel.app` ✅; dev = `http://localhost:5173` (glej C8)
+- [ ] D1c Upload s slabim žetonom IN napačnim telesom vrne 400 (validator argumentov teče pred preverjanjem žetona) – razmisli o preverjanju žetona v HTTP plasti pred mutacijo
 - [ ] D2 Upload **pravega** runa (dev E2E je uporabil sintetičnega): velikost, validacija, združevanje dveh snemalcev z dveh PC-jev
 - [ ] D2a Ali je gzip potreben (pravi run > ~300 KB?) – strežnik ga zdaj ne podpira
 - [ ] D3 Poraba Convex po 1 tednu (klici, DB I/O, prostor) vs ocena v razdelku 10
