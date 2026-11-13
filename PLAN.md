@@ -21,6 +21,7 @@ Vse mora delovati znotraj **brezplačnih paketov**.
 | Discord nastavitve prek spleta | ✅ Portal Room: webhook URL + bot token (write-only, tabela `secrets`), App ID / Public Key / Server ID samodejno; env samo rezerva (prod ima trenutno še env vrednosti) |
 | Talenti | ✅ drevesa, rangi x/max, ikone, build "5/22/0", respec v objavah, polje vidnosti `talents` |
 | Ikona, Privacy, Terms | ✅ `static/icon.svg` (+ `icon-120.png` za Google, `icon-512.png` za Discord avatar), `/privacy`, `/terms` |
+| Glavna stran pri 20+ junakih | ✅ Roster s **fiksno višino**: Cards 2×2 ali List 8 vrstic na stran, iskalnik + listanje ‹ › (izbira pogleda v localStorage, privzeto List pri > 8). **Tavern Gossip** enake višine kot Roster (absolutno v stolpcu), lasten zlat drsnik (`.wow-scroll` v `layout.css`), do 30 dogodkov; obiskovalcu "Members only", če je `lastLogin` skrit. Preverjeno: obe višini 504 px, lestvice vedno na istem mestu. |
 
 **Naslednji velik projekt: WowCompany Companion** (namizna aplikacija Tauri za Windows/Linux, dungeon analitika iz combat loga, prijava prek portala, rubrika Dungeon Runs) – celoten načrt, preverjena dejstva o combat logu in faze so v **[COMPANION.md](COMPANION.md)**.
 

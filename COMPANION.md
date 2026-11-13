@@ -363,3 +363,31 @@ WowCompany/
 - Nič surovih logov ali tujih igralcev na strežnik. Vzorci logov ostanejo v `wowlog/` (gitignore).
 - Brezplačni paketi so trda omejitev – vsaka nova funkcija z oceno porabe.
 - Pred commitom preveri, da ni skrivnosti (`.env` vrednosti) v diffu.
+
+---
+
+## 16. Kako nadaljevati po čiščenju spomina (handoff)
+
+**Stanje 13. 11. 2026:** načrt potrjen (Tauri 2 + Svelte, Windows + Linux, objava ob koncu runa, prijava prek portala).
+Koda za Companion še **ne obstaja**. Portal (PLAN.md) je v produkciji in nespremenjen.
+
+**Prvi koraki (faza C1 – parser), v tem vrstnem redu:**
+1. Preberi ta dokument (razdelki 3, 3.1, 5, 6) in `PLAN.md` razdelek 0.
+2. Preveri trenutne verzije: `cargo search tauri`, `bun pm view @tauri-apps/cli version`, `cargo search notify` (uporabi stabilne, ne alfa/rc).
+3. Ustvari Cargo workspace v korenu (`Cargo.toml` z `members = ["crates/wowlog"]`, kasneje `desktop/src-tauri`).
+   Pazi: koren je tudi Bun/SvelteKit projekt – `target/` dodaj v `.gitignore`.
+4. `crates/wowlog`: tip `Event` + parser vrstice (`MM/DD/YYYY HH:MM:SS.ffff␠␠EVENT,csv…`, narekovaji, `nil`, hex zastavice),
+   podpora za vse dogodke iz razdelka 3, neznani dogodki → `Event::Other`.
+5. Testi: na `wowlog/WoWCombatLog-111326_173926.txt` (lokalno, ni v gitu – test naj se preskoči, če datoteke ni) +
+   **sintetične** vrstice v `crates/wowlog/tests/fixtures/` (brez pravih imen): `ENCOUNTER_START/END`, party zastavice (`0x512`, `0x514`), `ZONE_CHANGE` v instanco 389 (Ragefire Chasm).
+6. CLI `wowlog-dump <datoteka>`: število dogodkov po tipu, damage/heal po igralcu, smrti → ročna primerjava z vzorcem.
+
+**Kaj potrebujemo od uporabnika (še odprto):**
+- Pravi log iz dungeona s partyjem (`/console advancedCombatLogging 1`, `/combatlog`, `/chatlog`) → `wowlog/`.
+- `sudo apt install libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev build-essential libssl-dev` (pred fazo C4).
+- Pot do mape `Logs` v Proton prefiksu (za `locate` modul).
+
+**Stvari, ki ostajajo iz portala (ne pozabi):**
+- Dev Convex baza ima 20 testnih junakov (člani guilda) – po želji odstrani (dev admin → Heroes).
+- Dev poller je ustavljen (da ni dvojnih Discord objav) – za razvoj portala ga vklopi v dev adminu → Settings.
+- Google aplikacija še v *Testing* – uporabnik jo bo objavil (brez logotipa).
