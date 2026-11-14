@@ -114,6 +114,17 @@ struct PlayerAcc {
     tl_healing: Vec<i64>,
     tl_taken: Vec<i64>,
     recap: VecDeque<RecapRaw>,
+    /// kind → biggest event so far (`at_ms` holds the absolute timestamp until `summarize`).
+    records: BTreeMap<RecordKind, RunRecord>,
+}
+
+impl PlayerAcc {
+    /// Keeps the event when it beats the current record of its kind (first one wins a tie).
+    fn record(&mut self, r: RunRecord) {
+        if r.amount > 0 && self.records.get(&r.kind).is_none_or(|old| old.amount < r.amount) {
+            self.records.insert(r.kind, r);
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -445,7 +456,22 @@ impl RunAcc {
                         Some(s) => (s.id, s.name.clone()),
                         None => (0, "Melee".to_string()),
                     };
+                    let target = self.public_name(&rec.dest);
                     let p = self.players.get_mut(&guid).expect("actor exists");
+                    let kind = if damage.critical {
+                        RecordKind::Crit
+                    } else {
+                        RecordKind::Hit
+                    };
+                    p.record(RunRecord {
+                        kind,
+                        amount: damage.amount,
+                        spell: name.clone(),
+                        spell_id: id,
+                        unit: target,
+                        at_ms: ts,
+                        pet,
+                    });
                     p.damage += damage.amount;
                     p.hits += 1;
                     p.crits += damage.critical as u32;
@@ -469,6 +495,15 @@ impl RunAcc {
                     let (hp, max_hp) = hp_of(advanced.as_deref(), &rec.dest.guid);
                     let guid = rec.dest.guid.clone();
                     let p = self.players.get_mut(&guid).expect("checked");
+                    p.record(RunRecord {
+                        kind: RecordKind::HitTaken,
+                        amount: damage.amount,
+                        spell: spell_name.clone().unwrap_or_else(|| "Unknown".to_string()),
+                        spell_id: spell.as_ref().map_or(0, |s| s.id),
+                        unit: source.clone(),
+                        at_ms: ts,
+                        pet: false,
+                    });
                     p.taken += damage.amount;
                     if *source_kind == DamageSource::Environmental {
                         p.env_taken += damage.amount;
@@ -501,7 +536,22 @@ impl RunAcc {
                 let effective = heal.amount - heal.overheal;
                 let b = self.bucket(ts, cfg);
                 if let Some((guid, pet)) = self.actor(&rec.source) {
+                    let target = self.public_name(&rec.dest);
                     let p = self.players.get_mut(&guid).expect("actor exists");
+                    let kind = if heal.critical {
+                        RecordKind::CritHeal
+                    } else {
+                        RecordKind::Heal
+                    };
+                    p.record(RunRecord {
+                        kind,
+                        amount: effective,
+                        spell: spell.name.clone(),
+                        spell_id: spell.id,
+                        unit: target,
+                        at_ms: ts,
+                        pet,
+                    });
                     p.healing += effective;
                     p.overheal += heal.overheal;
                     let s = p.heal_spells.entry((spell.id, pet)).or_insert_with(|| SpellAcc {
@@ -708,6 +758,14 @@ impl RunAcc {
                 },
                 top_damage: top(&p.dmg_spells),
                 top_healing: top(&p.heal_spells),
+                records: p
+                    .records
+                    .values()
+                    .map(|r| RunRecord {
+                        at_ms: r.at_ms - start,
+                        ..r.clone()
+                    })
+                    .collect(),
             })
             .collect();
         players.sort_by(|a, b| {

@@ -14,6 +14,7 @@
 	import TalentTree from '#lib/components/wow/TalentTree.svelte';
 	import Locked from '#lib/components/wow/Locked.svelte';
 	import RunCard from '#lib/components/wow/RunCard.svelte';
+	import { RECORD_KINDS, RECORD_LABEL, fmtNum, fmtWhen } from '#lib/runs.js';
 	import type { Item, Profession, StatLine, TalentTree as Tree } from '#lib/types.js';
 	import {
 		COUNTER_LABELS,
@@ -186,6 +187,41 @@
 							tales.
 						</div>
 					{:else}
+						{#if heroRuns.data?.records?.length}
+							<section class="wow-frame rounded-lg p-4">
+								<h3 class="text-sm font-semibold text-primary">Personal Records</h3>
+								<p class="text-xs text-muted-foreground italic">
+									biggest numbers ever caught on a combat log. screenshots or it didn't happen.
+								</p>
+								<div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+									{#each RECORD_KINDS as kind (kind)}
+										{@const r = heroRuns.data.records.find((x) => x.kind === kind)}
+										{#if r}
+											<a
+												href="/runs/{r.runId}?tab=numbers"
+												class="block rounded-md border border-border p-3 transition-colors hover:border-primary/60"
+											>
+												<div class="text-xs tracking-wide text-muted-foreground uppercase">
+													{RECORD_LABEL[kind].title}
+												</div>
+												<div class="text-2xl font-bold text-primary tabular-nums">
+													{fmtNum(r.amount)}
+												</div>
+												<div class="text-sm">
+													{r.spell}{#if r.pet}<span class="text-xs text-muted-foreground"> (pet)</span
+														>{/if}
+													{#if r.unit}<span class="text-muted-foreground">
+															{RECORD_LABEL[kind].prep}</span
+														>
+														{r.unit}{/if}
+												</div>
+												<div class="text-xs text-muted-foreground">{r.zone} · {fmtWhen(r.at)}</div>
+											</a>
+										{/if}
+									{/each}
+								</div>
+							</section>
+						{/if}
 						{#each heroRuns.data?.runs ?? [] as run (run.id)}
 							<RunCard {run} highlight={slug} />
 						{/each}

@@ -6,8 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
-/// 1 = C2–C5, 2 = + `loot` (chat log).
-pub const SCHEMA_VERSION: u32 = 2;
+/// 1 = C2–C5, 2 = + `loot` (chat log), 3 = + `records` per player (biggest crit, hit, heal …).
+pub const SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -117,6 +117,40 @@ pub struct PlayerSummary {
     pub crit_pct: f64,
     pub top_damage: Vec<SpellStat>,
     pub top_healing: Vec<SpellStat>,
+    /// Biggest single events of the run, at most one per kind (schema 3).
+    #[serde(default)]
+    pub records: Vec<RunRecord>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RecordKind {
+    /// Biggest critical damage hit dealt.
+    Crit,
+    /// Biggest non-critical damage hit dealt.
+    Hit,
+    /// Biggest critical heal (effective).
+    CritHeal,
+    /// Biggest non-critical heal (effective).
+    Heal,
+    /// Biggest single hit taken.
+    HitTaken,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunRecord {
+    pub kind: RecordKind,
+    pub amount: i64,
+    pub spell: String,
+    /// 0 = melee / environment.
+    pub spell_id: u32,
+    /// The other side: target for dealt damage / healing, attacker for `HitTaken`
+    /// (non-group players are anonymised).
+    pub unit: Option<String>,
+    pub at_ms: i64,
+    /// True when the player's pet did it.
+    pub pet: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

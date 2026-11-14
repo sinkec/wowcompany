@@ -510,5 +510,65 @@ fn loot_from_chat_log_is_attached_to_the_run() {
     assert_eq!(runs[0].loot[1].quality, Some(3));
     assert_eq!(runs[0].loot[1].item_id, Some(2084));
     let json = serde_json::to_string(&runs[0]).unwrap();
-    assert!(json.contains("\"schema\":2") && json.contains("\"itemId\":2084"));
+    assert!(json.contains("\"schema\":3") && json.contains("\"itemId\":2084"));
+}
+
+#[test]
+fn biggest_hits_become_records() {
+    let (l, _) = full_run();
+    let (runs, _) = detect(&l, Config::default());
+    assert_eq!(runs[0].schema, 3);
+    let rec = |slug: &str, kind: RecordKind| {
+        player(&runs[0], slug)
+            .records
+            .iter()
+            .find(|r| r.kind == kind)
+            .map(|r| (r.amount, r.spell.as_str(), r.unit.as_deref(), r.pet))
+    };
+    // recorder: biggest non-crit is the 300 Fireball on the boss, never crit, died to lava
+    assert_eq!(
+        rec("grobos-stinkfoot", RecordKind::Hit),
+        Some((300, "Fireball", Some("Oggleflint"), false))
+    );
+    assert_eq!(rec("grobos-stinkfoot", RecordKind::Crit), None);
+    let lava = rec("grobos-stinkfoot", RecordKind::HitTaken).unwrap();
+    assert_eq!((lava.0, lava.2), (1200, None));
+    // warlock: one crit (200) and a bigger plain hit (900); the imp's 30 never wins
+    assert_eq!(
+        rec("fizzle-boom", RecordKind::Crit),
+        Some((200, "Shadow Bolt", Some("Ragefire Trogg"), false))
+    );
+    assert_eq!(
+        rec("fizzle-boom", RecordKind::Hit),
+        Some((900, "Shadow Bolt", Some("Taragaman the Hungerer"), false))
+    );
+    // healer: effective healing counts (100, not 80 with 20 overheal); biggest hit taken is the killing Fireball
+    assert_eq!(
+        rec("mendy-bandage", RecordKind::Heal),
+        Some((100, "Lesser Heal", Some("Mendy Bandage"), false))
+    );
+    assert_eq!(
+        rec("mendy-bandage", RecordKind::HitTaken),
+        Some((800, "Fireball", Some("Oggleflint"), false))
+    );
+    // offsets are relative to the run start (an event may land after the last activity, e.g. lava)
+    for p in &runs[0].players {
+        for r in &p.records {
+            assert!(r.at_ms >= 0, "{r:?}");
+        }
+    }
+    // a stranger's 999 Fireball is nobody's record
+    assert!(
+        runs[0]
+            .players
+            .iter()
+            .all(|p| p.records.iter().all(|r| r.amount != 999))
+    );
+    // schema 2 JSON (no `records`) still parses
+    let mut v = serde_json::to_value(&runs[0]).unwrap();
+    for p in v["players"].as_array_mut().unwrap() {
+        p.as_object_mut().unwrap().remove("records");
+    }
+    let old: RunSummary = serde_json::from_value(v).unwrap();
+    assert!(old.players.iter().all(|p| p.records.is_empty()));
 }

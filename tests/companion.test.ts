@@ -2,6 +2,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
 	addRecorder,
+	beatsRecord,
 	checkRun,
 	computeAwards,
 	makeLinkCode,
@@ -165,5 +166,54 @@ describe('loot (schema 2)', () => {
 		expect(
 			computeAwards(party, [L('a'), L('a')]).find((x) => x.key === 'lootGoblin')
 		).toBeUndefined();
+	});
+});
+
+describe('records (schema 3)', () => {
+	const R = (kind: 'crit' | 'hit' | 'heal' | 'critHeal' | 'hitTaken', amount: number, o = {}) => ({
+		kind,
+		amount,
+		spell: 'Fireball',
+		spellId: 133,
+		unit: 'Oggleflint' as string | null,
+		atMs: 5000,
+		pet: false,
+		...o
+	});
+	const run = (records: ReturnType<typeof R>[]) =>
+		RUN({ schema: 3, players: [P('grobos-stinkfoot', { recorder: true, records }), P('fizzle-boom')] });
+
+	test('sane records are accepted; old runs without records too', () => {
+		expect(checkRun(run([R('crit', 1204), R('hitTaken', 800, { unit: null })]), NOW)).toBeNull();
+		expect(checkRun(RUN({ schema: 3 }), NOW)).toBeNull();
+	});
+	test('duplicates, nonsense amounts and out-of-run times are rejected', () => {
+		expect(checkRun(run([R('crit', 1), R('crit', 2)]), NOW)).toBe('bad records');
+		expect(checkRun(run([R('crit', 0)]), NOW)).toBe('bad record entry');
+		expect(checkRun(run([R('crit', Infinity)]), NOW)).toBe('bad record entry');
+		expect(checkRun(run([R('crit', 5, { spell: '' })]), NOW)).toBe('bad record entry');
+		expect(checkRun(run([R('crit', 5, { atMs: -1 })]), NOW)).toBe('bad record entry');
+		expect(checkRun(run([R('crit', 5, { atMs: 7 * 3_600_000 })]), NOW)).toBe('bad record entry');
+		// lava after the last fight: later than the run's duration, still fine
+		expect(checkRun(run([R('hitTaken', 700, { atMs: 1_800_000 + 20_000 })]), NOW)).toBeNull();
+	});
+	test('One-Shot Wonder goes to the biggest crit, plain hits do not count', () => {
+		const party = [
+			P('a', { damage: 1, records: [R('crit', 900), R('hit', 5000)] }),
+			P('b', { damage: 1, records: [R('crit', 1204, { spell: 'Pyroblast' })] })
+		];
+		const boom = computeAwards(party).find((x) => x.key === 'oneShotWonder');
+		expect(boom?.slug).toBe('b');
+		expect(boom?.detail).toContain('1,204 Pyroblast crit into Oggleflint');
+		expect(
+			computeAwards([P('a', { damage: 1, records: [R('hit', 5000)] })]).find(
+				(x) => x.key === 'oneShotWonder'
+			)
+		).toBeUndefined();
+	});
+	test('a hero record is replaced only by a bigger number', () => {
+		expect(beatsRecord(null, { amount: 1 })).toBe(true);
+		expect(beatsRecord({ amount: 100 }, { amount: 100 })).toBe(false);
+		expect(beatsRecord({ amount: 100 }, { amount: 101 })).toBe(true);
 	});
 });

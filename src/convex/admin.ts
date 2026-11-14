@@ -7,6 +7,7 @@ import type { Id } from './_generated/dataModel.js';
 import { action, internalMutation, internalQuery, mutation, query, type MutationCtx } from './_generated/server.js';
 import { authComponent } from './auth.js';
 import { requireAdmin } from './lib/access.js';
+import { ensurePollChain } from './poll.js';
 import { get as bnetGet, profileNs, slugify } from './lib/blizzard.js';
 import { deletePlayer, insertPlayer } from './lib/players.js';
 import { ALL_FIELDS, DEFAULT_SETTINGS, getSettings } from './lib/settings.js';
@@ -37,10 +38,18 @@ export const overview = query({
 			.query('pollState')
 			.withIndex('by_key', (q) => q.eq('key', 'main'))
 			.unique();
-		const roster = await ctx.db
-			.query('guildRoster')
+		// samo majhen meta dokument; velik roster le, dokler meta še ne obstaja (pred prvo osvežitvijo)
+		const meta = await ctx.db
+			.query('guildRosterMeta')
 			.withIndex('by_key', (q) => q.eq('key', 'main'))
 			.unique();
+		const legacy = meta
+			? null
+			: await ctx.db
+					.query('guildRoster')
+					.withIndex('by_key', (q) => q.eq('key', 'main'))
+					.unique();
+		const roster = meta ?? (legacy ? { count: legacy.members.length, fetchedAt: legacy.fetchedAt } : null);
 
 		const summaries = await Promise.all(
 			players.map((p) =>
@@ -88,7 +97,7 @@ export const overview = query({
 			members: roles
 				.map((r) => ({ id: r._id, userId: r.userId, email: r.email, name: r.name ?? null, role: r.role, createdAt: r.createdAt }))
 				.sort((a, b) => (a.role === b.role ? a.createdAt - b.createdAt : a.role === 'admin' ? -1 : 1)),
-			roster: { count: roster?.members.length ?? 0, fetchedAt: roster?.fetchedAt ?? null },
+			roster: { count: roster?.count ?? 0, fetchedAt: roster?.fetchedAt ?? null },
 			activePlayers: active,
 			estimate
 		};
@@ -110,6 +119,9 @@ export const updateSettings = mutation({
 		if (args.pollIntervalSec !== undefined) patch.pollIntervalSec = Math.min(3600, Math.max(60, Math.round(args.pollIntervalSec)));
 		if (args.paused !== undefined) patch.paused = args.paused;
 		await upsertSettings(ctx, patch);
+		// pavza ustavi verigo pollerja, nadaljevanje / nov interval jo zažene takoj
+		if (patch.paused !== undefined || patch.pollIntervalSec !== undefined)
+			await ensurePollChain(ctx, patch.pollIntervalSec !== undefined);
 	}
 });
 
@@ -186,8 +198,10 @@ export const setPublicFields = internalMutation({
 
 export const setPollInterval = internalMutation({
 	args: { seconds: v.number(), paused: v.optional(v.boolean()) },
-	handler: async (ctx, { seconds, paused }) =>
-		upsertSettings(ctx, { pollIntervalSec: Math.max(60, seconds), ...(paused === undefined ? {} : { paused }) })
+	handler: async (ctx, { seconds, paused }) => {
+		await upsertSettings(ctx, { pollIntervalSec: Math.max(60, seconds), ...(paused === undefined ? {} : { paused }) });
+		await ensurePollChain(ctx, true);
+	}
 });
 
 /** Pozabi Last-Modified -> naslednji zagon pollerja prenese vse igralce znova. */

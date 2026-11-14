@@ -7,6 +7,8 @@ export const MAX_PLAYERS = 10;
 export const MAX_RUN_MS = 6 * 3_600_000;
 export const MAX_AGE_MS = 30 * 86_400_000;
 export const MAX_LOOT = 400;
+/** Največ rekordov na igralca (ena vrsta = en rekord). */
+export const MAX_RECORDS = 5;
 
 const WORDS = [
 	'MURLOC',
@@ -74,7 +76,31 @@ export function checkRun(s: RunSummary, now: number): string | null {
 		)
 	)
 		return 'bad loot entry';
+	for (const p of s.players) {
+		const recs = p.records ?? [];
+		if (recs.length > MAX_RECORDS || new Set(recs.map((r) => r.kind)).size !== recs.length)
+			return 'bad records';
+		if (
+			recs.some(
+				(r) =>
+					!(r.amount > 0) ||
+					!Number.isFinite(r.amount) ||
+					!r.spell ||
+					r.spell.length > 120 ||
+					(r.unit?.length ?? 0) > 120 ||
+					r.atMs < 0 ||
+					// dogodek je lahko po zadnji aktivnosti (lava po boju), zato meja ni trajanje runa
+					r.atMs > MAX_RUN_MS
+			)
+		)
+			return 'bad record entry';
+	}
 	return null;
+}
+
+/** Rekord, ki premaga shranjenega (ali prvi sploh). */
+export function beatsRecord(prev: { amount: number } | null | undefined, next: { amount: number }) {
+	return !prev || next.amount > prev.amount;
 }
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
@@ -142,6 +168,19 @@ export function computeAwards(players: PlayerSummary[], loot: LootDrop[] = []): 
 			title: 'Shut Up Button',
 			slug: kicker.slug,
 			detail: `Interrupted ${kicker.interrupts} casts. Nobody gets to finish a sentence.`
+		});
+
+	// One-Shot Wonder: največji crit runa.
+	const crits = players.flatMap((p) =>
+		(p.records ?? []).filter((r) => r.kind === 'crit').map((r) => ({ slug: p.slug, r }))
+	);
+	const boom = top(crits, (c) => c.r.amount);
+	if (boom)
+		out.push({
+			key: 'oneShotWonder',
+			title: 'One-Shot Wonder',
+			slug: boom.slug,
+			detail: `${fmt(boom.r.amount)} ${boom.r.spell} crit${boom.r.unit ? ` into ${boom.r.unit}` : ''}. Compensating for something.`
 		});
 
 	// Loot Goblin: največ pobranih predmetov (vsaj 3).

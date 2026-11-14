@@ -16,7 +16,11 @@ fn main() {
         }
         if let Some(l) = wowlog::parse_loot_line(line, year) {
             parsed += 1;
-            if l.looter.is_none() { mine += 1 } else { others += 1 }
+            if l.looter.is_none() {
+                mine += 1
+            } else {
+                others += 1
+            }
             *items.entry(l.item).or_default() += l.count;
         }
     }

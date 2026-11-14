@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api.js';
 import { internalAction, internalMutation, query } from './_generated/server.js';
 import { getViewer } from './lib/access.js';
+import { sameFields } from './lib/same.js';
 import { get as bnetGet, profileNs } from './lib/blizzard.js';
 
 const member = v.object({ name: v.string(), surname: v.string(), slug: v.string(), level: v.number(), classId: v.number() });
@@ -31,12 +32,21 @@ export const refresh = internalAction({
 export const save = internalMutation({
 	args: { members: v.array(member) },
 	handler: async (ctx, { members }) => {
+		const now = Date.now();
 		const doc = await ctx.db
 			.query('guildRoster')
 			.withIndex('by_key', (q) => q.eq('key', 'main'))
 			.unique();
-		if (doc) await ctx.db.patch(doc._id, { members, fetchedAt: Date.now() });
-		else await ctx.db.insert('guildRoster', { key: 'main', members, fetchedAt: Date.now() });
+		// isti seznam -> brez zapisa velikega dokumenta (ne razveljavi roster.members pri odprtih obrazcih)
+		if (!doc) await ctx.db.insert('guildRoster', { key: 'main', members, fetchedAt: now });
+		else if (!sameFields(doc, { members }, ['members'])) await ctx.db.patch(doc._id, { members, fetchedAt: now });
+
+		const meta = await ctx.db
+			.query('guildRosterMeta')
+			.withIndex('by_key', (q) => q.eq('key', 'main'))
+			.unique();
+		if (meta) await ctx.db.patch(meta._id, { count: members.length, fetchedAt: now });
+		else await ctx.db.insert('guildRosterMeta', { key: 'main', count: members.length, fetchedAt: now });
 	}
 });
 

@@ -20,7 +20,14 @@
 	import { classColor, fmt, weekSince } from '#lib/wow.js';
 
 	const roster = useQuery(api.players.list, { since: weekSince() });
-	const feed = useQuery(api.events.recent, { limit: 30 });
+	const feed = useQuery(api.events.recent, { limit: 20 });
+	// rekordi iz dungeon runov (Companion): null = skrito za obiskovalca
+	const topCrits = useQuery(api.runs.topRecords, { kind: 'crit' });
+	const topTaken = useQuery(api.runs.topRecords, { kind: 'hitTaken' });
+	const recBy = (rows: { slug: string; amount: number }[] | null | undefined) =>
+		rows ? new Map(rows.map((r) => [r.slug, r.amount])) : null;
+	const critBy = $derived(recBy(topCrits.data));
+	const takenBy = $derived(recBy(topTaken.data));
 
 	type SortKey = 'level' | 'seen' | 'name';
 	let sort = $state<SortKey>('level');
@@ -264,6 +271,7 @@
 					<Leaderboard title="Serial Killer" note="total things murdered" entries={withData} value={(c) => c.summary?.kills} />
 					<Leaderboard title="Errand Boy" note="quests done for random NPCs, unpaid" entries={withData} value={(c) => c.summary?.quests} />
 					<Leaderboard title="Hard to Kill" note="kills per death" entries={withData} value={kd} format={(n) => fmt(n, 1)} />
+					<Leaderboard title="Biggest Crit" note="one huge number in a dungeon, to compensate for everything else" entries={withData} value={(c) => (critBy ? (critBy.get(c.slug) ?? 0) : null)} empty="No crits on record. Run a dungeon with the Companion on." />
 					<Leaderboard title="Honor? What Honor" note="honorable kills" entries={withData} value={(c) => c.summary?.honorableKills} empty="Everybody's a pacifist. Cowards." />
 				</Tabs.Content>
 				<Tabs.Content value="week" class="mt-3 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -277,6 +285,7 @@
 				<Tabs.Content value="shame" class="mt-3 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 					<Leaderboard title="Professional Corpse" note="most deaths, lovingly counted" entries={withData} value={(c) => c.summary?.deaths} />
 					<Leaderboard title="Gravity's Favorite" note="deaths by falling. it's not that hard." entries={withData} value={(c) => ctr(c, 'falling_deaths')} empty="Nobody fell to death yet. Give it time." />
+					<Leaderboard title="Glass Jaw" note="hardest single hit ever taken in a dungeon" entries={withData} value={(c) => (takenBy ? (takenBy.get(c.slug) ?? 0) : null)} empty="Nobody got slapped on record yet." />
 					<Leaderboard title="Bottomless Pit" note="food eaten" entries={withData} value={(c) => ctr(c, 'food')} />
 					<Leaderboard title="Functional Alcoholic" note="drinks consumed" entries={withData} value={(c) => ctr(c, 'drinks')} />
 					<Leaderboard title="Homesick Little Baby" note="hearthstone uses" entries={withData} value={(c) => ctr(c, 'hearthed')} />

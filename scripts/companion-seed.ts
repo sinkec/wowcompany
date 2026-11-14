@@ -272,7 +272,54 @@ function makeRun(
 								pet: false
 							}
 						]
-					: []
+					: [],
+			// shema 3: največji dogodki runa (Big Numbers)
+			records: [
+				...(damage > 0
+					? [
+							{
+								kind: 'crit',
+								amount: Math.round(400 + rnd() * 2600),
+								spell: parts[0].name,
+								spellId: parts[0].id,
+								unit: segments.find((s) => s.kind === 'boss')?.name ?? 'Angry Trogg',
+								atMs: Math.floor(rnd() * durationMs),
+								pet: false
+							},
+							{
+								kind: 'hit',
+								amount: Math.round(200 + rnd() * 900),
+								spell: parts[parts.length - 1].name,
+								spellId: parts[parts.length - 1].id,
+								unit: 'Angry Trogg',
+								atMs: Math.floor(rnd() * durationMs),
+								pet: false
+							}
+						]
+					: []),
+				...(role[i] === 'heal'
+					? [
+							{
+								kind: 'critHeal',
+								amount: Math.round(900 + rnd() * 1500),
+								spell: 'Healing Wave',
+								spellId: 10396,
+								unit: `${p[0].name} ${p[0].surname}`,
+								atMs: Math.floor(rnd() * durationMs),
+								pet: false
+							}
+						]
+					: []),
+				{
+					kind: 'hitTaken',
+					amount: Math.round(150 + rnd() * 1800),
+					spell: i === 2 ? 'Lava' : 'Melee',
+					spellId: 0,
+					unit: i === 2 ? null : (segments.find((s) => s.kind === 'boss')?.name ?? 'Angry Trogg'),
+					atMs: Math.floor(rnd() * durationMs),
+					pet: false
+				}
+			]
 		};
 	});
 	const items: [string, number][] = [
@@ -295,7 +342,7 @@ function makeRun(
 	const killed = new Set(segments.filter((s) => s.result === 'kill').map((s) => s.encounterId))
 		.size;
 	return {
-		schema: 2,
+		schema: 3,
 		runKey: key(),
 		zone: { instanceId: zone.id, name: zone.name, difficultyId: 1, instanceUid: 7000 + zone.id },
 		startedAt,

@@ -46,6 +46,9 @@ async function visibility(ctx: QueryCtx) {
 	return { privateOk, publicFields: settings.publicFields, allowed: (k: string) => privateOk || pub.has(k) };
 }
 
+/** Največ vrstic zgodovine na strani lika (bralni I/O raste z vsako sejo). */
+const HISTORY_LIMIT = 300;
+
 /** Identiteta je vedno vidna (brez nje strani ni mogoče prikazati). */
 const ALWAYS = new Set(['_id', 'playerId', 'slug', 'name', 'surname', 'updatedAt']);
 
@@ -133,7 +136,8 @@ export const get = query({
 					.query('history')
 					.withIndex('by_player_at', (q) => q.eq('playerId', player._id))
 					.order('desc')
-					.take(1000)
+					// graf potrebuje trend, ne vsake vrstice; zapis nastane samo ob spremembi številk
+					.take(HISTORY_LIMIT)
 					.then((rows) => rows.reverse())
 			: null;
 		const week = s ? await weekDelta(ctx, player._id, s, since) : null;

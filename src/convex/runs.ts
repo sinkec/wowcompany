@@ -4,6 +4,7 @@ import { v } from 'convex/values';
 import type { Doc } from './_generated/dataModel.js';
 import { query, type QueryCtx } from './_generated/server.js';
 import { canSeePrivate } from './lib/access.js';
+import { recordKind } from './lib/companionSchema.js';
 import { runDetail, runListItem, type DetailsLike, type RunDocLike } from './lib/runsView.js';
 import { getSettings } from './lib/settings.js';
 
@@ -86,7 +87,7 @@ export const forHero = query({
 	args: { slug: v.string(), limit: v.optional(v.number()) },
 	handler: async (ctx, { slug, limit = 20 }) => {
 		const { allowed } = await visibility(ctx);
-		if (!allowed('runs')) return { locked: true as const, runs: [] };
+		if (!allowed('runs')) return { locked: true as const, runs: [], records: null };
 		const parts = await ctx.db
 			.query('runParticipants')
 			.withIndex('by_slug_and_started_at', (q) => q.eq('slug', slug))
@@ -96,9 +97,49 @@ export const forHero = query({
 			(r): r is Doc<'runs'> => r !== null
 		);
 		const classOf = await classesFor(ctx, runs);
+		// osebni rekordi (≤ 5 majhnih vrstic); številke -> polje runDetails
+		const records = allowed('runDetails')
+			? (
+					await ctx.db
+						.query('heroRecords')
+						.withIndex('by_slug_and_kind', (q) => q.eq('slug', slug))
+						.take(10)
+				).map(recordView)
+			: null;
 		return {
 			locked: false as const,
-			runs: runs.map((r) => runListItem(r as RunDocLike, classOf, allowed))
+			runs: runs.map((r) => runListItem(r as RunDocLike, classOf, allowed)),
+			records
 		};
+	}
+});
+
+const recordView = (r: Doc<'heroRecords'>) => ({
+	slug: r.slug,
+	kind: r.kind,
+	amount: r.amount,
+	spell: r.spell,
+	unit: r.unit,
+	pet: r.pet,
+	runId: r.runId,
+	zone: r.zone,
+	at: r.at
+});
+
+/**
+ * Lestvica: največji rekord ene vrste med vsemi junaki (privzeto crit). null = skrito.
+ * Bere samo majhne vrstice heroRecords – imena in razrede ima glavna stran že iz players.list.
+ */
+export const topRecords = query({
+	args: { kind: v.optional(recordKind), limit: v.optional(v.number()) },
+	handler: async (ctx, { kind = 'crit', limit = 10 }) => {
+		const { allowed } = await visibility(ctx);
+		if (!allowed('runs') || !allowed('runDetails')) return null;
+		const rows = await ctx.db
+			.query('heroRecords')
+			.withIndex('by_kind_and_amount', (q) => q.eq('kind', kind))
+			.order('desc')
+			.take(Math.min(25, Math.max(1, limit)));
+		return rows.map(recordView);
 	}
 });

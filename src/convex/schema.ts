@@ -8,6 +8,7 @@ import {
 	lootDrop,
 	partyMember,
 	playerSummary,
+	recordKind,
 	recorder,
 	runResult,
 	segment,
@@ -132,6 +133,14 @@ export default defineSchema({
 		)
 	}).index('by_key', ['key']),
 
+	// Veriga pollerja: vsak zagon načrtuje naslednjega (scheduler), pavza = brez naslednjega zagona.
+	// `token` loči veljavno verigo od stare (po spremembi intervala ali dvojnem zagonu stara sama umre).
+	pollChain: defineTable({
+		key: v.literal('main'),
+		token: v.string(),
+		nextAt: v.number()
+	}).index('by_key', ['key']),
+
 	// Majhen povzetek za seznam / lestvice (en dokument na igralca).
 	summaries: defineTable({ playerId: v.id('players'), ...summaryFields, updatedAt: v.number() })
 		.index('by_player', ['playerId'])
@@ -164,6 +173,7 @@ export default defineSchema({
 		postedAt: v.optional(v.number())
 	})
 		.index('by_at', ['at'])
+		.index('by_player_id_and_at', ['playerId', 'at'])
 		.index('by_posted', ['postedAt']),
 
 	// Nastavitve platforme (en dokument).
@@ -223,6 +233,13 @@ export default defineSchema({
 				classId: v.number()
 			})
 		)
+	}).index('by_key', ['key']),
+
+	// Število članov + čas osvežitve: admin dashboard bere samo to, ne celega rosterja.
+	guildRosterMeta: defineTable({
+		key: v.literal('main'),
+		count: v.number(),
+		fetchedAt: v.number()
 	}).index('by_key', ['key']),
 
 	// ---- WowCompany Companion (namizna aplikacija, glej COMPANION.md §7–8) ----
@@ -287,6 +304,24 @@ export default defineSchema({
 		timeline,
 		loot: v.optional(v.array(lootDrop))
 	}).index('by_run', ['runId']),
+
+	// Vseživljenjski rekordi spremljanih junakov (največji crit …): ena vrstica na junaka in vrsto.
+	// Posodobi jih ingestRun, ko run prinese večjo številko. Vidnost: polje 'runDetails'.
+	heroRecords: defineTable({
+		slug: v.string(),
+		kind: recordKind,
+		amount: v.number(),
+		spell: v.string(),
+		spellId: v.number(),
+		unit: v.union(v.string(), v.null()),
+		pet: v.boolean(),
+		runId: v.id('runs'),
+		zone: v.string(),
+		at: v.number()
+	})
+		.index('by_slug_and_kind', ['slug', 'kind'])
+		.index('by_kind_and_amount', ['kind', 'amount'])
+		.index('by_run', ['runId']),
 
 	// Kdo je bil v runu (za zavihek Runs na strani junaka).
 	runParticipants: defineTable({

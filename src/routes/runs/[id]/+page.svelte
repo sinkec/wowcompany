@@ -23,6 +23,8 @@
 		fmtWhen,
 		lootColor,
 		QUALITY_NAME,
+		RECORD_KINDS,
+		RECORD_LABEL,
 		resultBadge
 	} from '#lib/runs.js';
 
@@ -44,7 +46,7 @@
 	const totalDeaths = $derived(run?.totalDeaths ?? null);
 
 	// ?tab=meter|bosses|deaths|timeline|spells → povezava naravnost na zavihek
-	const TABS = ['meter', 'bosses', 'deaths', 'loot', 'timeline', 'spells'];
+	const TABS = ['meter', 'numbers', 'bosses', 'deaths', 'loot', 'timeline', 'spells'];
 	function initialTab(a: { details: boolean; deaths: boolean; loot: boolean }) {
 		const t = page.url.searchParams.get('tab') ?? '';
 		const ok = (x: string) => (x === 'deaths' ? a.deaths : x === 'loot' ? a.loot : a.details);
@@ -70,6 +72,21 @@
 		}
 		return [...m.values()].sort((a, b) => b.items - a.items);
 	});
+
+	// Big Numbers: največji dogodek vsake vrste (zmagovalec runa) + tabela po igralcih
+	const records = $derived(
+		players.flatMap((p) => (p.records ?? []).map((r) => ({ ...r, slug: p.slug })))
+	);
+	const bestRecords = $derived(
+		RECORD_KINDS.map((kind) => ({
+			kind,
+			best: records
+				.filter((r) => r.kind === kind)
+				.reduce<(typeof records)[number] | null>((b, r) => (!b || r.amount > b.amount ? r : b), null)
+		})).filter((x) => x.best)
+	);
+	const recordOf = (slug: string, kind: string) =>
+		records.find((r) => r.slug === slug && r.kind === kind) ?? null;
 
 	let spellsFor = $state<string | null>(null);
 	const spellPlayer = $derived(players.find((p) => p.slug === spellsFor) ?? players[0] ?? null);
@@ -216,6 +233,7 @@
 			<Tabs.Root value={initialTab(run.access)}>
 				<Tabs.List class="flex-wrap">
 					<Tabs.Trigger value="meter" disabled={!run.access.details}>The Meter</Tabs.Trigger>
+					<Tabs.Trigger value="numbers" disabled={!run.access.details}>Big Numbers</Tabs.Trigger>
 					<Tabs.Trigger value="bosses" disabled={!run.access.details}>Bosses</Tabs.Trigger>
 					<Tabs.Trigger value="deaths" disabled={!run.access.deaths}>Autopsies</Tabs.Trigger>
 					<Tabs.Trigger value="loot" disabled={!run.access.loot}
@@ -543,6 +561,81 @@
 							From the uploader's <code>/chatlog</code>. Need/greed rolls aren't tracked yet — only
 							who ended up with it.
 						</p>
+					{/if}
+				</Tabs.Content>
+
+				<!-- BIG NUMBERS -->
+				<Tabs.Content value="numbers" class="mt-4 space-y-4">
+					{#if !records.length}
+						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
+							No big numbers on file. This run was recorded by an older Companion — update the app and
+							the next one will name and shame the biggest crit.
+						</div>
+					{:else}
+						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+							{#each bestRecords as { kind, best } (kind)}
+								{#if best}
+									<div class="wow-frame rounded-lg p-4">
+										<div class="text-xs tracking-wide text-muted-foreground uppercase">
+											{RECORD_LABEL[kind].title}
+										</div>
+										<div class="mt-1 text-3xl font-bold text-primary tabular-nums">
+											{fmtNum(best.amount)}
+										</div>
+										<div class="mt-1 text-sm">
+											<span class="font-semibold" style="color: {classColor(classes[best.slug] ?? undefined)}"
+												>{names[best.slug] ?? best.slug}</span
+											>
+											<span class="text-muted-foreground">·</span>
+											{best.spell}{#if best.pet}<span class="text-xs text-muted-foreground"> (pet)</span
+												>{/if}
+											{#if best.unit}<span class="text-muted-foreground">
+													{RECORD_LABEL[kind].prep}</span
+												>
+												{best.unit}{/if}
+										</div>
+										<div class="mt-1 text-xs text-muted-foreground italic">
+											{RECORD_LABEL[kind].quip} · at {fmtDuration(best.atMs)}
+										</div>
+									</div>
+								{/if}
+							{/each}
+						</div>
+
+						<section class="wow-frame overflow-x-auto rounded-lg p-4">
+							<table class="w-full text-sm">
+								<thead>
+									<tr class="text-left text-xs text-muted-foreground">
+										<th class="pb-2 font-normal">Hero</th>
+										{#each RECORD_KINDS as kind (kind)}
+											<th class="pb-2 text-right font-normal">{RECORD_LABEL[kind].title}</th>
+										{/each}
+									</tr>
+								</thead>
+								<tbody>
+									{#each players as p (p.slug)}
+										<tr class="border-t border-border">
+											<td class="py-1.5 pr-3 font-semibold" style="color: {classColor(p.classId ?? undefined)}"
+												>{p.name}</td
+											>
+											{#each RECORD_KINDS as kind (kind)}
+												{@const r = recordOf(p.slug, kind)}
+												<td
+													class="py-1.5 pl-3 text-right tabular-nums"
+													title={r
+														? `${r.spell}${r.unit ? ` ${RECORD_LABEL[kind].prep} ${r.unit}` : ''} · at ${fmtDuration(r.atMs)}`
+														: ''}
+												>
+													{#if r}{fmtNum(r.amount)}
+														<span class="block text-xs text-muted-foreground">{r.spell}</span>
+													{:else}<span class="text-muted-foreground">—</span>{/if}
+												</td>
+											{/each}
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</section>
 					{/if}
 				</Tabs.Content>
 

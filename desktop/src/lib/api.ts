@@ -59,6 +59,19 @@ export type PlayerSummary = {
 	critPct: number;
 	topDamage: SpellStat[];
 	topHealing: SpellStat[];
+	/** Biggest single events of the run, one per kind (schema 3). */
+	records?: RunRecord[];
+};
+
+export type RunRecord = {
+	kind: 'crit' | 'hit' | 'critHeal' | 'heal' | 'hitTaken';
+	amount: number;
+	spell: string;
+	spellId: number;
+	/** target, or the attacker for hitTaken */
+	unit: string | null;
+	atMs: number;
+	pet: boolean;
 };
 
 export type RunSummary = {

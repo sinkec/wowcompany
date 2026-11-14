@@ -525,6 +525,23 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 
 ## 16. Kako nadaljevati po čiščenju spomina (handoff)
 
+**▶ ZAČNI TUKAJ – stanje ob koncu seje 14. 11. 2026:**
+- **Izdano:** Companion **v0.1.2** (oznaka `companion-v0.1.2`, GitHub Releases: Windows NSIS `.exe`, Linux AppImage + `.deb`),
+  portal »Get the app« (`/link`, `GetApp.svelte`) kaže zadnjo izdajo. `main` = `b0563fd`, delovno drevo čisto, vse na produkciji.
+- **Pri uporabniku teče** v0.1.2 iz `~/Applications/WowCompany-Companion.AppImage` (uporabnik želi AppImage, ne `.deb`),
+  povezan s prod računom, bere pravi combat log. Nova izdaja: zapri staro (SIGTERM; single-instance plugin sicer blokira novo), prenesi AppImage, zaženi z `setsid`.
+- **Izdaja nove verzije:** dvigni verzijo v `desktop/src-tauri/Cargo.toml` + `tauri.conf.json` (+ `desktop/package.json`), commit, `git tag companion-vX.Y.Z && git push --tags`
+  → workflow `.github/workflows/companion-release.yml` (≈ 15 min, oba OS).
+- **Loot iz `/chatlog` preverjen** na pravem Forever chat logu (60/60 vrstic): brez oklepajev/linkov → kakovost predmeta neznana (siva/bela na portalu).
+- **Nov načrt v0.2 (addon v Lua z UI-jem, rekordi kot največji crit, optimizacija Convexa, izboljšave portala in Companiona): [ADDON.md](ADDON.md)** – beri najprej §1 (necommitane spremembe!) in §7 (vrstni red).
+- **Naslednji koraki (po prioriteti):**
+  1. Prvi **pravi party dungeon** z `/combatlog` + `/chatlog` → preveri §14 A1–A16, B1b (ime iz chata ↔ član partyja), D2 (upload na prod), prikaz na `/runs`.
+     Če kaj ne dela: log v `wowlog/` (gitignored), `cargo run --bin wowrun -- wowlog/<log>`.
+  2. Windows preizkus (§14 C: pot do Logs, SmartScreen, B2 brisanje logov ob izhodu).
+  3. Tauri updater (C6: podpisni ključ v GitHub secrets, `latest.json`).
+  4. A17 party leader (ni v combat logu – chatlog sistemska sporočila ali addon).
+  5. D1 Google aplikacija → *Publish app* (brez logotipa).
+
 **Stanje 13. 11. 2026 (konec C1):** Cargo workspace v korenu (`Cargo.toml`, `rustfmt.toml` max_width 120, `/target/` v `.gitignore`),
 crate `crates/wowlog` je končan in testiran. Portal (PLAN.md) je nespremenjen (svelte-check 0 napak, 53 testov OK).
 

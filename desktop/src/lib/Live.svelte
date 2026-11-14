@@ -6,6 +6,13 @@
 	const maxDps = $derived(Math.max(1, ...(live?.players.map((p) => p.dps) ?? [1])));
 	const sorted = $derived([...(live?.players ?? [])].sort((a, b) => b.dps - a.dps));
 	const lastDeath = $derived(live?.deaths.at(-1) ?? null);
+	// največji crit in najhujši prejeti udarec runa do zdaj
+	const biggest = (kind: 'crit' | 'hitTaken') =>
+		(live?.players ?? [])
+			.flatMap((p) => (p.records ?? []).filter((r) => r.kind === kind).map((r) => ({ ...r, who: p.name })))
+			.sort((a, b) => b.amount - a.amount)[0] ?? null;
+	const topCrit = $derived(biggest('crit'));
+	const topTaken = $derived(biggest('hitTaken'));
 	const nameOf = (slug: string) => live?.players.find((p) => p.slug === slug)?.name ?? slug;
 
 	function endRun() {
@@ -103,6 +110,23 @@
 						{s.name} · {fmtDuration(s.endMs - s.startMs)}
 					</span>
 				{/each}
+			</div>
+		{/if}
+
+		{#if topCrit || topTaken}
+			<div class="flex flex-wrap gap-2 text-sm">
+				{#if topCrit}
+					<span class="rounded border border-primary/40 px-3 py-1">
+						💥 Biggest crit: <b class="text-primary">{fmtNum(topCrit.amount)}</b>
+						{topCrit.spell} · {topCrit.who}{topCrit.unit ? ` → ${topCrit.unit}` : ''}
+					</span>
+				{/if}
+				{#if topTaken}
+					<span class="rounded border border-border/60 px-3 py-1">
+						🩸 Hardest hit taken: <b class="text-destructive">{fmtNum(topTaken.amount)}</b>
+						{topTaken.spell} · {topTaken.who}{topTaken.unit ? ` ← ${topTaken.unit}` : ''}
+					</span>
+				{/if}
 			</div>
 		{/if}
 

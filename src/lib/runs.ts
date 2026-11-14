@@ -85,3 +85,14 @@ const QUALITY_HEX = ['#9d9d9d', '#ffffff', '#1eff00', '#0070dd', '#a335ee', '#ff
 export const lootColor = (q: number | null | undefined) =>
 	q == null ? '#e5d9b6' : (QUALITY_HEX[q] ?? '#e5d9b6');
 export const QUALITY_NAME = ['Poor', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Artifact'];
+
+/** Rekordi (Big Numbers): naslov, opis in beseda med številko in tarčo. */
+export const RECORD_KINDS = ['crit', 'hit', 'critHeal', 'heal', 'hitTaken'] as const;
+export type RecordKindName = (typeof RECORD_KINDS)[number];
+export const RECORD_LABEL: Record<RecordKindName, { title: string; quip: string; prep: string }> = {
+	crit: { title: 'Biggest Crit', quip: 'The number they will not shut up about.', prep: 'into' },
+	hit: { title: 'Biggest Hit', quip: 'No crit, just honest violence.', prep: 'into' },
+	critHeal: { title: 'Biggest Crit Heal', quip: 'Somebody was one sneeze from dying.', prep: 'on' },
+	heal: { title: 'Biggest Heal', quip: 'A band-aid the size of a tent.', prep: 'on' },
+	hitTaken: { title: 'Hardest Hit Taken', quip: 'Caught it with their face.', prep: 'from' }
+};

@@ -14,6 +14,7 @@ import {
 import { getViewer } from './lib/access.js';
 import {
 	addRecorder,
+	beatsRecord,
 	checkRun,
 	computeAwards,
 	LINK_TTL_MS,
@@ -253,6 +254,43 @@ async function partyFor(ctx: MutationCtx, s: RunSummary) {
 	);
 }
 
+/**
+ * Vseživljenjski rekordi: samo za spremljane junake (playerId) in samo, če run prinese večjo številko.
+ * Največ 5 vrstic na igralca -> ≤ 50 branj na run.
+ */
+async function writeHeroRecords(
+	ctx: MutationCtx,
+	runId: Id<'runs'>,
+	s: RunSummary,
+	party: { slug: string; playerId?: Id<'players'> }[]
+) {
+	const tracked = new Set(party.filter((p) => p.playerId).map((p) => p.slug));
+	for (const p of s.players) {
+		if (!tracked.has(p.slug)) continue;
+		for (const r of p.records ?? []) {
+			const prev = await ctx.db
+				.query('heroRecords')
+				.withIndex('by_slug_and_kind', (q) => q.eq('slug', p.slug).eq('kind', r.kind))
+				.unique();
+			if (!beatsRecord(prev, r)) continue;
+			const row = {
+				slug: p.slug,
+				kind: r.kind,
+				amount: r.amount,
+				spell: r.spell,
+				spellId: r.spellId,
+				unit: r.unit,
+				pet: r.pet,
+				runId,
+				zone: s.zone.name,
+				at: s.startedAt + r.atMs
+			};
+			if (prev) await ctx.db.replace('heroRecords', prev._id, row);
+			else await ctx.db.insert('heroRecords', row);
+		}
+	}
+}
+
 async function writeParticipants(
 	ctx: MutationCtx,
 	runId: Id<'runs'>,
@@ -342,6 +380,7 @@ export const ingestRun = internalMutation({
 			});
 			await ctx.db.insert('runDetails', { runId, ...details });
 			await writeParticipants(ctx, runId, party, s.startedAt);
+			await writeHeroRecords(ctx, runId, s, party);
 			return { runId, created: true, recorderAdded: true, replaced: false };
 		}
 
@@ -357,6 +396,7 @@ export const ingestRun = internalMutation({
 			if (old) await ctx.db.replace('runDetails', old._id, { runId: existing._id, ...details });
 			else await ctx.db.insert('runDetails', { runId: existing._id, ...details });
 			await writeParticipants(ctx, existing._id, party, s.startedAt);
+			await writeHeroRecords(ctx, existing._id, s, party);
 		} else if (added) {
 			await ctx.db.patch('runs', existing._id, { recordedBy, updatedAt: now });
 		}
@@ -395,6 +435,12 @@ export const deleteRun = internalMutation({
 			.query('runDetails')
 			.withIndex('by_run', (q) => q.eq('runId', runId))) {
 			await ctx.db.delete('runDetails', d._id);
+		}
+		// rekordi iz tega runa izginejo z njim (prejšnji rekord junaka se ne obnovi – pride z naslednjim runom)
+		for await (const r of ctx.db
+			.query('heroRecords')
+			.withIndex('by_run', (q) => q.eq('runId', runId))) {
+			await ctx.db.delete('heroRecords', r._id);
 		}
 		if (await ctx.db.get('runs', runId)) await ctx.db.delete('runs', runId);
 		return null;

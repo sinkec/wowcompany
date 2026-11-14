@@ -3,9 +3,9 @@
 // dvigni SCHEMA_VERSION na obeh straneh.
 import { v, type Infer } from 'convex/values';
 
-/** Najnovejša shema (Rust `SCHEMA_VERSION`). 1 = brez loota (aplikacija v0.1.0), 2 = + loot. */
-export const SCHEMA_VERSION = 2;
-export const SUPPORTED_SCHEMAS = [1, 2];
+/** Najnovejša shema (Rust `SCHEMA_VERSION`). 1 = brez loota (aplikacija v0.1.0), 2 = + loot, 3 = + rekordi igralcev. */
+export const SCHEMA_VERSION = 3;
+export const SUPPORTED_SCHEMAS = [1, 2, 3];
 
 const nullableNumber = v.union(v.number(), v.null());
 const nullableString = v.union(v.string(), v.null());
@@ -16,6 +16,25 @@ export const spellStat = v.object({
 	amount: v.number(),
 	hits: v.number(),
 	crits: v.number(),
+	pet: v.boolean()
+});
+
+export const recordKind = v.union(
+	v.literal('crit'),
+	v.literal('hit'),
+	v.literal('critHeal'),
+	v.literal('heal'),
+	v.literal('hitTaken')
+);
+
+/** Največji posamezen dogodek ene vrste v runu (shema 3). `unit` = tarča, pri hitTaken napadalec. */
+export const runRecord = v.object({
+	kind: recordKind,
+	amount: v.number(),
+	spell: v.string(),
+	spellId: v.number(),
+	unit: nullableString,
+	atMs: v.number(),
 	pet: v.boolean()
 });
 
@@ -39,7 +58,8 @@ export const playerSummary = v.object({
 	hps: v.number(),
 	critPct: v.number(),
 	topDamage: v.array(spellStat),
-	topHealing: v.array(spellStat)
+	topHealing: v.array(spellStat),
+	records: v.optional(v.array(runRecord))
 });
 
 export const segment = v.object({
@@ -120,7 +140,7 @@ export const lootDrop = v.object({
 
 /** Kar pošlje aplikacija (POST /companion/runs). */
 export const runSummary = v.object({
-	schema: v.union(v.literal(1), v.literal(2)),
+	schema: v.union(v.literal(1), v.literal(2), v.literal(3)),
 	runKey: v.string(),
 	zone,
 	startedAt: v.number(),
@@ -170,3 +190,5 @@ export type RunSummary = Infer<typeof runSummary>;
 export type PlayerSummary = Infer<typeof playerSummary>;
 export type Award = Infer<typeof award>;
 export type LootDrop = Infer<typeof lootDrop>;
+export type RunRecord = Infer<typeof runRecord>;
+export type RecordKind = Infer<typeof recordKind>;

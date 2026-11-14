@@ -1,4 +1,5 @@
 import { v } from 'convex/values';
+import type { Doc, Id } from './_generated/dataModel.js';
 import { query } from './_generated/server.js';
 import { canSeePrivate } from './lib/access.js';
 import { getSettings } from './lib/settings.js';
@@ -14,20 +15,29 @@ export const recent = query({
 		// čas dogodka = čas odjave -> feed je viden le, če je "Last seen" javen
 		if (!allowed('lastLogin')) return [];
 
-		let playerId = undefined;
+		// stran junaka: samo njegovi dogodki prek indeksa (prej: pregled vseh dogodkov vseh junakov)
+		const players = new Map<Id<'players'>, Doc<'players'> | null>();
+		let rows;
 		if (slug) {
 			const p = await ctx.db
 				.query('players')
 				.withIndex('by_slug', (q) => q.eq('slug', slug))
 				.unique();
-			if (!p) return [];
-			playerId = p._id;
+			if (!p?.active) return [];
+			players.set(p._id, p);
+			rows = ctx.db
+				.query('events')
+				.withIndex('by_player_id_and_at', (q) => q.eq('playerId', p._id))
+				.order('desc');
+		} else {
+			rows = ctx.db.query('events').withIndex('by_at').order('desc');
 		}
 		const n = Math.min(limit ?? 15, 50);
 		const out = [];
-		for await (const e of ctx.db.query('events').withIndex('by_at').order('desc')) {
-			if (playerId && e.playerId !== playerId) continue;
-			const player = await ctx.db.get(e.playerId);
+		for await (const e of rows) {
+			// vsak junak se prebere enkrat, ne enkrat na dogodek
+			if (!players.has(e.playerId)) players.set(e.playerId, await ctx.db.get(e.playerId));
+			const player = players.get(e.playerId);
 			if (!player?.active) continue;
 			const p = e.payload ?? {};
 			out.push({

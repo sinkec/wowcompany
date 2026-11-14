@@ -3,8 +3,9 @@ import { internal } from './_generated/api.js';
 
 const crons = cronJobs();
 
-// En cron, ena akcija na minuto. Daljši interval se nastavi v settings (akcija preskoči minute).
-crons.interval('poll players', { minutes: 1 }, internal.poll.run, {});
+// Poller se načrtuje sam (poll.begin -> scheduler, interval iz settings); ta cron samo preveri,
+// ali veriga teče, in jo po potrebi zažene (npr. po prvem deployu). Pavza = 0 zagonov pollerja.
+crons.interval('poll watchdog', { minutes: 15 }, internal.poll.watchdog, {});
 
 // Guild roster za predloge imen: 1 klic na dan.
 crons.cron('guild roster', '0 5 * * *', internal.roster.refresh, {});

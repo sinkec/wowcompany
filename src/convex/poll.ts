@@ -2,10 +2,11 @@
 // Večina zahtev vrne 304 (If-Modified-Since), zato je akcija kratka in poceni.
 import { v } from 'convex/values';
 import { internal } from './_generated/api.js';
-import { internalAction, internalMutation, internalQuery } from './_generated/server.js';
+import { internalAction, internalMutation, internalQuery, type MutationCtx } from './_generated/server.js';
 import { classSpecs, get, getCharacterParts, itemIcon, mapLimit, profileNs, talentInfo, type RawCharacter } from './lib/blizzard.js';
 import { itemIds, normalize, talentRefs, type Item } from './lib/normalize.js';
 import { getSettings } from './lib/settings.js';
+import { sameFields } from './lib/same.js';
 import { detailFields, summaryFields } from './schema.js';
 import type { Id } from './_generated/dataModel.js';
 
@@ -16,6 +17,8 @@ type RunResult =
 	| { checked: number; changed: number; notModified: number; notFound: number; failed: number };
 
 const CONCURRENCY = 10;
+const SUMMARY_KEYS = Object.keys(summaryFields);
+const DETAIL_KEYS = Object.keys(detailFields);
 
 /** Samo števci, ki so v tej seji zrasli. */
 function counterDeltas(prev?: Record<string, number>, next?: Record<string, number>) {
@@ -46,6 +49,68 @@ export const state = internalQuery({
 			.withIndex('by_key', (q) => q.eq('key', 'main'))
 			.unique();
 		return { paused: settings.paused, intervalSec: settings.pollIntervalSec, entries: ps?.entries ?? [] };
+	}
+});
+
+/** Ko veriga velja za mrtvo: naslednji zagon zamuja več kot toliko (deploy, napaka, pavza). */
+const CHAIN_GRACE_MS = 5 * 60_000;
+
+/**
+ * Zažene novo verigo pollerja (stara z drugim žetonom ob naslednjem zagonu sama odneha).
+ * `restart` = tudi če trenutna veriga še teče (npr. nov interval). Pri pavzi verigo ustavi.
+ */
+export async function ensurePollChain(ctx: MutationCtx, restart = false) {
+	const settings = await getSettings(ctx);
+	const chain = await ctx.db
+		.query('pollChain')
+		.withIndex('by_key', (q) => q.eq('key', 'main'))
+		.unique();
+	const now = Date.now();
+	if (settings.paused) {
+		if (chain?.token) await ctx.db.patch(chain._id, { token: '', nextAt: 0 });
+		return 'paused' as const;
+	}
+	const alive = !!chain?.token && chain.nextAt > now - CHAIN_GRACE_MS;
+	if (alive && !restart) return 'running' as const;
+	const token = `${now}-${Math.random().toString(36).slice(2)}`;
+	if (chain) await ctx.db.patch(chain._id, { token, nextAt: now });
+	else await ctx.db.insert('pollChain', { key: 'main', token, nextAt: now });
+	await ctx.scheduler.runAfter(0, internal.poll.run, { token });
+	return 'started' as const;
+}
+
+/** Cron vsakih 15 min: veriga teče? (berejo se samo settings + majhen pollChain) */
+export const watchdog = internalMutation({
+	args: {},
+	handler: async (ctx) => ensurePollChain(ctx)
+});
+
+/**
+ * Začetek zagona v verigi: preveri žeton, TAKOJ načrtuje naslednji zagon (veriga preživi napako v tem)
+ * in vrne vnose. Nadomešča poll.state za zagone iz verige (2 klica na zagon, kot prej s cronom).
+ */
+export const begin = internalMutation({
+	args: { token: v.string() },
+	handler: async (ctx, { token }): Promise<PollEntry[] | null> => {
+		const settings = await getSettings(ctx);
+		const chain = await ctx.db
+			.query('pollChain')
+			.withIndex('by_key', (q) => q.eq('key', 'main'))
+			.unique();
+		if (!chain || chain.token !== token) return null; // stara veriga
+		if (settings.paused) {
+			await ctx.db.patch(chain._id, { token: '', nextAt: 0 });
+			return null;
+		}
+		const intervalMs = Math.max(60, settings.pollIntervalSec) * 1000;
+		const next = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+		await ctx.db.patch(chain._id, { token: next, nextAt: Date.now() + intervalMs });
+		await ctx.scheduler.runAfter(intervalMs, internal.poll.run, { token: next });
+		const ps = await ctx.db
+			.query('pollState')
+			.withIndex('by_key', (q) => q.eq('key', 'main'))
+			.unique();
+		return ps?.entries ?? [];
 	}
 });
 
@@ -91,14 +156,21 @@ export const cachedTalents = internalQuery({
 });
 
 export const run = internalAction({
-	args: { force: v.optional(v.boolean()) },
-	handler: async (ctx, { force }): Promise<RunResult> => {
-		const st: PollStateResult = await ctx.runQuery(internal.poll.state, {});
-		if (st.entries.length === 0 || (st.paused && !force)) return { skipped: true };
-
-		// Interval > 60 s brez pisanja v bazo: teče samo v "svojih" minutah.
-		const everyMin = Math.max(1, Math.round(st.intervalSec / 60));
-		if (!force && Math.floor(Date.now() / 60_000) % everyMin !== 0) return { skipped: true };
+	// token = zagon iz verige (poll.begin); force = ročno (CLI, nov igralec) mimo pavze in verige
+	args: { force: v.optional(v.boolean()), token: v.optional(v.string()) },
+	handler: async (ctx, { force, token }): Promise<RunResult> => {
+		let entries: PollEntry[];
+		if (token) {
+			const e: PollEntry[] | null = await ctx.runMutation(internal.poll.begin, { token });
+			if (!e) return { skipped: true };
+			entries = e;
+		} else {
+			const st: PollStateResult = await ctx.runQuery(internal.poll.state, {});
+			if (st.paused && !force) return { skipped: true };
+			entries = st.entries;
+		}
+		if (entries.length === 0) return { skipped: true };
+		const st = { entries };
 
 		type Hit = { playerId: Id<'players'>; slug: string; raw: RawCharacter; lastModified?: string };
 		const hits: Hit[] = [];
@@ -221,6 +293,7 @@ export const apply = internalMutation({
 			.unique();
 		const entries = ps ? [...ps.entries] : [];
 		let newEvents = 0;
+		let entriesChanged = false;
 
 		for (const u of updates) {
 			const player = await ctx.db.get(u.playerId);
@@ -235,10 +308,17 @@ export const apply = internalMutation({
 				.withIndex('by_player', (q) => q.eq('playerId', u.playerId))
 				.unique();
 
-			if (prev) await ctx.db.patch(prev._id, { ...u.summary, updatedAt: now });
-			else await ctx.db.insert('summaries', { playerId: u.playerId, ...u.summary, updatedAt: now });
-			if (prevDetails) await ctx.db.patch(prevDetails._id, { ...u.details, updatedAt: now });
-			else await ctx.db.insert('details', { playerId: u.playerId, ...u.details, updatedAt: now });
+			// Blizzard včasih zamakne Last-Modified brez novih podatkov: brez spremembe ni zapisa,
+			// zato se players.list / players.get pri odprtih straneh ne izvedeta znova.
+			// replace (ne patch), da izginulo polje (npr. guild) res izgine.
+			if (!sameFields(prev, u.summary, SUMMARY_KEYS)) {
+				if (prev) await ctx.db.replace(prev._id, { playerId: u.playerId, ...u.summary, updatedAt: now });
+				else await ctx.db.insert('summaries', { playerId: u.playerId, ...u.summary, updatedAt: now });
+			}
+			if (!sameFields(prevDetails, u.details, DETAIL_KEYS)) {
+				if (prevDetails) await ctx.db.replace(prevDetails._id, { playerId: u.playerId, ...u.details, updatedAt: now });
+				else await ctx.db.insert('details', { playerId: u.playerId, ...u.details, updatedAt: now });
+			}
 
 			// zgodovina samo ob spremembi številk
 			const s = u.summary;
@@ -291,10 +371,13 @@ export const apply = internalMutation({
 			}
 
 			const idx = entries.findIndex((e) => e.playerId === u.playerId);
-			if (idx >= 0) entries[idx] = { ...entries[idx], lastModified: u.lastModified, lastLogin: s.lastLogin };
+			if (idx >= 0 && (entries[idx].lastModified !== u.lastModified || entries[idx].lastLogin !== s.lastLogin)) {
+				entries[idx] = { ...entries[idx], lastModified: u.lastModified, lastLogin: s.lastLogin };
+				entriesChanged = true;
+			}
 		}
 
-		if (ps) await ctx.db.patch(ps._id, { entries });
+		if (ps && entriesChanged) await ctx.db.patch(ps._id, { entries });
 		// novi dogodki -> Discord objava takoj (ločena akcija, ne blokira pollerja)
 		if (newEvents) await ctx.scheduler.runAfter(0, internal.discord.postPending, {});
 	}

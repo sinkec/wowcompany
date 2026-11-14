@@ -31,6 +31,7 @@ import type * as lib_normalize from "../lib/normalize.js";
 import type * as lib_players from "../lib/players.js";
 import type * as lib_profile from "../lib/profile.js";
 import type * as lib_runsView from "../lib/runsView.js";
+import type * as lib_same from "../lib/same.js";
 import type * as lib_settings from "../lib/settings.js";
 import type * as players from "../players.js";
 import type * as poll from "../poll.js";
@@ -68,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   "lib/players": typeof lib_players;
   "lib/profile": typeof lib_profile;
   "lib/runsView": typeof lib_runsView;
+  "lib/same": typeof lib_same;
   "lib/settings": typeof lib_settings;
   players: typeof players;
   poll: typeof poll;
