@@ -6,6 +6,8 @@
 //!   `v1|META|<addon version>|<epoch s>`
 //!   `v1|RUN|<instance id>|<start epoch s>|<end epoch s or 0>|<zone>|<leader or empty>`
 //!   `v1|CHAR|<name>|<level>|<class>|<crit %>|<attack power>|<armor>|<item level>|<epoch s>`
+//!   `v1|LOOT|<epoch s>|<item id>|<quality 0-6 or empty>|<count>|<item name>` (no looter: the
+//!   chat log has that; this adds the id and quality the chat log lacks)
 //! * app → addon: `Interface/AddOns/WowCompany/CompanionData.lua` – the personal records, which the
 //!   addon shows on its Records tab after the next `/reload` (the addon cannot see single hits).
 //!
@@ -44,6 +46,17 @@ pub struct AddonChar {
     pub at: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddonLoot {
+    /// UTC milliseconds.
+    pub at: i64,
+    pub item_id: u32,
+    pub quality: Option<u8>,
+    pub count: u32,
+    pub name: String,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddonExport {
@@ -52,6 +65,7 @@ pub struct AddonExport {
     pub at: Option<i64>,
     pub runs: Vec<AddonRun>,
     pub chars: Vec<AddonChar>,
+    pub loot: Vec<AddonLoot>,
 }
 
 /// The text between the quotes of a Lua string literal at the start of `s` (after the opening
@@ -123,6 +137,18 @@ pub fn parse_export(text: &str) -> AddonExport {
                     leader: Some(f[6].trim().to_string()).filter(|l| l.len() >= 2 && l.len() <= 80),
                 });
             }
+            Some("LOOT") if f.len() >= 7 => {
+                let (Some(at), Ok(item_id)) = (secs_to_ms(f[2]), f[3].trim().parse::<u32>()) else {
+                    continue;
+                };
+                out.loot.push(AddonLoot {
+                    at,
+                    item_id,
+                    quality: f[4].trim().parse::<u8>().ok().filter(|q| *q <= 6),
+                    count: f[5].trim().parse().unwrap_or(1),
+                    name: f[6..].join("|").trim().to_string(),
+                });
+            }
             Some("CHAR") if f.len() >= 10 => out.chars.push(AddonChar {
                 name: f[2].trim().to_string(),
                 level: f[3].trim().parse().unwrap_or(0),
@@ -159,6 +185,116 @@ pub fn leader_for(export: &AddonExport, run: &RunSummary) -> Option<String> {
         (None, [only]) => only.leader.clone(),
         _ => None,
     }
+}
+
+/// How far apart the same loot may be in the chat log (local clock) and in the addon (server clock).
+const LOOT_SLACK_MS: i64 = 5 * 60_000;
+
+/// Fills in item id and quality of the run's loot from the addon (the chat log has neither).
+/// Matched by item name and time; each addon line is used once. Returns whether anything changed.
+pub fn enrich_loot(export: &AddonExport, run: &mut RunSummary) -> bool {
+    let mut used = vec![false; export.loot.len()];
+    let mut changed = false;
+    for drop in run.loot.iter_mut() {
+        if drop.item_id.is_some() && drop.quality.is_some() {
+            continue;
+        }
+        let at = run.started_at + drop.at_ms;
+        let best = export
+            .loot
+            .iter()
+            .enumerate()
+            .filter(|(i, l)| !used[*i] && l.name.eq_ignore_ascii_case(&drop.item) && (l.at - at).abs() <= LOOT_SLACK_MS)
+            .min_by_key(|(_, l)| (l.at - at).abs());
+        if let Some((i, l)) = best {
+            used[i] = true;
+            if drop.item_id.is_none() {
+                drop.item_id = Some(l.item_id);
+                changed = true;
+            }
+            if drop.quality.is_none() && l.quality.is_some() {
+                drop.quality = l.quality;
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
+/// Everything the addon knows about a run: leader and loot details. `(changed, leader added)`.
+pub fn apply(export: &AddonExport, run: &mut RunSummary) -> (bool, bool) {
+    let mut leader_added = false;
+    if run.leader.is_none()
+        && let Some(l) = leader_for(export, run)
+    {
+        run.leader = Some(l);
+        leader_added = true;
+    }
+    let loot = enrich_loot(export, run);
+    (leader_added || loot, leader_added)
+}
+
+// ------------------------------------------------------------------ installing the addon
+
+/// The addon as shipped inside this app (same files as `addon/WowCompany` in the repository).
+const BUNDLED: &[(&str, &str)] = &[
+    (
+        "WowCompany.toc",
+        include_str!("../../../addon/WowCompany/WowCompany.toc"),
+    ),
+    (
+        "CompanionData.lua",
+        include_str!("../../../addon/WowCompany/CompanionData.lua"),
+    ),
+    ("Core.lua", include_str!("../../../addon/WowCompany/Core.lua")),
+    ("Logging.lua", include_str!("../../../addon/WowCompany/Logging.lua")),
+    ("Meter.lua", include_str!("../../../addon/WowCompany/Meter.lua")),
+    ("Export.lua", include_str!("../../../addon/WowCompany/Export.lua")),
+    ("UI.lua", include_str!("../../../addon/WowCompany/UI.lua")),
+    ("Minimap.lua", include_str!("../../../addon/WowCompany/Minimap.lua")),
+    ("Probe.lua", include_str!("../../../addon/WowCompany/Probe.lua")),
+];
+
+fn toc_version(toc: &str) -> Option<String> {
+    toc.lines()
+        .find_map(|l| l.strip_prefix("## Version:"))
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+/// Version of the addon inside this app.
+pub fn bundled_version() -> String {
+    toc_version(BUNDLED[0].1).unwrap_or_default()
+}
+
+/// Version of the addon in the game folder, `None` when it is not installed.
+pub fn installed_version(logs_dir: &Path) -> Option<String> {
+    let toc = fs::read_to_string(addon_dir(logs_dir)?.join("WowCompany.toc")).ok()?;
+    Some(toc_version(&toc).unwrap_or_else(|| "?".to_string()))
+}
+
+/// Copies the bundled addon into `<game>/Interface/AddOns/WowCompany` (install or update).
+/// An existing `CompanionData.lua` (the records this app wrote) is kept. Returns the version.
+pub fn install(logs_dir: &Path) -> Result<String, String> {
+    let game = game_dir(logs_dir)
+        .filter(|g| g.is_dir())
+        .ok_or("Game folder not found next to the Logs folder.")?;
+    // every file listed in the .toc must be in the bundle, or the addon would fail to load in game
+    for listed in BUNDLED[0].1.lines().map(str::trim).filter(|l| l.ends_with(".lua")) {
+        if !BUNDLED.iter().any(|(name, _)| *name == listed) {
+            return Err(format!("addon bundle is missing {listed}"));
+        }
+    }
+    let dir = game.join("Interface").join("AddOns").join("WowCompany");
+    fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    for (name, text) in BUNDLED {
+        let path = dir.join(name);
+        if *name == "CompanionData.lua" && path.exists() {
+            continue;
+        }
+        fs::write(&path, text).map_err(|e| format!("cannot write {name}: {e}"))?;
+    }
+    Ok(bundled_version())
 }
 
 fn game_dir(logs_dir: &Path) -> Option<&Path> {
@@ -269,6 +405,9 @@ WowCompanyDB = {
 "v1|RUN|389|1794695000|0|Ragefire Chasm|", -- [3]
 "v1|CHAR|Grobos \"The\" Stinkfoot|18|MAGE|2.12|13|184|11.75|1794700000", -- [4]
 "v1|RUN|broken", -- [5]
+"v1|LOOT|1794690600|2084|3|1|Darksteel Bastard Sword", -- [7]
+"v1|LOOT|1794690700|2589||3|Linen Cloth", -- [8]
+"v1|LOOT|1794690900|2589|1|2|Linen Cloth", -- [9]
 "v2|RUN|1|2|3|Future|Nobody", -- [6]
 "not ours",
 },
@@ -373,5 +512,94 @@ WowCompanyDB = {
         );
         assert!(!dir.join("CompanionData.lua.tmp").exists());
         assert_eq!(lua_quote("a\"b\\c\nd"), "\"a\\\"b\\\\c d\"");
+    }
+
+    #[test]
+    fn loot_gets_id_and_quality_from_the_addon() {
+        let e = parse_export(SAVED);
+        assert_eq!(e.loot.len(), 3);
+        assert_eq!(
+            (e.loot[0].item_id, e.loot[0].quality, e.loot[0].count),
+            (2084, Some(3), 1)
+        );
+        assert_eq!(e.loot[1].quality, None);
+
+        let mut r = run("Wailing Caverns", 43, 1_794_690_200, 1_794_691_700);
+        let drop = |item: &str, at_s: i64| wowrun::LootDrop {
+            slug: None,
+            looter: "Someone".into(),
+            item: item.into(),
+            item_id: None,
+            quality: None,
+            count: 1,
+            at_ms: (at_s - 1_794_690_200) * 1000,
+        };
+        r.loot = vec![
+            drop("Darksteel Bastard Sword", 1_794_690_610),
+            drop("Linen Cloth", 1_794_690_890), // nearest addon line is the second Linen Cloth
+            drop("Linen Cloth", 1_794_690_705),
+            drop("Mystery Meat", 1_794_690_700),            // the addon never saw it
+            drop("Darksteel Bastard Sword", 1_794_699_000), // hours later: not the same drop
+        ];
+        assert!(enrich_loot(&e, &mut r));
+        assert_eq!((r.loot[0].item_id, r.loot[0].quality), (Some(2084), Some(3)));
+        assert_eq!((r.loot[1].item_id, r.loot[1].quality), (Some(2589), Some(1)));
+        assert_eq!(
+            (r.loot[2].item_id, r.loot[2].quality),
+            (Some(2589), None),
+            "id known, quality not"
+        );
+        assert_eq!((r.loot[3].item_id, r.loot[3].quality), (None, None));
+        assert_eq!((r.loot[4].item_id, r.loot[4].quality), (None, None));
+        assert_eq!(
+            r.loot[0].looter, "Someone",
+            "the looter comes from the chat log, untouched"
+        );
+        // leader and loot in one go; a second pass has nothing left to do for the leader
+        let mut again = run("Wailing Caverns", 43, 1_794_690_200, 1_794_691_700);
+        assert_eq!(apply(&e, &mut again), (true, true));
+        assert_eq!(apply(&e, &mut again), (false, false));
+    }
+
+    #[test]
+    fn installs_and_updates_the_bundled_addon() {
+        let t = TempDir::new("addon-install");
+        let logs = t.path().join("Logs");
+        fs::create_dir_all(&logs).unwrap();
+        assert_eq!(installed_version(&logs), None);
+        assert!(!bundled_version().is_empty());
+
+        let v = install(&logs).unwrap();
+        assert_eq!(v, bundled_version());
+        assert_eq!(installed_version(&logs), Some(v.clone()));
+        let dir = addon_dir(&logs).unwrap();
+        // every file the .toc lists is there
+        let toc = fs::read_to_string(dir.join("WowCompany.toc")).unwrap();
+        for f in toc.lines().filter(|l| l.trim().ends_with(".lua")) {
+            assert!(dir.join(f.trim()).is_file(), "{f} missing");
+        }
+        // an update keeps the records the app wrote and repairs a damaged file
+        fs::write(
+            dir.join("CompanionData.lua"),
+            "WowCompanyCompanionData = { schema = 1 }",
+        )
+        .unwrap();
+        fs::write(dir.join("Core.lua"), "broken").unwrap();
+        fs::write(dir.join("WowCompany.toc"), "## Version: 0.0.1\n").unwrap();
+        assert_eq!(installed_version(&logs).as_deref(), Some("0.0.1"));
+        install(&logs).unwrap();
+        assert_eq!(installed_version(&logs), Some(v));
+        assert!(
+            fs::read_to_string(dir.join("CompanionData.lua"))
+                .unwrap()
+                .contains("schema = 1")
+        );
+        assert!(
+            fs::read_to_string(dir.join("Core.lua"))
+                .unwrap()
+                .contains("WowCompany addon core")
+        );
+        // no game folder at all
+        assert!(install(Path::new("/definitely/not/here/Logs")).is_err());
     }
 }

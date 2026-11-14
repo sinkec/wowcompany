@@ -57,6 +57,12 @@ function Widget:Cancel() self.cancelled = true end
 function CreateFrame(kind, name) return newWidget(kind, name) end
 UIParent = newWidget("Frame")
 GameTooltip = newWidget("GameTooltip")
+Minimap = newWidget("Minimap")
+function Minimap:GetWidth() return 140 end
+function Minimap:GetCenter() return 500, 500 end
+function Minimap:GetEffectiveScale() return 1 end
+local cursor = { 600, 500 }
+function GetCursorPosition() return cursor[1], cursor[2] end
 UISpecialFrames = {}
 tinsert = table.insert
 BackdropTemplateMixin = {}
@@ -119,7 +125,7 @@ local function runTimers()
     timers = {}
     for i = 1, #list do list[i]() end
 end
-C_AddOns = { GetAddOnMetadata = function() return "0.3.0" end }
+C_AddOns = { GetAddOnMetadata = function() return "0.4.0" end }
 C_CVar = {
     GetCVar = function() return game.advanced end,
     SetCVar = function(_, v) game.advanced = v end,
@@ -365,7 +371,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.3%.0|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.4%.0|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -386,6 +392,51 @@ fire("ZONE_CHANGED_NEW_AREA")
 fire("PLAYER_LOGOUT")
 check(#WowCompanyDB.export >= 3, "export is rebuilt right before the game saves")
 slash("log off")
+
+-- loot: item id + quality for the Companion, only inside a run, never a name
+local P = ns.Export.ParseLoot
+local l1 = P("You receive loot: |cff0070dd|Hitem:2084::::::::18:::::::|h[Darksteel Bastard Sword]|h|r.")
+check(l1 and l1.itemId == 2084 and l1.quality == 3 and l1.count == 1 and l1.name == "Darksteel Bastard Sword",
+    "loot link: id, quality from the colour, name")
+local l2 = P("Fizzle Boom receives loot: |cnIQ2:|Hitem:2589::::|h[Linen Cloth]|h|rx3.")
+check(l2 and l2.itemId == 2589 and l2.quality == 2 and l2.count == 3, "loot link: new colour form and stack count")
+check(P("You receive loot: Linen Clothx3") == nil and P(SECRET) == nil and P(nil) == nil,
+    "loot without a link (or a secret line) is skipped")
+WowCompanyDB.loot = {}
+fire("CHAT_MSG_LOOT", "You receive loot: |cff1eff00|Hitem:2589::::|h[Linen Cloth]|h|rx3.")
+check(#WowCompanyDB.loot == 0, "loot outside a dungeon run is not recorded")
+game.instanceType = "party"
+fire("ZONE_CHANGED_NEW_AREA")
+fire("CHAT_MSG_LOOT", "Fizzle Boom receives loot: |cff0070dd|Hitem:2084::::|h[Darksteel Bastard Sword]|h|r.")
+local lootLine = exported("^v1|LOOT|")
+check(lootLine ~= nil and string.find(lootLine, "|2084|3|1|Darksteel Bastard Sword$") ~= nil
+    and not string.find(lootLine, "Fizzle", 1, true), "export: LOOT line has the item, never the looter (" .. tostring(lootLine) .. ")")
+game.instanceType = "none"
+fire("ZONE_CHANGED_NEW_AREA")
+slash("log off")
+
+-- minimap button
+check(WowCompanyMinimapButton ~= nil and WowCompanyMinimapButton:IsShown(), "minimap button is there")
+local mm = WowCompanyMinimapButton
+local wasOpen = WowCompanyFrame:IsShown()
+mm.scripts.OnClick(mm, "LeftButton")
+check(WowCompanyFrame:IsShown() ~= wasOpen, "minimap: left click toggles the window")
+mm.scripts.OnClick(mm, "LeftButton")
+mm.scripts.OnClick(mm, "RightButton")
+check(game.combatLog == true and game.chatLog == true, "minimap: right click starts logging")
+mm.scripts.OnClick(mm, "RightButton")
+check(game.combatLog == false, "minimap: right click again stops it")
+cursor = { 500, 700 } -- straight above the minimap
+mm.scripts.OnDragStart(mm)
+mm.scripts.OnUpdate(mm)
+mm.scripts.OnDragStop(mm)
+check(math.abs(WowCompanyDB.settings.minimapAngle - 90) < 0.01 and math.abs(mm.point[4]) < 0.01 and mm.point[5] > 70,
+    "minimap: dragging moves it around the edge and remembers the angle")
+check(pcall(mm.scripts.OnEnter, mm) and pcall(mm.scripts.OnLeave, mm), "minimap: tooltip")
+slash("minimap")
+check(WowCompanyDB.settings.minimapHidden == true and not mm:IsShown(), "/wowco minimap hides it")
+slash("minimap")
+check(mm:IsShown(), "/wowco minimap shows it again")
 
 -- records written by the Companion (CompanionData.lua)
 check(ns.Export.Records() == nil, "no Companion data yet")
@@ -490,7 +541,11 @@ local p = WowCompanyDB.probe
 check(type(p) == "table" and p.sample.combat[1].during and p.sample.combat[1].after, "probe samples a fight")
 check(p.sample.loot[1].itemId == 2589 and p.sample.loot[1].color == "ff1eff00" and p.sample.loot[1].count == 3
     and p.sample.loot[1].mine, "probe reads the loot link")
-check(p.sample.loot[2].secret == true, "probe survives a secret loot line")
+local sawSecret = false
+for _, l in ipairs(p.sample.loot) do
+    if l.secret == true then sawSecret = true end
+end
+check(sawSecret, "probe survives a secret loot line")
 check(p.group.members.player.leader == true and p.group.members.player.hasSurname, "probe sees the leader")
 
 -- unknown command prints help, a broken handler does not kill the addon

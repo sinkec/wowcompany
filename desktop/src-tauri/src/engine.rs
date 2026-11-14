@@ -216,6 +216,10 @@ pub struct AddonStatus {
     pub chars: Vec<AddonChar>,
     /// Runs that got their party leader from the addon in this session.
     pub leaders_added: u32,
+    /// Version of the addon in the game folder (`None` = not installed).
+    pub installed_version: Option<String>,
+    /// Version of the addon shipped inside this app.
+    pub bundled_version: String,
 }
 
 #[derive(Default)]
@@ -223,6 +227,7 @@ struct AddonState {
     export: AddonExport,
     mtime: Option<SystemTime>,
     installed: bool,
+    installed_version: Option<String>,
     leaders_added: u32,
 }
 
@@ -326,6 +331,22 @@ impl Core {
         }
     }
 
+    /// Installs or updates the addon that ships inside this app into the game folder.
+    pub fn install_addon(&self) -> Result<String, String> {
+        let dir = self
+            .watch
+            .lock()
+            .expect("watch lock")
+            .logs_dir
+            .clone()
+            .ok_or("No Logs folder yet – pick it in Settings first.")?;
+        let version = addon::install(Path::new(&dir))?;
+        let mut a = self.addon.lock().expect("addon lock");
+        a.installed = true;
+        a.installed_version = Some(version.clone());
+        Ok(version)
+    }
+
     pub fn addon_status(&self) -> AddonStatus {
         let a = self.addon.lock().expect("addon lock");
         AddonStatus {
@@ -335,6 +356,8 @@ impl Core {
             runs: a.export.runs.len(),
             chars: a.export.chars.clone(),
             leaders_added: a.leaders_added,
+            installed_version: a.installed_version.clone(),
+            bundled_version: addon::bundled_version(),
         }
     }
 
@@ -350,6 +373,7 @@ impl Core {
         let changed = {
             let mut a = self.addon.lock().expect("addon lock");
             a.installed = installed;
+            a.installed_version = addon::installed_version(logs_dir);
             let changed = mtime.is_some() && mtime != a.mtime;
             if changed {
                 a.mtime = mtime;
@@ -376,31 +400,30 @@ impl Core {
     /// even uploaded: add the leader to recent runs that lack one and send them again.
     fn add_leaders_to_stored_runs(&self) {
         let export = self.addon.lock().expect("addon lock").export.clone();
-        if export.runs.is_empty() {
+        if export.runs.is_empty() && export.loot.is_empty() {
             return;
         }
         let q = self.queue.lock().expect("queue lock");
         let recent = q.recent_json(wall_ms() - ADDON_BACKFILL_MS).unwrap_or_default();
-        let mut added = 0u32;
+        let (mut added, mut updated) = (0u32, 0u32);
         for (run_key, json) in recent {
             let Ok(mut run) = serde_json::from_str::<RunSummary>(&json) else {
                 continue;
             };
-            if run.leader.is_some() {
+            // leader + item ids/quality of the loot
+            let (changed, leader_added) = addon::apply(&export, &mut run);
+            if !changed {
                 continue;
             }
-            let Some(leader) = addon::leader_for(&export, &run) else {
-                continue;
-            };
-            run.leader = Some(leader);
             if let Ok(json) = serde_json::to_string(&run)
                 && q.update_json(&run_key, &json).is_ok()
             {
-                added += 1;
+                updated += 1;
+                added += u32::from(leader_added);
             }
         }
         drop(q);
-        if added > 0 {
+        if updated > 0 {
             self.addon.lock().expect("addon lock").leaders_added += added;
             self.runs_version.fetch_add(1, Ordering::SeqCst);
             self.kick_uploader();
@@ -414,8 +437,8 @@ impl Core {
         // the party leader, when the addon already told us
         {
             let a = self.addon.lock().expect("addon lock");
-            for r in runs.iter_mut().filter(|r| r.leader.is_none()) {
-                r.leader = addon::leader_for(&a.export, r);
+            for r in runs.iter_mut() {
+                addon::apply(&a.export, r);
             }
         }
         let q = self.queue.lock().expect("queue lock");

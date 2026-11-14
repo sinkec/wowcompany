@@ -1,6 +1,6 @@
 <script lang="ts">
 	// "How to log": vklop, preverjanje (sproti iz stanja aplikacije), izklop in pospravljanje.
-	import { ago, type Status } from './api';
+	import { ago, api, type Status } from './api';
 
 	let { status, ongo }: { status: Status; ongo: (tab: 'settings') => void } = $props();
 
@@ -59,6 +59,24 @@
 					: 'No data from it yet – type /reload in game once.'
 		}
 	]);
+	// namestitev / posodobitev addona, ki je priložen aplikaciji
+	const addonOutdated = $derived(
+		!!status.addon.installedVersion && status.addon.installedVersion !== status.addon.bundledVersion
+	);
+	let installing = $state(false);
+	let installNote = $state<string | null>(null);
+	async function installAddon() {
+		installing = true;
+		installNote = null;
+		try {
+			const v = await api.installAddon();
+			installNote = `Addon v${v} is in the game's AddOns folder. Restart the game (a new addon needs a full restart; an update needs /reload).`;
+		} catch (e) {
+			installNote = `Could not install: ${e}`;
+		} finally {
+			installing = false;
+		}
+	}
 	const icon = (ok: boolean | null) => (ok === true ? '✅' : ok === false ? '❌' : '⚠️');
 </script>
 
@@ -78,6 +96,27 @@
 				</li>
 			{/each}
 		</ul>
+		<div class="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3 text-sm">
+			{#if !status.addon.installed || addonOutdated}
+				<button class="btn btn-primary" disabled={installing || !status.watch.logsDir} onclick={installAddon}>
+					{installing
+						? 'Copying…'
+						: status.addon.installed
+							? `Update addon to v${status.addon.bundledVersion}`
+							: `Install the WowCompany addon (v${status.addon.bundledVersion})`}
+				</button>
+				<span class="text-xs text-muted-foreground">
+					{status.addon.installed
+						? `Installed: v${status.addon.installedVersion}.`
+						: 'In-game meter, automatic logging, party leader and item quality for the portal.'}
+				</span>
+			{:else}
+				<span class="text-xs text-muted-foreground">
+					WowCompany addon v{status.addon.installedVersion} is up to date. In game: <code class="text-primary">/wowco</code>
+				</span>
+			{/if}
+			{#if installNote}<span class="basis-full text-xs text-primary">{installNote}</span>{/if}
+		</div>
 	</section>
 
 	<section class="wow-frame space-y-3 rounded-lg p-5">

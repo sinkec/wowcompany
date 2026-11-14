@@ -58,7 +58,9 @@ const status: Status = {
 		dataAt: now - 5 * 60e3,
 		runs: 3,
 		chars: [{ name: 'Tankus Maximus', level: 18, class: 'WARRIOR', crit: 2.12, itemLevel: 11.75 }],
-		leadersAdded: 1
+		leadersAdded: 1,
+		installedVersion: q.get('addon') === '0' ? null : q.get('addon') === 'old' ? '0.3.0' : '0.4.0',
+		bundledVersion: '0.4.0'
 	},
 	records: {
 		schema: 1,

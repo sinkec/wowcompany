@@ -110,6 +110,7 @@ pub fn run() {
             commands::end_run,
             commands::open_url,
             commands::delete_logs_now,
+            commands::install_addon,
         ])
         .build(tauri::generate_context!())
         .expect("error while building WowCompany Companion")

@@ -132,6 +132,10 @@ export type Status = {
 		runs: number;
 		chars: { name: string; level: number; class: string; crit: number; itemLevel: number }[];
 		leadersAdded: number;
+		/** version in the game folder, null = not installed */
+		installedVersion: string | null;
+		/** version shipped inside this app */
+		bundledVersion: string;
 	};
 	/** Personal bests of the log owner's characters (whole log, open world included). */
 	records: { schema: number; characters: PersonalCharacter[] };
@@ -185,7 +189,9 @@ export const api = {
 	deleteRun: (runKey: string) => invoke<void>('delete_run', { runKey }),
 	endRun: () => invoke<void>('end_run'),
 	openUrl: (url: string) => invoke<void>('open_url', { url }),
-	deleteLogsNow: () => invoke<CleanupReport>('delete_logs_now')
+	deleteLogsNow: () => invoke<CleanupReport>('delete_logs_now'),
+	/** Copies the addon shipped with this app into the game's AddOns folder; returns its version. */
+	installAddon: () => invoke<string>('install_addon')
 };
 
 export const fmtNum = (n: number) => Math.round(n).toLocaleString('en-US');

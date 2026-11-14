@@ -402,7 +402,21 @@ export const ingestRun = internalMutation({
 			else await ctx.db.insert('runDetails', { runId: existing._id, ...details });
 			await writeParticipants(ctx, existing._id, party, s.startedAt);
 			await writeHeroRecords(ctx, existing._id, s, party);
-		} else if (added || (s.leader && !existing.leader)) {
+		} else {
+			// isti posnetek z več podatki o lootu (ID/kakovost iz addona pride pozno): zamenjaj samo loot
+			const known = (l: { quality: number | null; itemId: number | null }[]) =>
+				l.filter((x) => x.quality !== null || x.itemId !== null).length;
+			if (known(loot) > 0) {
+				const old = await ctx.db
+					.query('runDetails')
+					.withIndex('by_run', (q) => q.eq('runId', existing._id))
+					.unique();
+				const oldLoot = old?.loot ?? [];
+				if (old && oldLoot.length === loot.length && known(loot) > known(oldLoot))
+					await ctx.db.patch('runDetails', old._id, { loot });
+			}
+		}
+		if (!better && (added || (s.leader && !existing.leader))) {
 			// slabši/enak posnetek lahko še vedno prinese snemalca ali vodjo (addon pride pozno, ob /reload)
 			await ctx.db.patch('runs', existing._id, {
 				recordedBy,

@@ -137,3 +137,9 @@ pub async fn delete_logs_now(core: State<'_, Arc<Core>>) -> Result<crate::cleanu
         .await
         .map_err(|e| e.to_string())?
 }
+
+/// Installs or updates the WowCompany addon in the game's AddOns folder; returns its version.
+#[tauri::command]
+pub fn install_addon(core: Core_<'_>) -> Result<String, String> {
+    core.install_addon()
+}

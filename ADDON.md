@@ -37,9 +37,15 @@ Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez nje
 - **Companion → addon:** Companion piše `Interface/AddOns/WowCompany/CompanionData.lua` (osebni rekordi), addon jih kaže na zavihku
   **Records** po `/reload`. Preverjeno na pravih datotekah (Lua prebere datoteko, ki jo zapiše aplikacija).
 - Companion Guide kaže stanje addona (nameščen, verzija, zadnji podatki, dodani vodje).
-- **Še odprto:** loot s kakovostjo/ID-jem in rolli iz addona (CHAT_MSG_LOOT oblika ni preverjena), statistika lika na portalu,
-  gumb »Install addon« v Companionu (addon je treba zdaj ročno skopirati v `Interface/AddOns`), minimap gumb,
-  `/wowco probe` v dungeonu (ali so vrednosti metra med bojem skrite).
+- **Companion v0.1.6 + addon 0.4.0:**
+  - **Install addon:** addon je vgrajen v aplikacijo (`include_str!` v `addon.rs`, seznam `BUNDLED` – ob novi datoteki addona jo
+    dodaj tja in v `.toc`; test to preverja). Gumb v zavihku How to log (namesti / posodobi, `CompanionData.lua` ohrani).
+  - **Loot:** addon ob `CHAT_MSG_LOOT` med runom zapiše `v1|LOOT|epoch|itemId|quality|count|name` (brez imena igralca);
+    Companion z `enrich_loot` po imenu predmeta in času (±5 min) dopolni `itemId` in `quality` lootu iz chat loga; strežnik pri
+    enakem posnetku zamenja samo loot, če prinese več podatkov. **Oblika CHAT_MSG_LOOT v Forever ni preverjena** (če sporočilo
+    nima povezave `|Hitem:`, addon vrstice preskoči in ostane vse kot prej).
+  - **Minimap gumb** (`Minimap.lua`): levi klik okno, desni klik logiranje, vlečenje okoli minimape, `/wowco minimap`.
+- **Še odprto:** rolli need/greed (dogodki niso preverjeni), statistika lika na portalu, `/wowco probe` v dungeonu.
 - Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`;
   v izvozu je edino tuje ime vodja LASTNEGA partyja).
 

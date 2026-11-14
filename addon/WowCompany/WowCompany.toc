@@ -2,7 +2,7 @@
 ## Title: |cffd8a83cWowCompany|r
 ## Notes: Dungeon meter and automatic combat logging for the WowCompany portal. /wowco
 ## Author: WowCompany
-## Version: 0.3.0
+## Version: 0.4.0
 ## SavedVariables: WowCompanyDB
 
 CompanionData.lua
@@ -11,4 +11,5 @@ Logging.lua
 Meter.lua
 Export.lua
 UI.lua
+Minimap.lua
 Probe.lua

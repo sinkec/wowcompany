@@ -4,6 +4,9 @@
 --   v1|META|<addon version>|<epoch s>
 --   v1|RUN|<instance id>|<start epoch s>|<end epoch s or 0>|<zone>|<leader or empty>
 --   v1|CHAR|<name>|<level>|<class>|<crit %>|<attack power>|<armor>|<item level>|<epoch s>
+--   v1|LOOT|<epoch s>|<item id>|<quality 0-6 or empty>|<count>|<item name>
+-- LOOT carries no looter: the chat log (read by the Companion) already says who took what, but
+-- without the item's quality and id. The app matches the two by item name and time.
 -- Privacy: the only other player ever named here is the leader of YOUR party.
 
 local _, ns = ...
@@ -12,6 +15,29 @@ local Export = {}
 ns.Export = Export
 
 local MAX_RUNS = 30
+local MAX_LOOT = 200
+
+-- Item quality from a link colour: classic hex colours and the newer "|cnIQ3:" form.
+local QUALITY = {
+    ["9d9d9d"] = 0, ["ffffff"] = 1, ["1eff00"] = 2, ["0070dd"] = 3, ["0070de"] = 3,
+    ["a335ee"] = 4, ["ff8000"] = 5, ["e6cc80"] = 6,
+}
+
+-- { itemId, quality, count, name } from a loot chat line, or nil when it has no item link.
+function Export.ParseLoot(msg)
+    msg = ns.plain(msg)
+    if type(msg) ~= "string" then return nil end
+    local itemId = tonumber(string.match(msg, "|Hitem:(%d+)"))
+    local name = string.match(msg, "|h%[(.-)%]|h")
+    if not itemId or not name or name == "" then return nil end
+    local quality = tonumber(string.match(msg, "|cnIQ(%d):"))
+    if not quality then
+        local hex = string.match(msg, "|c%x%x(%x%x%x%x%x%x)|Hitem:")
+        quality = hex and QUALITY[string.lower(hex)] or nil
+    end
+    local count = tonumber(string.match(msg, "|h|rx(%d+)")) or 1
+    return { itemId = itemId, quality = quality, count = count, name = name }
+end
 
 -- No separators or line breaks inside a field.
 local function clean(v)
@@ -78,6 +104,12 @@ function Export.Rebuild()
             clean(r.zone), clean(r.leader),
         }, "|"))
     end
+    for _, l in ipairs(ns.db.loot or {}) do
+        table.insert(lines, table.concat({
+            "v1", "LOOT", tostring(l.at or 0), tostring(l.itemId or 0), l.quality and tostring(l.quality) or "",
+            tostring(l.count or 1), clean(l.name),
+        }, "|"))
+    end
     local char = charLine()
     if char then table.insert(lines, char) end
     ns.db.export = lines
@@ -122,6 +154,19 @@ ns.on("PARTY_LEADER_CHANGED", sync)
 ns.on("PLAYER_LOGOUT", sync) -- also fires on /reload, right before the game saves
 ns.onReady(function()
     ns.db.runs = type(ns.db.runs) == "table" and ns.db.runs or {}
+    ns.db.loot = type(ns.db.loot) == "table" and ns.db.loot or {}
+end)
+
+-- Loot seen in a dungeon run: which item (id, quality), never who.
+ns.on("CHAT_MSG_LOOT", function(msg)
+    if not ns.db or not ns.Meter.Run() then return end
+    local item = Export.ParseLoot(msg)
+    if not item then return end
+    item.at = ns.now()
+    ns.db.loot = type(ns.db.loot) == "table" and ns.db.loot or {}
+    table.insert(ns.db.loot, item)
+    while #ns.db.loot > MAX_LOOT do table.remove(ns.db.loot, 1) end
+    Export.Rebuild()
 end)
 
 -- ------------------------------------------------------------------ records from the Companion
