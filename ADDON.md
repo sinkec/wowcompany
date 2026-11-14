@@ -25,18 +25,17 @@ samo prek SavedVariables, in to šele ob `/reload`, odjavi ali izhodu iz igre. Z
 
 Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez njega vse deluje kot v v0.1.2.
 
-## 1. Stanje (14. 11. 2026, konec seje)
+## 1. Stanje (14. 11. 2026 zvečer) – ZAČNI TUKAJ
 
-- Izdano: **Companion v0.1.3** (rekordi), `main` = `cafcc2b`, portal in Convex prod objavljena 14. 11. 2026;
-  poller na prod teče po novem (interval 900 s).
-- **Necommitano:** addon 0.1.2 (`addon/`, `check:addon`), faza W (osebni rekordi, Companion 0.1.4), rezultati samotesta v tej datoteki.
-  Addon je nameščen v mapi igre, a **v igri še ni preizkušen** (samo `addon/smoke.lua`). Spodnje je že commitano in objavljeno:
-  - faza O1–O4 + O6 (optimizacija Convexa),
-  - faza R1–R5 (rekordi: Rust shema 3, strežnik, portal, Companion Live; verzija aplikacije dvignjena na **0.1.3**, še ni izdana),
-  - `addon/WowCompany/` – samotest A0 (sintaksa Lua **ni strojno preverjena**: lokalno ni Lua orodij),
-  - dokumenti (COMPANION.md §16, PLAN.md §0, ta datoteka).
-- Dev: nasejani 3 runi s shemo 3 (`bun scripts/companion-seed.ts --clean` jih odstrani), poller na pavzi,
-  23 neobjavljenih testnih dogodkov (dev nima webhooka).
+- **Vse commitano in na produkciji:** `main` = `877bd66`, Companion **v0.1.4** izdan (Windows + Linux), osebni rekordi iz open worlda
+  delujejo na prod (uporabnikovi so naloženi). Addon 0.2.1 je v uporabnikovi mapi igre in **deluje** (uporabnik potrdil).
+- Pri uporabniku teče lokalno zgrajen Companion 0.1.4 (`target/release/wowcompany-companion`); AppImage v `~/Applications` je še 0.1.3.
+- **Naslednji korak: povezava addon → Companion** (§4.1a, §4.4): addon piše `WowCompanyDB.export` (vodja partyja, loot s kakovostjo
+  in ID-jem, rolli, statistika lika, meter runa iz C_DamageMeter), Companion bere
+  `_forever_/WTF/Account/*/SavedVariables/WowCompany.lua` (ob `/reload` / odjavi) in dopolni run; zavihek »Addon« v Companionu
+  (nameščen? verzija? zadnji podatki). Nato Companion → addon (`CompanionData.lua`: rekordi, lestvice).
+- Odprto iz samotesta: CHAT_MSG_LOOT oblika, vodja v partyju, ali so vrednosti metra med bojem skrite (`/wowco probe` v dungeonu).
+- Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`).
 
 ## 2. Faza O – preostala optimizacija Convexa (majhno, najprej)
 
