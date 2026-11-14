@@ -169,4 +169,24 @@ impl Api {
             Ok((status, text, _)) => Upload::Rejected(Self::error_text(status, &text)),
         }
     }
+    /// Personal records of the log owner (`POST /companion/records`). `Ok` carries no data.
+    pub fn upload_records(&self, token: &str, json: &str) -> Upload {
+        match self.post("/companion/records", Some(token), json) {
+            Err(e) => Upload::Retry {
+                after_ms: None,
+                error: e,
+            },
+            Ok((200, _, _)) => Upload::Ok {
+                run_id: String::new(),
+                url: String::new(),
+                created: false,
+            },
+            Ok((status @ (401 | 403), text, _)) => Upload::Unauthorized(Self::error_text(status, &text)),
+            Ok((status, text, retry_after)) if status == 429 || status >= 500 => Upload::Retry {
+                after_ms: retry_after,
+                error: Self::error_text(status, &text),
+            },
+            Ok((status, text, _)) => Upload::Rejected(Self::error_text(status, &text)),
+        }
+    }
 }

@@ -27,15 +27,16 @@ Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez nje
 
 ## 1. Stanje (14. 11. 2026, konec seje)
 
-- Izdano: Companion v0.1.2, `main` = `b0563fd`.
-- **Necommitano v delovnem drevesu** (vse preverjeno na dev, nič še na prod):
+- Izdano: **Companion v0.1.3** (rekordi), `main` = `cafcc2b`, portal in Convex prod objavljena 14. 11. 2026;
+  poller na prod teče po novem (interval 900 s).
+- **Necommitano:** addon 0.1.2 (`addon/`, `check:addon`), faza W (osebni rekordi, Companion 0.1.4), rezultati samotesta v tej datoteki.
+  Addon je nameščen v mapi igre, a **v igri še ni preizkušen** (samo `addon/smoke.lua`). Spodnje je že commitano in objavljeno:
   - faza O1–O4 + O6 (optimizacija Convexa),
   - faza R1–R5 (rekordi: Rust shema 3, strežnik, portal, Companion Live; verzija aplikacije dvignjena na **0.1.3**, še ni izdana),
   - `addon/WowCompany/` – samotest A0 (sintaksa Lua **ni strojno preverjena**: lokalno ni Lua orodij),
   - dokumenti (COMPANION.md §16, PLAN.md §0, ta datoteka).
 - Dev: nasejani 3 runi s shemo 3 (`bun scripts/companion-seed.ts --clean` jih odstrani), poller na pavzi,
   23 neobjavljenih testnih dogodkov (dev nima webhooka).
-- **Po pushu na prod:** `bunx convex run --prod poll:watchdog` (zagon verige pollerja), nato oznaka `companion-v0.1.3`.
 
 ## 2. Faza O – preostala optimizacija Convexa (majhno, najprej)
 
@@ -82,6 +83,24 @@ Dev higiena: `check:visibility` (8976 preverjanj) in seed samo pred izdajo.
 
 Poraba: `records` doda ~1 KB na run; `heroRecords` ≤ 6 majhnih vrstic na junaka → zanemarljivo.
 
+## 3a. Faza W – osebni rekordi iz celega loga (open world) – narejeno 14. 11. 2026, necommitano
+
+Rekordi runov (faza R) veljajo samo znotraj dungeon runa. Faza W doda rekorde **lika, ki snema**, iz celega combat loga:
+
+- [x] `wowrun::personal` (`Personal`, `PersonalUpload`): samo `AFFILIATION_MINE` igralec; tuji igralci so `Another player`,
+      sam nase `themselves`; cona iz `ZONE_CHANGE` / `MAP_CHANGE`, `inDungeon` po tabeli dungeonov. Stanje je serializabilno.
+      Testa v `tests/runs.rs`; `cargo run -p wowrun --example personal -- <log>` (preverjeno na pravem logu: Silverpine Forest).
+- [x] Strežnik: `POST /companion/records` → `companion.ingestPersonal` (validator `personalUpload`, `checkPersonal`,
+      omejitev `companionRecords` 60/h). Zapiše samo spremljanega junaka, ki ni last drugega uporabnika, in samo večjo številko.
+      `heroRecords`: `runId` neobvezen, `zone` lahko `null`, novo polje `world`. E2E v `scripts/companion-e2e.ts`.
+- [x] Portal: Personal Records kaže »Open world · cona«; rekord brez runa ni povezava. (Oznaka še ni pregledana na posnetku.)
+- [x] Companion **0.1.4** (še ni izdan): `Pipeline::feed(line, &mut Personal)`, stanje v `records.json` (preživi brisanje logov),
+      nalaganje največ 1×/min ob novem rekordu, zavihek **Records**, Guide »Records everywhere«.
+- [x] **Brisanje logov ob izhodu:** `cleanup::game_running()` (Linux `/proc/*/cmdline`, Windows `tasklist` – **Windows ni preizkušen**).
+      Igra zaprta → odprt run se najprej zaključi in shrani (`Cmd::Finish`), nato se pobrišejo **vsi** logi. Igra odprta ali neznano →
+      ostane datoteka, v katero je igra pisala v zadnjih 2 min. Addon datotek ne more brisati; briše samo Companion.
+- [x] Addon **0.1.2**: nastavitev **Log everywhere** (privzeto izklopljeno): `/wowco log everywhere` ali gumb v zavihku Logging.
+
 ## 4. Faza A – addon `WowCompany`
 
 ### 4.1 Ugotovitve o Forever (A0) – **preberi pred pisanjem addona**
@@ -121,41 +140,91 @@ Vir: addoni, ki jih ima uporabnik nameščene (`_forever_/Interface/AddOns/`: Fo
   `BackdropTemplateMixin`, `Minimap`, `C_Timer`, `C_AddOns`, `C_ChatInfo.SendAddonMessage` obstajajo.
 - Nov addon igra prepozna šele ob **ponovnem zagonu** (ne ob `/reload`).
 
-**Naslednji preizkus (A0b), preden se piše UI:** `LoggingCombat(true)` iz addona, izpis funkcij `C_DamageMeter` in vzorec
-njihovih vrednosti po boju, `CHAT_MSG_LOOT` z registracijo že ob nalaganju, `UnitIsGroupLeader` v partyju.
+**Drugi krog (A0b, 14. 11. 2026, addon 0.0.3):**
 
-### 4.1a Popravljen načrt addona (ker CLEU ni na voljo)
+- [x] **`LoggingCombat(true)` in `LoggingChat(true)` iz addona delujeta** (vrneta `true`, stanje se vklopi) → samodejni vklop logov je mogoč.
+- [x] **Registracija `COMBAT_LOG_EVENT_UNFILTERED` / `COMBAT_LOG_EVENT` sproži `ADDON_ACTION_FORBIDDEN`** in okno
+      »WowCompany has been blocked from an action only available to the Blizzard UI«. **Teh dveh dogodkov addon ne sme nikoli registrirati.**
+- [x] **`C_DamageMeter` deluje in daje navadne (ne skrite) številke** zunaj boja:
+  - funkcije: `IsDamageMeterAvailable`, `GetAvailableCombatSessions`, `GetCombatSessionFromType(sessionType, meterType)`,
+    `GetCombatSessionFromID`, `GetCombatSessionSourceFromType`, `GetCombatSessionSourceFromID`, `GetSessionDurationSeconds`, `ResetAllCombatSessions`;
+  - `Enum.DamageMeterSessionType`: Overall 0, Current 1, Expired 2;
+  - `Enum.DamageMeterType`: DamageDone 0, Dps 1, HealingDone 2, Hps 3, Absorbs 4, Interrupts 5, Dispels 6, DamageTaken 7,
+    AvoidableDamageTaken 8, Deaths 9, EnemyDamageTaken 10;
+  - `GetAvailableCombatSessions()` → seznam `{sessionID, name, durationSeconds}` – en boj na sejo, ime = glavni nasprotnik,
+    bossi z oznako `(!)` (v poročilu je bilo 30 sej prejšnjega runa Wailing Caverns);
+  - `GetCombatSessionFromType(...)` → `{durationSeconds, totalAmount, maxAmount, combatSources[]}`; vir:
+    `{name ("Ime Priimek"), sourceGUID, classFilename, totalAmount, amountPerSecond, isLocalPlayer, deathRecapID, deathTimeSeconds, …}`.
+    Skrit je samo `specIconID`. Overall vsebuje **vse člane partyja**.
+  - **Še ne preverjeno:** ali so vrednosti skrite *med* bojem; kaj vrne `GetCombatSessionSourceFromType/ID` (verjetno uroki –
+    mogoče največji udarec); argumenti dogodka `DAMAGE_METER_COMBAT_SESSION_UPDATED`.
+- [x] `C_LootHistory`: `GetAllEncounterInfos`, `GetInfoForEncounter`, `GetSortedDropsForEncounter`, `GetSortedInfoForDrop`, `GetLootHistoryTime`.
+- [x] `C_PartyInfo`: med drugim `GetLootMethod`, `IsPartyFull`, `IsGUIDInGroup`. `UnitClass` deluje.
+- [ ] `CHAT_MSG_LOOT` še vedno brez vzorca (med selftestom ni bilo pobiranja) in vodja v partyju – preveriti v prvem dungeonu.
 
-Addon **ne računa** damage-a. Številke pridejo iz Companiona, ki bere combat log na disku:
+### 4.1a Načrt addona po samotestu
 
-| Smer | Kanal | Kdaj |
-|---|---|---|
-| Addon → Companion | SavedVariables (`WowCompanyDB.export`) | ob `/reload` / odjavi |
-| **Companion → addon** | Companion zapiše `Interface/AddOns/WowCompany/CompanionData.lua` (kot TSM-ova namizna aplikacija) | addon ga naloži ob `/reload` / prijavi |
+CLEU je zaprt, **Blizzardov merilnik `C_DamageMeter` pa je odprt** – addon je lahko pravi merilnik, le da številke bere iz njega:
 
-Addon torej **prikazuje** (po `/reload`): povzetek zadnjega runa (meter, smrti, nagrade), osebne rekorde, lestvice portala
-(Biggest Crit, Hall of Shame), stanje povezave. **Zbira** (kar combat log nima): vodjo partyja, loot s kakovostjo in ID-jem, rolle,
-uboje (PARTY_KILL/UNIT_DIED), statistiko lika. **Naredi**: samodejni `/combatlog` + `/chatlog` v dungeonu (če A0.2), opomnik za `/reload` po runu.
-Meter v živo med bojem samo, če A0.5 pokaže uporaben `C_DamageMeter`.
+| Kaj | Vir v addonu |
+|---|---|
+| Meter (damage, DPS, healing, HPS, prejeta škoda, smrti, interrupti, dispeli) po boju in za cel run | `C_DamageMeter` (seje Current / Overall / po ID-ju) |
+| Seznam bojev runa z bossi | `GetAvailableCombatSessions()` |
+| Samodejni `/combatlog` + `/chatlog` v dungeonu | `LoggingCombat(true)`, `LoggingChat(true)` |
+| Vodja partyja, sestava | `UnitIsGroupLeader`, `GROUP_ROSTER_UPDATE`, `PARTY_LEADER_CHANGED` |
+| Loot s kakovostjo, rolli | `CHAT_MSG_LOOT` (preveriti), `C_LootHistory`, `START_LOOT_ROLL` |
+| Statistika lika | `GetCritChance`, `UnitAttackPower`, `UnitArmor`, `GetAverageItemLevel` |
+| **Največji crit (rekordi)** | iz combat loga prek Companiona; v igri samo, če `GetCombatSessionSource…` da udarce po urokih |
+
+Kanala ostajata: addon → Companion prek SavedVariables (ob `/reload` / odjavi), Companion → addon prek
+`Interface/AddOns/WowCompany/CompanionData.lua` (rekordi in lestvice s portala, vidni po `/reload`).
+
+Dodatna vrednost: addon z `C_DamageMeter` da meter runa **tudi brez `/combatlog`** – Companion lahko iz SavedVariables naloži
+osnovni run (damage/healing/smrti po igralcih), če combat loga ni. To je rezervni vir, combat log ostane glavni (uroki, časovnica, recapi).
+
+Pravila za kodo addona: nikoli `RegisterEvent("COMBAT_LOG_EVENT*")`; vsako vrednost skozi `issecretvalue`; skritih vrednosti ne
+primerjaj in ne računaj z njimi (lahko se jih samo prikaže s `SetText`); `C_Item.GetItemInfo` namesto `GetItemInfo`.
 
 Vzori: ForeverDungeonJournal (`Systems/RunLog.lua` – zaznava runa brez CLEU), `postblink/KwikTip`.
 
-### 4.2 Zgradba
+### 4.2 Zgradba (stanje: addon 0.1.0, prvi del napisan)
 
 ```
-addon/WowCompany/
-  WowCompany.toc        ## Interface: 16001, SavedVariables: WowCompanyDB, SavedVariablesPerCharacter: WowCompanyCharDB
-  Core.lua              dogodki, stanje, slash ukazi (/wowco, /wowco selftest, /wowco reset)
-  Logging.lua           samodejni LoggingCombat/LoggingChat ob vstopu v dungeon, izklop po izhodu
-  CompanionData.lua     piše Companion (zadnji run, rekordi, lestvice) – addon samo bere
-  Summary.lua           prikaz zadnjega runa in rekordov iz CompanionData (brez CLEU, glej 4.1a)
-  Loot.lua              loot s kakovostjo + ID, rolli need/greed
-  Run.lua               vodja partyja, sestava, začetek/konec, instanca
-  Export.lua            vrstice za Companion v WowCompanyDB.export
-  UI/Main.lua, UI/Minimap.lua, UI/Theme.lua
+addon/
+  .luacheckrc           seznam WoW funkcij za luacheck
+  smoke.lua             preizkus zunaj igre: lažen WoW API naloži addon, sproži dogodke, izriše vse zavihke (40 preverjanj)
+  WowCompany/
+    WowCompany.toc      ## Interface: 16001, SavedVariables: WowCompanyDB
+    Core.lua            ns, nastavitve, dogodki (ns.on – COMBAT_LOG_EVENT* zavrne), ns.command, /wowco
+    Logging.lua         samodejni LoggingCombat/LoggingChat v dungeonu; izklop 20 min po izhodu, samo če jih je vklopil addon
+    Meter.lua           branje C_DamageMeter (boj / overall / pretekli boj po ID-ju), seznam bojev
+    UI.lua              okno Meter · Fights · Logging (premično, Escape zapre)
+    Probe.lua           /wowco probe – vzorči odprta vprašanja (skrivnosti med bojem, uroki, loot, vodja)
 ```
 
-Brez zunanjih knjižnic (Ace3 ni potreben) – manj tveganja z licencami in verzijami.
+**Preverjanje:** `bun run check:addon` = `luac5.1 -p` + `lua5.1 addon/smoke.lua` + `luacheck` (orodja: `sudo apt install lua5.1 lua-check`).
+Smoke test dokazuje samo, da je naša koda zdrava – ne, da se pravi odjemalec vede kot lažni. **V igri še ni preizkušeno.**
+
+**Ukazi v igri:** `/wowco` (okno), `/wowco log on|off|auto|everywhere`, `/wowco advanced`, `/wowco probe`, `/wowco reset`.
+Okno: odpre se ob prijavi (če ni bilo zaprto), privzeto na vrhu zaslona, vlečenje, gumb `pin`, položaj se shrani.
+
+**Addon 0.1.3:** zavihek **Now** (privzet) – ena stran za trenutni boj: tarča, trajanje, tvoj damage/DPS, healing/HPS, prejeta škoda,
+interrupti; osvežuje se 2× na sekundo iz seje `Current`.
+
+**Pravilo zasebnosti (zahteva uporabnika 14. 11. 2026): addon ne sme kazati drugih igralcev, razen članov partyja.**
+`Meter.Visible(session)` pusti samo: lastno vrstico (`isLocalPlayer` ali GUID), člane skupine (`C_PartyInfo.IsGUIDInGroup`), ali vse
+vrstice, če si s skupino v dungeonu (zasebna instanca). Vrstica, katere lastnika ni mogoče preveriti (skrita identiteta med bojem),
+se **ne pokaže** in se ne ugiba. Skupni seštevki seje se kažejo samo v dungeonu s skupino (`Meter.TotalsAreParty`). Znana luknja:
+ime boja v zavihku Fights je ime nasprotnika – pri dvoboju je to lahko ime igralca.
+
+**Addon 0.2.0 – prenovljeno okno (UI.lua na novo):** okvir z igrinim robom namigov (`UI-Tooltip-Border`), zlata glava z zavihki
+(podčrtan aktivni), kartice 2×2 na strani Now (vrednost, na sekundo, »Overall«), vrstice metra z deležem v %, razredno barvo in
+teksturo `UI-StatusBar`, zavihek Logging s statusnimi lučkami in opisi, namigi (`GameTooltip`) na gumbih, noga z lučko REC, cono in verzijo.
+Uporabljene so samo igrine pisave in teksture. **Run v dungeonu:** `Meter.Run()` (cona, čas, število bojev in bossov od vstopa;
+`db.state.run`, nadaljuje po corpse runu do 20 min) – pas na strani Now in ime dungeona v nogi. Videz v igri še ni pregledan.
+
+**Še manjka (drugi del):** zavihka Records in Loot, izvoz za Companion (`WowCompanyDB.export`), branje `CompanionData.lua`,
+minimap gumb, vodja partyja in rolli. Najprej rezultat `/wowco probe` iz pravega dungeona.
 
 ### 4.3 UI (enak občutek kot Companion)
 

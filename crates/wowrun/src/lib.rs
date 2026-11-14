@@ -19,8 +19,10 @@
 pub mod analyzer;
 pub mod detector;
 pub mod dungeons;
+pub mod personal;
 pub mod summary;
 
 pub use analyzer::Config;
 pub use detector::{Detector, run_key};
+pub use personal::{PERSONAL_SCHEMA, Personal, PersonalCharacter, PersonalRecord, PersonalUpload};
 pub use summary::*;

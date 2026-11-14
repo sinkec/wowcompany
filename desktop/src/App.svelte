@@ -3,13 +3,14 @@
 	import { api, errText, type Status } from './lib/api';
 	import LinkPanel from './lib/LinkPanel.svelte';
 	import Guide from './lib/Guide.svelte';
+	import Records from './lib/Records.svelte';
 	import Live from './lib/Live.svelte';
 	import Runs from './lib/Runs.svelte';
 	import SettingsView from './lib/Settings.svelte';
 
 	let status = $state<Status | null>(null);
 	let error = $state<string | null>(null);
-	let tab = $state<'live' | 'runs' | 'guide' | 'settings'>('live');
+	let tab = $state<'live' | 'runs' | 'records' | 'guide' | 'settings'>('live');
 	let pickedTab = false;
 	let skipLink = $state(false);
 
@@ -53,7 +54,7 @@
 		</div>
 		{#if status && !needsLink}
 			<nav class="ml-auto flex gap-1">
-				{#each [['live', 'Live'], ['runs', `Runs${status.queue.pending ? ` (${status.queue.pending}⏳)` : ''}`], ['guide', 'How to log'], ['settings', 'Settings']] as [key, label] (key)}
+				{#each [['live', 'Live'], ['runs', `Runs${status.queue.pending ? ` (${status.queue.pending}⏳)` : ''}`], ['records', 'Records'], ['guide', 'How to log'], ['settings', 'Settings']] as [key, label] (key)}
 					<button
 						class="btn {tab === key
 							? 'bg-primary/15 text-primary'
@@ -114,6 +115,8 @@
 				<Live {status} />
 			{:else if tab === 'runs'}
 				<Runs {status} />
+			{:else if tab === 'records'}
+				<Records {status} ongo={(t) => (tab = t)} />
 			{:else if tab === 'guide'}
 				<Guide {status} ongo={(t) => (tab = t)} />
 			{:else}

@@ -191,15 +191,19 @@
 							<section class="wow-frame rounded-lg p-4">
 								<h3 class="text-sm font-semibold text-primary">Personal Records</h3>
 								<p class="text-xs text-muted-foreground italic">
-									biggest numbers ever caught on a combat log. screenshots or it didn't happen.
+									biggest numbers ever caught on a combat log, dungeons and open world. screenshots or it didn't happen.
 								</p>
 								<div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 									{#each RECORD_KINDS as kind (kind)}
 										{@const r = heroRuns.data.records.find((x) => x.kind === kind)}
 										{#if r}
-											<a
-												href="/runs/{r.runId}?tab=numbers"
-												class="block rounded-md border border-border p-3 transition-colors hover:border-primary/60"
+											<!-- rekord iz runa vodi na run; rekord iz open worlda nima kam -->
+											<svelte:element
+												this={r.runId ? 'a' : 'div'}
+												href={r.runId ? `/runs/${r.runId}?tab=numbers` : undefined}
+												class="block rounded-md border border-border p-3 transition-colors {r.runId
+													? 'hover:border-primary/60'
+													: ''}"
 											>
 												<div class="text-xs tracking-wide text-muted-foreground uppercase">
 													{RECORD_LABEL[kind].title}
@@ -215,8 +219,13 @@
 														>
 														{r.unit}{/if}
 												</div>
-												<div class="text-xs text-muted-foreground">{r.zone} · {fmtWhen(r.at)}</div>
-											</a>
+												<div class="text-xs text-muted-foreground">
+													{#if r.world}<span class="text-primary/80">Open world</span>{r.zone
+															? ` · ${r.zone}`
+															: ''}{:else}{r.zone ?? 'Some dungeon'}{/if}
+													· {fmtWhen(r.at)}
+												</div>
+											</svelte:element>
 										{/if}
 									{/each}
 								</div>

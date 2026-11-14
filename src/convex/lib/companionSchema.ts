@@ -138,6 +138,26 @@ export const lootDrop = v.object({
 	atMs: v.number()
 });
 
+/** Osebni rekord iz celega loga (tudi open world) – Rust `wowrun::personal`. `at` = UTC ms. */
+export const personalRecord = v.object({
+	kind: recordKind,
+	amount: v.number(),
+	spell: v.string(),
+	spellId: v.number(),
+	unit: nullableString,
+	at: v.number(),
+	zone: nullableString,
+	inDungeon: v.boolean()
+});
+
+/** Kar pošlje aplikacija na POST /companion/records. */
+export const personalUpload = v.object({
+	schema: v.literal(1),
+	characters: v.array(
+		v.object({ slug: v.string(), name: v.string(), records: v.array(personalRecord) })
+	)
+});
+
 /** Kar pošlje aplikacija (POST /companion/runs). */
 export const runSummary = v.object({
 	schema: v.union(v.literal(1), v.literal(2), v.literal(3)),
@@ -192,3 +212,4 @@ export type Award = Infer<typeof award>;
 export type LootDrop = Infer<typeof lootDrop>;
 export type RunRecord = Infer<typeof runRecord>;
 export type RecordKind = Infer<typeof recordKind>;
+export type PersonalUpload = Infer<typeof personalUpload>;

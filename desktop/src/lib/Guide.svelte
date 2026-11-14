@@ -100,6 +100,17 @@
 	</section>
 
 	<section class="wow-frame space-y-3 rounded-lg p-5">
+		<h2 class="text-lg font-bold text-primary">Records everywhere (optional)</h2>
+		<p class="text-sm">
+			Your biggest crit, hit, heal and hardest hit taken are tracked from the <b>whole</b> combat log,
+			not just dungeons — see the <b>Records</b> tab. For open-world records keep
+			<code class="text-primary select-text">/combatlog</code> on outside dungeons too. With the
+			WowCompany addon: <code class="text-primary select-text">/wowco log everywhere</code>. The log
+			grows ~5–10 MB per hour of fighting; it is deleted when you quit this app.
+		</p>
+	</section>
+
+	<section class="wow-frame space-y-3 rounded-lg p-5">
 		<h2 class="text-lg font-bold text-primary">After the dungeon: stop logging</h2>
 		<ol class="list-decimal space-y-2 pl-5 text-sm">
 			<li>
@@ -120,9 +131,10 @@
 		<h2 class="text-lg font-bold text-primary">Tidying up</h2>
 		<p class="text-sm">
 			{#if status.settings.deleteLogsOnExit}
-				When you <b>Quit</b> the app (tray → Quit), it deletes the old combat and chat logs. It keeps
-				a file only if a run is still being recorded from it or the game wrote to it in the last 2 minutes
-				— deleting a file WoW is still writing would lose the data.
+				When you <b>Quit</b> the app (tray → Quit), it deletes the combat and chat logs. If the game is
+				already closed, all of them go (an unfinished run is saved first). If the game is still running,
+				it keeps the file WoW wrote to in the last 2 minutes — deleting a file the game is still writing
+				would lose the data. Your personal records stay.
 			{:else}
 				Automatic deletion is <b>off</b>. Old logs pile up in the Logs folder until you delete them.
 			{/if}

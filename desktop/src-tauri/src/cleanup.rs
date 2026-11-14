@@ -23,6 +23,60 @@ pub struct CleanupReport {
     pub at: i64,
 }
 
+/// Is the game running right now? `None` = could not tell (treated as "maybe").
+///
+/// When WoW is closed nothing can still be writing the logs, so they can all go; while it
+/// runs, a file written in the last two minutes is kept (see the rules above).
+pub fn game_running() -> Option<bool> {
+    game_running_impl()
+}
+
+/// A process name or command line that belongs to the game client.
+fn is_game_process(text: &str) -> bool {
+    let t = text.to_ascii_lowercase();
+    ["wow.exe", "wowclassic.exe", "wow-64.exe"]
+        .iter()
+        .any(|n| t.contains(n))
+}
+
+#[cfg(target_os = "linux")]
+fn game_running_impl() -> Option<bool> {
+    // Under Proton/Wine the Windows path of the client is in the process command line.
+    let entries = fs::read_dir("/proc").ok()?;
+    for e in entries.filter_map(Result::ok) {
+        let name = e.file_name();
+        if !name.to_string_lossy().bytes().all(|b| b.is_ascii_digit()) {
+            continue;
+        }
+        if let Ok(cmd) = fs::read(e.path().join("cmdline"))
+            && is_game_process(&String::from_utf8_lossy(&cmd))
+        {
+            return Some(true);
+        }
+    }
+    Some(false)
+}
+
+#[cfg(target_os = "windows")]
+fn game_running_impl() -> Option<bool> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let out = std::process::Command::new("tasklist")
+        .args(["/FO", "CSV", "/NH"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    Some(is_game_process(&String::from_utf8_lossy(&out.stdout)))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
+fn game_running_impl() -> Option<bool> {
+    None
+}
+
 pub fn cleanup_logs(dir: &Path, protect: &[PathBuf], recent: Duration, now: SystemTime) -> CleanupReport {
     let mut report = CleanupReport::default();
     let Ok(entries) = fs::read_dir(dir) else { return report };
@@ -119,6 +173,32 @@ mod tests {
         let r2 = cleanup_logs(d, &[], Duration::from_secs(120), later);
         assert_eq!(r2.deleted.len(), 2);
         assert!(r2.kept.is_empty());
+    }
+
+    #[test]
+    fn recognises_the_game_process() {
+        assert!(is_game_process(r"Z:\games\World of Warcraft\_forever_\Wow.exe"));
+        assert!(is_game_process("\"WowClassic.exe\",\"1234\",\"Console\""));
+        assert!(!is_game_process("/usr/bin/wowcompany-companion"));
+        assert!(!is_game_process("firefox https://wowcompany.vercel.app"));
+        // this test binary is not the game; on Linux the answer is a definite yes/no
+        #[cfg(target_os = "linux")]
+        assert!(game_running().is_some());
+    }
+
+    #[test]
+    fn closed_game_means_fresh_files_go_too() {
+        let t = TempDir::new("cleanup-closed");
+        let d = t.path();
+        fs::write(d.join("WoWCombatLog-111426_200000.txt"), "fresh").unwrap();
+        fs::write(d.join("WoWChatLog.txt"), "fresh").unwrap();
+        // game still open: both were written just now → kept
+        let open = cleanup_logs(d, &[], Duration::from_secs(120), SystemTime::now());
+        assert!(open.deleted.is_empty() && open.kept.len() == 2);
+        // game closed: no grace window
+        let closed = cleanup_logs(d, &[], Duration::ZERO, SystemTime::now());
+        assert_eq!(closed.deleted.len(), 2);
+        assert!(closed.kept.is_empty());
     }
 
     #[test]

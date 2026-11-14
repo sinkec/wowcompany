@@ -1,7 +1,8 @@
 // HTTP vstopne točke za namizno aplikacijo (kličejo se neposredno na *.convex.site, ne prek Vercela).
 //   POST /companion/link/start  {deviceName, appVersion?}  -> {code, pollToken, linkUrl, expiresAt}
 //   POST /companion/link/poll   {pollToken}                -> {status, token?}
-//   POST /companion/runs        Authorization: Bearer <token>, telo = RunSummary (schema 1)
+//   POST /companion/runs        Authorization: Bearer <token>, telo = RunSummary (schema 1–3)
+//   POST /companion/records     Authorization: Bearer <token>, telo = PersonalUpload (osebni rekordi)
 // Žetoni in poll skrivnosti nastanejo tu (akcije smejo uporabljati naključnost) in se v bazo
 // zapišejo samo kot SHA-256.
 import { ConvexError } from 'convex/values';
@@ -159,6 +160,31 @@ export const uploadRun = httpAction(async (ctx, req) => {
 		});
 		const site = process.env.SITE_URL ?? '';
 		return json({ ...r, url: `${site}/runs/${r.runId}` }, r.created ? 201 : 200);
+	} catch (e) {
+		return errorResponse(e);
+	}
+});
+
+/** Osebni rekordi iz celega loga (tudi open world). Oblika = validator `personalUpload`. */
+export const uploadRecords = httpAction(async (ctx, req) => {
+	const auth = req.headers.get('authorization') ?? '';
+	const m = /^Bearer (wcc_[A-Za-z0-9_-]{20,})$/.exec(auth);
+	if (!m) return json({ error: 'missing or malformed device token', code: 'unauthorized' }, 401);
+
+	const body = await readJson(req, 64 * 1024);
+	if (body instanceof Response) return body;
+	if (!isObj(body)) return json({ error: 'body must be an object' }, 400);
+	if (body.schema !== 1)
+		return json(
+			{ error: `unsupported schema ${String(body.schema)}, server speaks 1`, code: 'schema' },
+			400
+		);
+	try {
+		const r = await ctx.runMutation(internal.companion.ingestPersonal, {
+			tokenHash: await sha256hex(m[1]),
+			upload: body as never
+		});
+		return json(r, 200);
 	} catch (e) {
 		return errorResponse(e);
 	}

@@ -1,5 +1,11 @@
 // Čiste funkcije za Companion (brez ctx) – testirane v tests/companion.test.ts.
-import type { Award, LootDrop, PlayerSummary, RunSummary } from './companionSchema.js';
+import type {
+	Award,
+	LootDrop,
+	PersonalUpload,
+	PlayerSummary,
+	RunSummary
+} from './companionSchema.js';
 
 export const LINK_TTL_MS = 10 * 60_000;
 export const MAX_BODY_BYTES = 2 * 1024 * 1024;
@@ -91,6 +97,37 @@ export function checkRun(s: RunSummary, now: number): string | null {
 					r.atMs < 0 ||
 					// dogodek je lahko po zadnji aktivnosti (lava po boju), zato meja ni trajanje runa
 					r.atMs > MAX_RUN_MS
+			)
+		)
+			return 'bad record entry';
+	}
+	return null;
+}
+
+/** Največ likov v enem pošiljanju osebnih rekordov (glavni + alti na istem računalniku). */
+export const MAX_PERSONAL_CHARACTERS = 20;
+
+/** Osebni rekordi iz celega loga: oblika in zdrave meje. */
+export function checkPersonal(u: PersonalUpload, now: number): string | null {
+	if (u.characters.length < 1 || u.characters.length > MAX_PERSONAL_CHARACTERS)
+		return `characters must be 1–${MAX_PERSONAL_CHARACTERS}`;
+	const slugs = new Set(u.characters.map((c) => c.slug));
+	if (slugs.size !== u.characters.length || [...slugs].some((x) => !/^[\p{L}\p{N}'-]{2,64}$/u.test(x)))
+		return 'bad slugs';
+	for (const c of u.characters) {
+		if (c.records.length > MAX_RECORDS || new Set(c.records.map((r) => r.kind)).size !== c.records.length)
+			return 'bad records';
+		if (
+			c.records.some(
+				(r) =>
+					!(r.amount > 0) ||
+					!Number.isFinite(r.amount) ||
+					!r.spell ||
+					r.spell.length > 120 ||
+					(r.unit?.length ?? 0) > 120 ||
+					(r.zone?.length ?? 0) > 120 ||
+					r.at < now - 366 * 86_400_000 ||
+					r.at > now + 86_400_000
 			)
 		)
 			return 'bad record entry';

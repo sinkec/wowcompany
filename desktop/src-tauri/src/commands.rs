@@ -25,6 +25,8 @@ pub struct StatusDto {
     pub queue: Counts,
     pub runs_version: u64,
     pub live: Option<RunSummary>,
+    /// Personal bests of the log owner's characters (whole log, open world included).
+    pub records: wowrun::PersonalUpload,
 }
 
 #[tauri::command]
@@ -39,6 +41,7 @@ pub fn get_status(core: Core_<'_>) -> StatusDto {
         queue: core.counts(),
         runs_version: core.runs_version.load(Ordering::SeqCst),
         live: core.live.lock().expect("live").clone(),
+        records: core.personal_records(),
         settings,
     }
 }

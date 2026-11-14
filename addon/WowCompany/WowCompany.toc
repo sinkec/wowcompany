@@ -1,8 +1,12 @@
 ## Interface: 16001
 ## Title: |cffd8a83cWowCompany|r
-## Notes: Companion addon for the WowCompany portal. Dungeon extras the combat log does not have.
+## Notes: Dungeon meter and automatic combat logging for the WowCompany portal. /wowco
 ## Author: WowCompany
-## Version: 0.0.1
+## Version: 0.2.1
 ## SavedVariables: WowCompanyDB
 
-Selftest.lua
+Core.lua
+Logging.lua
+Meter.lua
+UI.lua
+Probe.lua

@@ -572,3 +572,105 @@ fn biggest_hits_become_records() {
     let old: RunSummary = serde_json::from_value(v).unwrap();
     assert!(old.players.iter().all(|p| p.records.is_empty()));
 }
+
+#[test]
+fn personal_records_cover_the_whole_log_but_only_the_recorder() {
+    let c = cast();
+    let boar = mob("Mottled Boar", 3098, 0, "0000001111");
+    let trogg = mob("Ragefire Trogg", 11318, 7001, "000000BBBB");
+    let mut l = Log::new();
+    // open world, solo: no run at all, records still count
+    l.zone(1, "Durotar");
+    l.wait(1000).spell(&c.me, &boar, 133, "Fireball", 420, true);
+    l.wait(500).spell(&c.me, &boar, 133, "Fireball", 90, false);
+    l.wait(500).swing_landed(&boar, &c.me, 33);
+    l.wait(500).spell(&c.me, &c.rando, 133, "Fireball", 60, true); // duel: smaller, and the name must not leak
+    l.wait(500).heal(&c.me, &c.me, 80, 30, 900);
+    // someone else's numbers are never ours
+    l.wait(500).spell(&c.lock, &boar, 686, "Shadow Bolt", 9000, true);
+    l.wait(500).spell(&c.rando, &c.me, 133, "Fireball", 700, false);
+    // dungeon: a bigger plain hit
+    l.wait(1000).zone(RFC, "Ragefire Chasm");
+    l.wait(1000).spell(&c.me, &trogg, 133, "Fireball", 300, false);
+    l.wait(500).lava(&c.me, 1200, 0);
+
+    let mut p = Personal::new(3_600_000);
+    assert!(p.is_empty() && !p.is_dirty());
+    for r in l.records() {
+        p.push(&r);
+    }
+    assert!(p.is_dirty());
+    let up = p.upload();
+    assert_eq!(up.schema, PERSONAL_SCHEMA);
+    assert_eq!(up.characters.len(), 1, "only the recorder: {up:?}");
+    let me = &up.characters[0];
+    assert_eq!(
+        (me.slug.as_str(), me.name.as_str()),
+        ("grobos-stinkfoot", "Grobos Stinkfoot")
+    );
+    let rec = |k: RecordKind| me.records.iter().find(|r| r.kind == k).unwrap();
+
+    let crit = rec(RecordKind::Crit);
+    assert_eq!(
+        (
+            crit.amount,
+            crit.spell.as_str(),
+            crit.unit.as_deref(),
+            crit.zone.as_deref(),
+            crit.in_dungeon
+        ),
+        (420, "Fireball", Some("Mottled Boar"), Some("Durotar"), false)
+    );
+    let hit = rec(RecordKind::Hit);
+    assert_eq!(
+        (hit.amount, hit.unit.as_deref(), hit.zone.as_deref(), hit.in_dungeon),
+        (300, Some("Ragefire Trogg"), Some("Ragefire Chasm"), true)
+    );
+    let heal = rec(RecordKind::Heal);
+    assert_eq!((heal.amount, heal.unit.as_deref()), (50, Some("themselves")));
+    let taken = rec(RecordKind::HitTaken);
+    assert_eq!(
+        (taken.amount, taken.unit.as_deref(), taken.in_dungeon),
+        (1200, None, true)
+    );
+    // UTC = log time minus the offset
+    let first = l
+        .records()
+        .into_iter()
+        .find(|r| matches!(r.kind, wowlog::Kind::Damage { .. }))
+        .unwrap();
+    assert_eq!(crit.at, first.timestamp - 3_600_000);
+    // no other player's name anywhere
+    let json = serde_json::to_string(&up).unwrap();
+    assert!(!json.contains("Random") && !json.contains("Fizzle"), "{json}");
+    assert!(json.contains("\"spellId\":133") && json.contains("\"inDungeon\":true"));
+
+    // state survives a save/load; nothing new = stays clean after an upload
+    p.mark_clean();
+    let saved = serde_json::to_string(&p).unwrap();
+    let mut back: Personal = serde_json::from_str(&saved).unwrap();
+    back.set_utc_offset(3_600_000);
+    assert_eq!(back.upload(), up);
+    for r in l.records() {
+        back.push(&r);
+    }
+    assert!(!back.is_dirty(), "replaying the same log changes nothing");
+}
+
+#[test]
+fn stranger_hit_on_the_recorder_is_anonymous() {
+    let c = cast();
+    let mut l = Log::new();
+    l.zone(1, "Durotar");
+    l.wait(500).spell(&c.rando, &c.me, 133, "Fireball", 700, false);
+    let mut p = Personal::new(0);
+    for r in l.records() {
+        p.push(&r);
+    }
+    let up = p.upload();
+    let taken = &up.characters[0].records[0];
+    assert_eq!(
+        (taken.kind, taken.amount, taken.unit.as_deref()),
+        (RecordKind::HitTaken, 700, Some("Another player"))
+    );
+}

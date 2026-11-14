@@ -315,8 +315,12 @@ export default defineSchema({
 		spellId: v.number(),
 		unit: v.union(v.string(), v.null()),
 		pet: v.boolean(),
-		runId: v.id('runs'),
-		zone: v.string(),
+		/** run, iz katerega je rekord; manjka pri rekordih iz celega loga (open world) */
+		runId: v.optional(v.id('runs')),
+		/** dungeon ali cona; pri open worldu je lahko neznana */
+		zone: v.union(v.string(), v.null()),
+		/** true = zunaj dungeon runa (osebni rekordi iz /companion/records) */
+		world: v.optional(v.boolean()),
 		at: v.number()
 	})
 		.index('by_slug_and_kind', ['slug', 'kind'])

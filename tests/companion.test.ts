@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
 	addRecorder,
 	beatsRecord,
+	checkPersonal,
 	checkRun,
 	computeAwards,
 	makeLinkCode,
@@ -215,5 +216,37 @@ describe('records (schema 3)', () => {
 		expect(beatsRecord(null, { amount: 1 })).toBe(true);
 		expect(beatsRecord({ amount: 100 }, { amount: 100 })).toBe(false);
 		expect(beatsRecord({ amount: 100 }, { amount: 101 })).toBe(true);
+	});
+});
+
+describe('personal records (open world)', () => {
+	const R = (o = {}) => ({
+		kind: 'crit' as const,
+		amount: 420,
+		spell: 'Fireball',
+		spellId: 133,
+		unit: 'Mottled Boar' as string | null,
+		at: NOW - 60_000,
+		zone: 'Durotar' as string | null,
+		inDungeon: false,
+		...o
+	});
+	const U = (records = [R()], slug = 'grobos-stinkfoot') => ({
+		schema: 1 as const,
+		characters: [{ slug, name: 'Grobos Stinkfoot', records }]
+	});
+	test('a sane upload passes, unknown zone and no unit are fine', () => {
+		expect(checkPersonal(U(), NOW)).toBeNull();
+		expect(checkPersonal(U([R({ zone: null, unit: null })]), NOW)).toBeNull();
+	});
+	test('garbage is rejected', () => {
+		expect(checkPersonal({ schema: 1, characters: [] }, NOW)).toContain('characters must be');
+		expect(checkPersonal(U([R()], 'x y'), NOW)).toBe('bad slugs');
+		expect(checkPersonal(U([R(), R()]), NOW)).toBe('bad records');
+		expect(checkPersonal(U([R({ amount: 0 })]), NOW)).toBe('bad record entry');
+		expect(checkPersonal(U([R({ amount: NaN })]), NOW)).toBe('bad record entry');
+		expect(checkPersonal(U([R({ spell: '' })]), NOW)).toBe('bad record entry');
+		expect(checkPersonal(U([R({ at: NOW + 2 * 86_400_000 })]), NOW)).toBe('bad record entry');
+		expect(checkPersonal(U([R({ at: NOW - 400 * 86_400_000 })]), NOW)).toBe('bad record entry');
 	});
 });

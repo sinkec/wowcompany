@@ -97,7 +97,7 @@ const summary = {
 	endedAt: now - 3_600_000 + base.durationMs
 };
 
-const created: { runId?: string; devices: string[] } = { devices: [] };
+const created: { runId?: string; recordSlug?: string; devices: string[] } = { devices: [] };
 try {
 	const a = await linkDevice('E2E Box A');
 	created.devices.push(a.deviceId);
@@ -145,6 +145,8 @@ try {
 		recorder: 'fizzle-boom'
 	};
 	const up3 = await post('/companion/runs', longer, b.token);
+	// če prvo nalaganje pade, drugi posnetek ustvari run – tudi tega je treba pospraviti
+	created.runId ??= up3.data.runId;
 	check(
 		up3.data.runId === up1.data.runId && up3.data.recorderAdded && up3.data.replaced,
 		'second recorder merges + more complete run replaces',
@@ -172,10 +174,80 @@ try {
 	);
 	check(doc?.party?.length === 3, 'party stored', doc?.party);
 
+	// ---- osebni rekordi iz celega loga (open world): POST /companion/records
+	const players = (await $`bunx convex data players --limit 100 --format jsonLines`.quiet())
+		.text()
+		.trim()
+		.split('\n')
+		.map((l) => JSON.parse(l));
+	const hero = players.find((p) => !p.ownerUserId || p.ownerUserId === userId);
+	const rec = (o: object = {}) => ({
+		kind: 'heal',
+		amount: 7,
+		spell: 'E2E Bandage',
+		spellId: 746,
+		unit: 'themselves',
+		at: now - 60_000,
+		zone: 'Durotar',
+		inDungeon: false,
+		...o
+	});
+	const personal = (slug: string, records: object[]) => ({
+		schema: 1,
+		characters: [{ slug, name: 'E2E Hero', records }]
+	});
+	check(
+		(await post('/companion/records', personal('nobody-here', [rec()]))).status === 401,
+		'records without token → 401'
+	);
+	const unknown = await post('/companion/records', personal('nobody-here', [rec()]), a.token);
+	check(
+		unknown.status === 200 && unknown.data.updated === 0 && unknown.data.ignored?.[0] === 'nobody-here',
+		'records for an untracked hero are ignored',
+		unknown
+	);
+	check(
+		(await post('/companion/records', personal('nobody-here', [rec({ amount: 0 })]), a.token))
+			.status === 400,
+		'nonsense record → 400'
+	);
+	check(
+		(await post('/companion/records', { schema: 9, characters: [] }, a.token)).status === 400,
+		'unknown records schema → 400'
+	);
+	if (hero) {
+		created.recordSlug = hero.slug;
+		const first = await post('/companion/records', personal(hero.slug, [rec()]), a.token);
+		check(first.status === 200 && first.data.updated === 1, 'open-world record stored', first);
+		const same = await post('/companion/records', personal(hero.slug, [rec()]), a.token);
+		check(same.data.updated === 0, 'same number again changes nothing', same.data);
+		const bigger = await post(
+			'/companion/records',
+			personal(hero.slug, [rec({ amount: 9 })]),
+			a.token
+		);
+		check(bigger.data.updated === 1, 'a bigger number replaces it', bigger.data);
+		const rows = (await $`bunx convex data heroRecords --limit 300 --format jsonLines`.quiet())
+			.text()
+			.trim()
+			.split('\n')
+			.map((l) => JSON.parse(l))
+			.filter((r) => r.slug === hero.slug && r.kind === 'heal');
+		check(
+			rows.length === 1 && rows[0].amount === 9 && rows[0].world === true && !rows[0].runId,
+			'one row per hero and kind, marked open world',
+			rows
+		);
+	} else {
+		console.log('  (no tracked hero on dev → skipping the stored-record checks)');
+	}
+
 	await convexRun('companion:deleteDevice', { deviceId: a.deviceId });
 	check((await post('/companion/runs', summary, a.token)).status === 401, 'deleted device → 401');
 } finally {
 	if (created.runId) await convexRun('companion:deleteRun', { runId: created.runId });
+	if (created.recordSlug)
+		await convexRun('companion:deleteWorldRecords', { slug: created.recordSlug });
 	for (const d of created.devices) await convexRun('companion:deleteDevice', { deviceId: d });
 	console.log('cleanup done');
 }

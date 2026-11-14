@@ -52,6 +52,24 @@ const status: Status = {
 	upload: { lastError: null, lastUploadAt: now - 120000, blocked: false },
 	queue: { pending: 1, uploaded: 2, failed: 1 },
 	runsVersion: 1,
+	records: {
+		schema: 1,
+		characters:
+			q.get('records') === '0'
+				? []
+				: [
+						{
+							slug: 'tankus-maximus',
+							name: 'Tankus Maximus',
+							records: [
+								{ kind: 'crit', amount: 1204, spell: 'Fireball', spellId: 133, unit: 'Mottled Boar', at: now - 3600e3, zone: 'Durotar', inDungeon: false },
+								{ kind: 'hit', amount: 612, spell: 'Melee', spellId: 0, unit: 'Oggleflint', at: now - 7200e3, zone: 'Ragefire Chasm', inDungeon: true },
+								{ kind: 'heal', amount: 380, spell: 'Heavy Linen Bandage', spellId: 1159, unit: 'themselves', at: now - 86400e3, zone: 'Durotar', inDungeon: false },
+								{ kind: 'hitTaken', amount: 1890, spell: 'Lava', spellId: 0, unit: null, at: now - 2 * 86400e3, zone: 'Ragefire Chasm', inDungeon: true }
+							]
+						}
+					]
+	},
 	live:
 		q.get('tab') === 'live'
 			? {
@@ -162,7 +180,8 @@ await import('./main');
 const tab = q.get('tab');
 if (tab && tab !== 'live') {
 	setTimeout(() => {
-		const label = tab === 'runs' ? 'Runs' : tab === 'guide' ? 'How to log' : 'Settings';
+		const label =
+			tab === 'runs' ? 'Runs' : tab === 'records' ? 'Records' : tab === 'guide' ? 'How to log' : 'Settings';
 		[...document.querySelectorAll('nav button')]
 			.find((b) => b.textContent?.startsWith(label))
 			?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

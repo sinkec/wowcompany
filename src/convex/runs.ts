@@ -121,8 +121,10 @@ const recordView = (r: Doc<'heroRecords'>) => ({
 	spell: r.spell,
 	unit: r.unit,
 	pet: r.pet,
-	runId: r.runId,
+	runId: r.runId ?? null,
 	zone: r.zone,
+	/** true = zunaj dungeon runa (osebni rekordi iz celega loga) */
+	world: r.world ?? false,
 	at: r.at
 });
 

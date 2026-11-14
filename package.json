@@ -20,6 +20,7 @@
 		"env:push": "bun scripts/env-push.ts",
 		"convex": "convex dev",
 		"check:visibility": "bun scripts/check-visibility.ts",
+		"check:addon": "luac5.1 -p addon/WowCompany/*.lua && lua5.1 addon/smoke.lua && cd addon && luacheck WowCompany --no-color",
 		"check:companion": "bun scripts/companion-e2e.ts",
 		"test": "bun test tests/",
 		"discord:register": "bun scripts/discord-register.ts"

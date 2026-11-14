@@ -15,13 +15,14 @@ import { getViewer } from './lib/access.js';
 import {
 	addRecorder,
 	beatsRecord,
+	checkPersonal,
 	checkRun,
 	computeAwards,
 	LINK_TTL_MS,
 	normalizeCode,
 	runScore
 } from './lib/companion.js';
-import { runSummary, type RunSummary } from './lib/companionSchema.js';
+import { personalUpload, runSummary, type RunSummary } from './lib/companionSchema.js';
 
 const limiter = new RateLimiter(components.rateLimiter, {
 	// Cela platforma: največ 30 novih povezav na uro (prijateljska skupina).
@@ -29,7 +30,9 @@ const limiter = new RateLimiter(components.rateLimiter, {
 	// Na povezavo: aplikacija polla vsake ~3 s.
 	companionLinkPoll: { kind: 'token bucket', rate: 40, period: MINUTE, capacity: 10 },
 	// Na napravo: ~1 run na 2 min v povprečju, do 10 naenkrat (čakalna vrsta po izpadu interneta).
-	companionUpload: { kind: 'token bucket', rate: 30, period: HOUR, capacity: 10 }
+	companionUpload: { kind: 'token bucket', rate: 30, period: HOUR, capacity: 10 },
+	// Na napravo: osebni rekordi (aplikacija jih pošlje največ enkrat na minuto, samo ob novem rekordu).
+	companionRecords: { kind: 'token bucket', rate: 60, period: HOUR, capacity: 10 }
 });
 
 /** Napaka, ki jo HTTP plast pretvori v statusno kodo. */
@@ -404,6 +407,69 @@ export const ingestRun = internalMutation({
 	}
 });
 
+/**
+ * Osebni rekordi iz celega combat loga (tudi open world), POST /companion/records.
+ * Samo za spremljane junake, ki niso last drugega uporabnika; zapiše se le večja številka.
+ */
+export const ingestPersonal = internalMutation({
+	args: { tokenHash: v.string(), upload: personalUpload },
+	returns: v.object({ updated: v.number(), ignored: v.array(v.string()) }),
+	handler: async (ctx, { tokenHash, upload }) => {
+		const device = await ctx.db
+			.query('devices')
+			.withIndex('by_token_hash', (q) => q.eq('tokenHash', tokenHash))
+			.unique();
+		if (!device) fail('unauthorized', 'Unknown device. Link the app again.');
+		if (device.revokedAt) fail('forbidden', 'This device was revoked.');
+		const role = await roleOf(ctx, device.userId);
+		if (role !== 'admin' && role !== 'member') fail('forbidden', 'Members only.');
+
+		const now = Date.now();
+		const problem = checkPersonal(upload, now);
+		if (problem) fail('bad_request', problem);
+
+		const rl = await limiter.limit(ctx, 'companionRecords', { key: device._id });
+		if (!rl.ok) fail('rate_limited', 'Too many record uploads.', rl.retryAfter);
+
+		let updated = 0;
+		const ignored: string[] = [];
+		for (const c of upload.characters) {
+			const player = await ctx.db
+				.query('players')
+				.withIndex('by_slug', (q) => q.eq('slug', c.slug))
+				.first();
+			// neznan junak ali junak drugega uporabnika: ne zapišemo ničesar
+			if (!player || (player.ownerUserId && player.ownerUserId !== device.userId)) {
+				ignored.push(c.slug);
+				continue;
+			}
+			for (const r of c.records) {
+				const prev = await ctx.db
+					.query('heroRecords')
+					.withIndex('by_slug_and_kind', (q) => q.eq('slug', c.slug).eq('kind', r.kind))
+					.unique();
+				if (!beatsRecord(prev, r)) continue;
+				const row = {
+					slug: c.slug,
+					kind: r.kind,
+					amount: r.amount,
+					spell: r.spell,
+					spellId: r.spellId,
+					unit: r.unit,
+					pet: false,
+					zone: r.zone,
+					world: !r.inDungeon,
+					at: r.at
+				};
+				if (prev) await ctx.db.replace('heroRecords', prev._id, row);
+				else await ctx.db.insert('heroRecords', row);
+				updated++;
+			}
+		}
+		return { updated, ignored };
+	}
+});
+
 // ---------------------------------------------------------------- vzdrževanje
 
 /** Cron: pobriši zahteve za povezavo, starejše od 1 dneva. */
@@ -444,6 +510,23 @@ export const deleteRun = internalMutation({
 		}
 		if (await ctx.db.get('runs', runId)) await ctx.db.delete('runs', runId);
 		return null;
+	}
+});
+
+/** CLI/test: pobriši rekorde junaka, ki niso iz runa (osebni rekordi iz celega loga). */
+export const deleteWorldRecords = internalMutation({
+	args: { slug: v.string() },
+	returns: v.number(),
+	handler: async (ctx, { slug }) => {
+		let n = 0;
+		for await (const r of ctx.db
+			.query('heroRecords')
+			.withIndex('by_slug_and_kind', (q) => q.eq('slug', slug))) {
+			if (r.runId) continue;
+			await ctx.db.delete('heroRecords', r._id);
+			n++;
+		}
+		return n;
 	}
 });
 

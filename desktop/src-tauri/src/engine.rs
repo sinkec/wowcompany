@@ -16,7 +16,20 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use wowrun::{Config, Detector, RunSummary};
+use wowrun::{Config, Detector, Personal, PersonalUpload, RunSummary};
+
+/// Personal records are uploaded at most this often.
+const RECORDS_UPLOAD_GAP_MS: i64 = 60_000;
+/// After the server refused them (4xx): try again this much later.
+const RECORDS_REJECTED_GAP_MS: i64 = 3_600_000;
+
+/// Saved personal bests; a missing or broken file starts empty.
+fn load_personal(path: &Path) -> Personal {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
 
 /// Logs older than this are not replayed at start-up.
 const MAX_LOG_AGE_AT_START: Duration = Duration::from_secs(12 * 3600);
@@ -67,13 +80,16 @@ impl Pipeline {
         }
     }
 
-    pub fn feed(&mut self, line: &str) -> Vec<RunSummary> {
+    /// One combat log line. `personal` collects the log owner's own records from the whole
+    /// log (open world too); it lives outside the pipeline so it survives a reconfigure.
+    pub fn feed(&mut self, line: &str, personal: &mut Personal) -> Vec<RunSummary> {
         self.lines += 1;
         match wowlog::parse_line(line) {
             Ok(rec) => {
                 if let wowlog::Kind::CombatLogVersion { advanced, .. } = rec.kind {
                     self.advanced = Some(advanced);
                 }
+                personal.push(&rec);
                 self.det.push(&rec)
             }
             Err(_) => {
@@ -179,6 +195,8 @@ pub enum Cmd {
     /// Logs folder (or min players) changed: restart tailing.
     Reconfigure,
     EndRun,
+    /// App is quitting and the game is closed: close any run in progress, store it, then answer.
+    Finish(mpsc::Sender<()>),
 }
 
 pub struct Core {
@@ -190,6 +208,9 @@ pub struct Core {
     pub auth: Mutex<AuthStatus>,
     pub upload: Mutex<UploadStatus>,
     pub live: Mutex<Option<RunSummary>>,
+    /// The log owner's personal bests (whole log, open world included); saved in `records.json`.
+    pub personal: Mutex<Personal>,
+    personal_path: PathBuf,
     /// Bumped whenever the local run list changes (UI refreshes the Runs tab).
     pub runs_version: AtomicU64,
     /// Bumped to cancel a running link poller.
@@ -204,6 +225,9 @@ impl Core {
         let queue = Queue::open(&data_dir.join("runs.sqlite")).map_err(|e| format!("cannot open run store: {e}"))?;
         let tokens = TokenStore::new(config_dir);
         let linked = tokens.load().is_some();
+        let personal_path = data_dir.join("records.json");
+        let mut personal = load_personal(&personal_path);
+        personal.set_utc_offset(utc_offset_ms());
         Ok(Arc::new(Core {
             config_dir: config_dir.to_path_buf(),
             settings: Mutex::new(settings),
@@ -216,6 +240,8 @@ impl Core {
             }),
             upload: Mutex::new(UploadStatus::default()),
             live: Mutex::new(None),
+            personal: Mutex::new(personal),
+            personal_path,
             runs_version: AtomicU64::new(0),
             link_gen: AtomicU64::new(0),
             wake_uploader: AtomicBool::new(false),
@@ -252,6 +278,23 @@ impl Core {
 
     pub fn counts(&self) -> Counts {
         self.queue.lock().expect("queue lock").counts().unwrap_or_default()
+    }
+
+    /// Personal bests for the UI and the upload.
+    pub fn personal_records(&self) -> PersonalUpload {
+        self.personal.lock().expect("personal lock").upload()
+    }
+
+    /// Writes `records.json` (temp file + rename, so a crash never leaves half a file).
+    fn save_personal(&self) {
+        let json = match serde_json::to_string(&*self.personal.lock().expect("personal lock")) {
+            Ok(j) => j,
+            Err(_) => return,
+        };
+        let tmp = self.personal_path.with_extension("json.tmp");
+        if std::fs::write(&tmp, json).is_ok() {
+            let _ = std::fs::rename(&tmp, &self.personal_path);
+        }
     }
 
     fn store_runs(&self, runs: Vec<RunSummary>) {
@@ -322,6 +365,13 @@ impl Core {
                         let runs = pipe.end_manual();
                         self.store_runs(runs);
                     }
+                    Cmd::Finish(done) => {
+                        let runs = pipe.finish();
+                        self.store_runs(runs);
+                        *self.live.lock().expect("live lock") = None;
+                        self.watch.lock().expect("watch lock").run_in_progress = false;
+                        let _ = done.send(());
+                    }
                 }
             }
 
@@ -351,8 +401,19 @@ impl Core {
                         more = batch.more;
                         let got_lines = !batch.lines.is_empty();
                         let mut finished = Vec::new();
-                        for line in &batch.lines {
-                            finished.extend(pipe.feed(line));
+                        let new_record = {
+                            let mut personal = self.personal.lock().expect("personal lock");
+                            let was_dirty = personal.is_dirty();
+                            let before = personal.upload();
+                            for line in &batch.lines {
+                                finished.extend(pipe.feed(line, &mut personal));
+                            }
+                            // dirty alone is not enough: it stays set while an upload is pending
+                            personal.is_dirty() && (!was_dirty || personal.upload() != before)
+                        };
+                        if new_record {
+                            self.save_personal();
+                            self.kick_uploader();
                         }
                         self.store_runs(finished);
                         let mut w = self.watch.lock().expect("watch lock");
@@ -423,6 +484,8 @@ impl Core {
 
     fn uploader(self: Arc<Self>) {
         let mut api: Option<Api> = None;
+        // personal records: not before this time (one attempt a minute is plenty)
+        let mut records_next_at = 0i64;
         loop {
             for _ in 0..12 {
                 if self.wake_uploader.swap(false, Ordering::SeqCst) {
@@ -480,6 +543,43 @@ impl Core {
                 self.runs_version.fetch_add(1, Ordering::SeqCst);
                 if blocked {
                     break;
+                }
+            }
+
+            // personal records (whole log, open world): one small request when something improved
+            if wall_ms() >= records_next_at && !self.upload.lock().expect("upload lock").blocked {
+                let pending = {
+                    let p = self.personal.lock().expect("personal lock");
+                    (p.is_dirty() && !p.is_empty()).then(|| p.upload())
+                };
+                if let Some(snapshot) = pending {
+                    records_next_at = wall_ms() + RECORDS_UPLOAD_GAP_MS;
+                    let json = serde_json::to_string(&snapshot).unwrap_or_default();
+                    match api.upload_records(&token, &json) {
+                        Upload::Rejected(_) => {
+                            // e.g. a server that does not know this endpoint yet: keep the records
+                            // (nothing is lost) and ask again in an hour instead of hammering it
+                            records_next_at = wall_ms() + RECORDS_REJECTED_GAP_MS;
+                        }
+                        Upload::Ok { .. } => {
+                            let mut p = self.personal.lock().expect("personal lock");
+                            // a newer record may have arrived while the request was in flight
+                            if p.upload() == snapshot {
+                                p.mark_clean();
+                            }
+                            drop(p);
+                            self.save_personal();
+                        }
+                        Upload::Retry { after_ms, .. } => {
+                            records_next_at =
+                                wall_ms() + after_ms.unwrap_or(RECORDS_UPLOAD_GAP_MS).max(RECORDS_UPLOAD_GAP_MS);
+                        }
+                        Upload::Unauthorized(error) => {
+                            let mut u = self.upload.lock().expect("upload lock");
+                            u.blocked = true;
+                            u.last_error = Some(error);
+                        }
+                    }
                 }
             }
         }
@@ -577,7 +677,13 @@ impl Core {
             };
             (PathBuf::from(dir), protect)
         };
-        let mut report = crate::cleanup::cleanup_logs(&dir, &protect, Duration::from_secs(120), SystemTime::now());
+        // Game closed → nothing can still be writing, so even the newest file goes.
+        // Game open or unknown → keep what was written in the last two minutes.
+        let recent = match crate::cleanup::game_running() {
+            Some(false) => Duration::ZERO,
+            _ => Duration::from_secs(120),
+        };
+        let mut report = crate::cleanup::cleanup_logs(&dir, &protect, recent, SystemTime::now());
         report.at = wall_ms();
         self.watch.lock().expect("watch lock").last_cleanup = Some(report.clone());
         Ok(report)
@@ -585,9 +691,19 @@ impl Core {
 
     /// Called when the app quits (tray → Quit, OS shutdown).
     pub fn on_exit(&self) {
-        if self.settings().delete_logs_on_exit {
-            let _ = self.cleanup_logs();
+        // personal records survive the logs
+        self.save_personal();
+        if !self.settings().delete_logs_on_exit {
+            return;
         }
+        // The game is closed: whatever run was still open is over. Store it first (it uploads on
+        // the next start), so its log file is no longer needed and can be deleted with the rest.
+        if crate::cleanup::game_running() == Some(false) {
+            let (tx, rx) = mpsc::channel();
+            self.send(Cmd::Finish(tx));
+            let _ = rx.recv_timeout(Duration::from_secs(3));
+        }
+        let _ = self.cleanup_logs();
     }
 
     pub fn candidates(&self) -> Vec<Candidate> {
@@ -611,9 +727,10 @@ mod tests {
     #[test]
     fn pipeline_turns_log_into_one_run() {
         let mut p = Pipeline::new(2, 3_600_000);
+        let mut personal = Personal::new(0);
         let mut runs = Vec::new();
         for l in fixture().lines() {
-            runs.extend(p.feed(l));
+            runs.extend(p.feed(l, &mut personal));
         }
         assert!(runs.is_empty(), "left the dungeon, waiting for the grace period");
         assert_eq!(p.dungeon(), None);
@@ -623,6 +740,13 @@ mod tests {
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].zone.name, "Ragefire Chasm");
         assert_eq!(p.bad_lines, 0);
+        // the log owner's own bests are collected on the side (only theirs)
+        let up = personal.upload();
+        assert_eq!(up.characters.len(), 1);
+        assert_eq!(up.characters[0].slug, "tankus-maximus");
+        let hit = &up.characters[0].records[0];
+        assert_eq!((hit.amount, hit.spell.as_str(), hit.in_dungeon), (40, "Melee", true));
+        assert!(personal.is_dirty());
         // UTC = local − 1 h
         assert_eq!(
             runs[0].started_at,
@@ -633,20 +757,21 @@ mod tests {
     #[test]
     fn pipeline_reads_advanced_flag_and_chat_loot() {
         let mut p = Pipeline::new(2, 0);
+        let mut personal = Personal::new(0);
         assert_eq!(p.advanced, None);
         let text = fixture();
         let lines: Vec<&str> = text.lines().collect();
         // up to (and including) the boss kill, still inside the dungeon
         let cut = lines.iter().position(|l| l.contains("ENCOUNTER_END")).unwrap() + 1;
         for l in &lines[..cut] {
-            p.feed(l);
+            p.feed(l, &mut personal);
         }
         assert_eq!(p.advanced, Some(true));
         p.feed_chat("11/20 20:00:18.5000  You receive loot: [Oggleflint's Ugly Hat].", 2026);
         p.feed_chat("11/20 20:00:18.6000  [Party] Fizzle: gz on the hat lol", 2026);
         assert_eq!((p.chat_lines, p.loot_lines), (2, 1));
         for l in &lines[cut..] {
-            p.feed(l);
+            p.feed(l, &mut personal);
         }
         let runs = p.finish();
         assert_eq!(runs[0].loot.len(), 1);
@@ -664,10 +789,11 @@ mod tests {
 
         let mut tail = LogTail::new(t.path(), MAX_LOG_AGE_AT_START);
         let mut p = Pipeline::new(2, 0);
+        let mut personal = Personal::new(0);
         let q = Queue::in_memory().unwrap();
-        let feed = |tail: &mut LogTail, p: &mut Pipeline| {
+        let mut feed = |tail: &mut LogTail, p: &mut Pipeline| {
             for l in tail.poll().unwrap().lines {
-                for r in p.feed(&l) {
+                for r in p.feed(&l, &mut personal) {
                     q.enqueue(&r, 0).unwrap();
                 }
             }

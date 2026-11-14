@@ -123,7 +123,22 @@ export type Status = {
 	queue: { pending: number; uploaded: number; failed: number };
 	runsVersion: number;
 	live: RunSummary | null;
+	/** Personal bests of the log owner's characters (whole log, open world included). */
+	records: { schema: number; characters: PersonalCharacter[] };
 };
+
+export type PersonalRecord = {
+	kind: RunRecord['kind'];
+	amount: number;
+	spell: string;
+	spellId: number;
+	unit: string | null;
+	/** UTC ms */
+	at: number;
+	zone: string | null;
+	inDungeon: boolean;
+};
+export type PersonalCharacter = { slug: string; name: string; records: PersonalRecord[] };
 
 export type RunRow = {
 	runKey: string;
