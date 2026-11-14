@@ -177,6 +177,53 @@
 
 				<!-- DUNGEON RUNS -->
 				<Tabs.Content value="runs" class="mt-4 space-y-3">
+					<!-- osebni rekordi (tudi open world) so neodvisni od tega, ali ima junak kak run -->
+					{#if heroRuns.data?.records?.length}
+						<section class="wow-frame rounded-lg p-4">
+							<h3 class="text-sm font-semibold text-primary">Personal Records</h3>
+							<p class="text-xs text-muted-foreground italic">
+								biggest numbers ever caught on a combat log, dungeons and open world. screenshots or
+								it didn't happen.
+							</p>
+							<div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+								{#each RECORD_KINDS as kind (kind)}
+									{@const r = heroRuns.data.records.find((x) => x.kind === kind)}
+									{#if r}
+										<!-- rekord iz runa vodi na run; rekord iz open worlda nima kam -->
+										<svelte:element
+											this={r.runId ? 'a' : 'div'}
+											href={r.runId ? `/runs/${r.runId}?tab=numbers` : undefined}
+											class="block rounded-md border border-border p-3 transition-colors {r.runId
+												? 'hover:border-primary/60'
+												: ''}"
+										>
+											<div class="text-xs tracking-wide text-muted-foreground uppercase">
+												{RECORD_LABEL[kind].title}
+											</div>
+											<div class="text-2xl font-bold text-primary tabular-nums">
+												{fmtNum(r.amount)}
+											</div>
+											<div class="text-sm">
+												{r.spell}{#if r.pet}<span class="text-xs text-muted-foreground">
+														(pet)</span
+													>{/if}
+												{#if r.unit}<span class="text-muted-foreground">
+														{RECORD_LABEL[kind].prep}</span
+													>
+													{r.unit}{/if}
+											</div>
+											<div class="text-xs text-muted-foreground">
+												{#if r.world}<span class="text-primary/80">Open world</span>{r.zone
+														? ` · ${r.zone}`
+														: ''}{:else}{r.zone ?? 'Some dungeon'}{/if}
+												· {fmtWhen(r.at)}
+											</div>
+										</svelte:element>
+									{/if}
+								{/each}
+							</div>
+						</section>
+					{/if}
 					{#if heroRuns.data?.locked}
 						<Locked what="their dungeon runs (and how often they died in them)" />
 					{:else if heroRuns.data && !heroRuns.data.runs.length}
@@ -187,50 +234,6 @@
 							tales.
 						</div>
 					{:else}
-						{#if heroRuns.data?.records?.length}
-							<section class="wow-frame rounded-lg p-4">
-								<h3 class="text-sm font-semibold text-primary">Personal Records</h3>
-								<p class="text-xs text-muted-foreground italic">
-									biggest numbers ever caught on a combat log, dungeons and open world. screenshots or it didn't happen.
-								</p>
-								<div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-									{#each RECORD_KINDS as kind (kind)}
-										{@const r = heroRuns.data.records.find((x) => x.kind === kind)}
-										{#if r}
-											<!-- rekord iz runa vodi na run; rekord iz open worlda nima kam -->
-											<svelte:element
-												this={r.runId ? 'a' : 'div'}
-												href={r.runId ? `/runs/${r.runId}?tab=numbers` : undefined}
-												class="block rounded-md border border-border p-3 transition-colors {r.runId
-													? 'hover:border-primary/60'
-													: ''}"
-											>
-												<div class="text-xs tracking-wide text-muted-foreground uppercase">
-													{RECORD_LABEL[kind].title}
-												</div>
-												<div class="text-2xl font-bold text-primary tabular-nums">
-													{fmtNum(r.amount)}
-												</div>
-												<div class="text-sm">
-													{r.spell}{#if r.pet}<span class="text-xs text-muted-foreground"> (pet)</span
-														>{/if}
-													{#if r.unit}<span class="text-muted-foreground">
-															{RECORD_LABEL[kind].prep}</span
-														>
-														{r.unit}{/if}
-												</div>
-												<div class="text-xs text-muted-foreground">
-													{#if r.world}<span class="text-primary/80">Open world</span>{r.zone
-															? ` · ${r.zone}`
-															: ''}{:else}{r.zone ?? 'Some dungeon'}{/if}
-													· {fmtWhen(r.at)}
-												</div>
-											</svelte:element>
-										{/if}
-									{/each}
-								</div>
-							</section>
-						{/if}
 						{#each heroRuns.data?.runs ?? [] as run (run.id)}
 							<RunCard {run} highlight={slug} />
 						{/each}
