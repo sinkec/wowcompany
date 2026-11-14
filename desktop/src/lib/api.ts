@@ -123,6 +123,16 @@ export type Status = {
 	queue: { pending: number; uploaded: number; failed: number };
 	runsVersion: number;
 	live: RunSummary | null;
+	/** Link with the WowCompany WoW addon (files in the game folder, both directions). */
+	addon: {
+		installed: boolean;
+		version: string | null;
+		/** when the addon last saved its data (it reaches the disk on /reload or logout) */
+		dataAt: number | null;
+		runs: number;
+		chars: { name: string; level: number; class: string; crit: number; itemLevel: number }[];
+		leadersAdded: number;
+	};
 	/** Personal bests of the log owner's characters (whole log, open world included). */
 	records: { schema: number; characters: PersonalCharacter[] };
 };

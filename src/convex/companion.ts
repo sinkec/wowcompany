@@ -368,7 +368,9 @@ export const ingestRun = internalMutation({
 			result: s.result,
 			awards: computeAwards(s.players, loot),
 			lootCount: loot.reduce((n, l) => n + l.count, 0),
-			score
+			score,
+			// vodjo pozna samo addon; posnetek brez addona ga ne sme izbrisati
+			...(s.leader ? { leader: s.leader } : {})
 		};
 
 		if (!existing) {
@@ -400,8 +402,13 @@ export const ingestRun = internalMutation({
 			else await ctx.db.insert('runDetails', { runId: existing._id, ...details });
 			await writeParticipants(ctx, existing._id, party, s.startedAt);
 			await writeHeroRecords(ctx, existing._id, s, party);
-		} else if (added) {
-			await ctx.db.patch('runs', existing._id, { recordedBy, updatedAt: now });
+		} else if (added || (s.leader && !existing.leader)) {
+			// slabši/enak posnetek lahko še vedno prinese snemalca ali vodjo (addon pride pozno, ob /reload)
+			await ctx.db.patch('runs', existing._id, {
+				recordedBy,
+				updatedAt: now,
+				...(s.leader && !existing.leader ? { leader: s.leader } : {})
+			});
 		}
 		return { runId: existing._id, created: false, recorderAdded: added, replaced: better };
 	}

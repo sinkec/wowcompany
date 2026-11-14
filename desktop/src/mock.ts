@@ -52,6 +52,14 @@ const status: Status = {
 	upload: { lastError: null, lastUploadAt: now - 120000, blocked: false },
 	queue: { pending: 1, uploaded: 2, failed: 1 },
 	runsVersion: 1,
+	addon: {
+		installed: q.get('addon') !== '0',
+		version: '0.3.0',
+		dataAt: now - 5 * 60e3,
+		runs: 3,
+		chars: [{ name: 'Tankus Maximus', level: 18, class: 'WARRIOR', crit: 2.12, itemLevel: 11.75 }],
+		leadersAdded: 1
+	},
 	records: {
 		schema: 1,
 		characters:

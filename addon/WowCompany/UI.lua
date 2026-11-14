@@ -1,4 +1,4 @@
--- The window: Now · Meter · Fights · Logging.
+-- The window: Now · Meter · Fights · Records · Logging.
 --
 -- Look: a dark parchment panel with the game's own tooltip border, gold headings, class-coloured
 -- bars and stat cards – it should read like a part of the WoW interface, not like a web page.
@@ -26,13 +26,13 @@ local C = {
     good = { 0.30, 0.90, 0.40 },
     bad = { 1.00, 0.32, 0.26 },
 }
-local WIDTH, HEIGHT = 400, 300
+local WIDTH, HEIGHT = 440, 300
 local PAD = 12
 local HEADER, FOOTER = 30, 20
 local ROWS, ROW_H = 9, 20
 
 local main -- the window, built on first use
-local rows, fightRows, cards, logRows = {}, {}, {}, {}
+local rows, fightRows, cards, logRows, recordRows = {}, {}, {}, {}, {}
 local view = { tab = "now", sessionId = nil, sessionName = nil }
 
 local function color(fs, c, a) fs:SetTextColor(c[1], c[2], c[3], a or 1) end
@@ -445,6 +445,81 @@ local function buildFights(parent)
     end
 end
 
+-- ------------------------------------------------------------------ records tab
+-- Personal bests. The addon cannot see single hits (the game hides them), so these come from
+-- the Companion app, which reads the combat log and writes them into the addon's folder.
+
+local RECORDS = {
+    { kind = "crit", label = "Biggest crit", prep = "into" },
+    { kind = "hit", label = "Biggest hit", prep = "into" },
+    { kind = "critHeal", label = "Biggest crit heal", prep = "on" },
+    { kind = "heal", label = "Biggest heal", prep = "on" },
+    { kind = "hitTaken", label = "Hardest hit taken", prep = "from" },
+}
+
+local function buildRecords(parent)
+    for i, def in ipairs(RECORDS) do
+        local y = -(i - 1) * 36
+        local row = { def = def }
+        row.label = text(parent, "GameFontHighlightSmall", "LEFT", C.dim)
+        row.label:SetPoint("TOPLEFT", 0, y)
+        row.label:SetText(string.upper(def.label))
+        row.amount = text(parent, "GameFontNormalLarge", "RIGHT", C.gold)
+        row.amount:SetPoint("TOPRIGHT", 0, y - 2)
+        row.amount:SetWidth(110)
+        row.detail = text(parent, "GameFontHighlightSmall", "LEFT", C.text)
+        row.detail:SetPoint("TOPLEFT", 0, y - 14)
+        row.detail:SetPoint("RIGHT", row.amount, "LEFT", -8, 0)
+        if i > 1 then
+            local sep = line(parent, 0.12)
+            sep:SetPoint("TOPLEFT", 0, y + 5)
+            sep:SetPoint("TOPRIGHT", 0, y + 5)
+        end
+        recordRows[i] = row
+    end
+    main.recordsEmpty = text(parent, "GameFontHighlightSmall", "CENTER", C.dim)
+    main.recordsEmpty:SetPoint("CENTER", 0, 10)
+    main.recordsEmpty:SetWidth(WIDTH - 4 * PAD)
+    if main.recordsEmpty.SetWordWrap then main.recordsEmpty:SetWordWrap(true) end
+    main.recordsEmpty:SetText("No records here yet.\n\nKeep the Companion app running with the combat log on, "
+        .. "make something bleed, then type /reload.")
+    main.recordsHint = text(parent, "GameFontHighlightSmall", "LEFT", C.faint)
+    main.recordsHint:SetPoint("BOTTOMLEFT", 0, 0)
+    main.recordsHint:SetText("From the Companion app · refreshed on /reload")
+end
+
+local function refreshRecords()
+    local mine = ns.Export.Records()
+    local any = false
+    for i = 1, #recordRows do
+        local row = recordRows[i]
+        local found
+        if mine then
+            for _, r in ipairs(mine.records) do
+                if type(r) == "table" and r.kind == row.def.kind then found = r end
+            end
+        end
+        if found then
+            any = true
+            row.amount:SetText(ns.fmt(found.amount))
+            local detail = tostring(found.spell or "?")
+            if found.unit then detail = detail .. " " .. row.def.prep .. " " .. tostring(found.unit) end
+            detail = detail .. "  |cff6b635a·  " .. (found.inDungeon and "" or "open world, ")
+                .. tostring(found.zone or "somewhere") .. "|r"
+            row.detail:SetText(detail)
+        else
+            row.amount:SetText("–")
+            row.detail:SetText("")
+        end
+        local visible = mine ~= nil
+        row.label:SetShown(visible)
+        row.amount:SetShown(visible)
+        row.detail:SetShown(visible)
+    end
+    main.recordsEmpty:SetShown(not any)
+    main.recordsHint:SetShown(any)
+end
+
 -- ------------------------------------------------------------------ logging tab
 
 local LOG_ROWS = {
@@ -598,9 +673,9 @@ local function build()
     applyPin()
 
     main.tabs = {}
-    local x = 104
-    for _, t in ipairs({ { "now", "Now", 40 }, { "meter", "Meter", 48 }, { "fights", "Fights", 48 },
-        { "logging", "Logging", 56 } }) do
+    local x = 96
+    for _, t in ipairs({ { "now", "Now", 38 }, { "meter", "Meter", 46 }, { "fights", "Fights", 46 },
+        { "records", "Records", 58 }, { "logging", "Logging", 54 } }) do
         local b = tab(main, t[2], t[3], function() UI.Show(t[1]) end)
         b:SetPoint("TOPLEFT", x, -4)
         x = x + t[3] + 2
@@ -675,6 +750,9 @@ local function build()
     main.fightsEmpty:SetPoint("CENTER")
     main.fightsEmpty:SetText("No fights on record. Suspiciously peaceful.")
 
+    main.records = page()
+    buildRecords(main.records)
+
     main.logging = page()
     buildLogging(main.logging)
 
@@ -696,6 +774,7 @@ function UI.Refresh()
     main.now:SetShown(view.tab == "now")
     main.meter:SetShown(view.tab == "meter")
     main.fights:SetShown(view.tab == "fights")
+    main.records:SetShown(view.tab == "records")
     main.logging:SetShown(view.tab == "logging")
     refreshFooter()
     if view.tab == "now" then
@@ -708,6 +787,8 @@ function UI.Refresh()
         refreshMeter()
     elseif view.tab == "fights" then
         refreshFights()
+    elseif view.tab == "records" then
+        refreshRecords()
     else
         refreshLogging()
     end

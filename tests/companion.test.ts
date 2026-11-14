@@ -250,3 +250,11 @@ describe('personal records (open world)', () => {
 		expect(checkPersonal(U([R({ at: NOW - 400 * 86_400_000 })]), NOW)).toBe('bad record entry');
 	});
 });
+
+describe('party leader (from the addon)', () => {
+	test('a sane leader passes, nonsense does not', () => {
+		expect(checkRun(RUN({ schema: 3, leader: 'Fizzle Boom' }), NOW)).toBeNull();
+		expect(checkRun(RUN({ schema: 3, leader: 'x' }), NOW)).toBe('bad leader');
+		expect(checkRun(RUN({ schema: 3, leader: 'x'.repeat(81) }), NOW)).toBe('bad leader');
+	});
+});

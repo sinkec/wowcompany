@@ -173,7 +173,9 @@ export const runSummary = v.object({
 	segments: v.array(segment),
 	deaths: v.array(death),
 	timeline,
-	loot: v.optional(v.array(lootDrop))
+	loot: v.optional(v.array(lootDrop)),
+	/** vodja partyja – iz addona WowCompany (combat log ga ne pozna) */
+	leader: v.optional(v.string())
 });
 
 export const award = v.object({

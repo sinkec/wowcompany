@@ -31,6 +31,10 @@ pub struct RunSummary {
     /// Items looted during the run (from `/chatlog`; empty when the chat log is off).
     #[serde(default)]
     pub loot: Vec<LootDrop>,
+    /// Party leader (`Name Surname`). The combat log does not know it; the Companion fills it
+    /// in from the WowCompany addon's export when there is one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub leader: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -29,6 +29,7 @@ export type RunDocLike = {
 	recordedBy: Recorder[];
 	awards: Award[];
 	lootCount?: number;
+	leader?: string;
 };
 
 export type DetailsLike = {
@@ -90,8 +91,8 @@ export function runListItem(run: RunDocLike, classOf: Map<string, number>, allow
 			deaths: deaths ? p.deaths : null
 		})),
 		recordedBy: recorders.map((r) => ({ slug: r.slug, name: nameIn(run.party, r.slug), at: r.at })),
-		/** Combat log ne pove, kdo je vodja skupine (pride z addonom / chat logom – COMPANION.md §14). */
-		leader: null as string | null,
+		/** Combat log ne pove, kdo je vodja skupine – pride iz addona WowCompany (član partyja, kot ostala imena). */
+		leader: (run.leader ?? null) as string | null,
 		totalDeaths: deaths ? run.party.reduce((n, p) => n + p.deaths, 0) : null,
 		/** null = skrito (runLoot); 0 = ni podatka ali nič pobranega */
 		lootCount: allowed('runLoot') ? (run.lootCount ?? 0) : null,

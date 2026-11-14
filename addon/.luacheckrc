@@ -4,6 +4,7 @@ max_line_length = 120
 -- the addon's own globals (SavedVariables, slash commands)
 globals = {
     "WowCompanyDB",
+    "WowCompanyCompanionData",
     "SLASH_WOWCOMPANY1",
     "SLASH_WOWCOMPANY2",
     "SlashCmdList",
@@ -47,6 +48,7 @@ read_globals = {
     "UnitFullName",
     "UnitGUID",
     "UnitIsGroupLeader",
+    "UnitLevel",
     "UnitName",
     "issecretvalue",
     "print",

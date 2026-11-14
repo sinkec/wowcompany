@@ -27,6 +27,8 @@ pub struct StatusDto {
     pub live: Option<RunSummary>,
     /// Personal bests of the log owner's characters (whole log, open world included).
     pub records: wowrun::PersonalUpload,
+    /// Link with the WowCompany WoW addon.
+    pub addon: crate::engine::AddonStatus,
 }
 
 #[tauri::command]
@@ -42,6 +44,7 @@ pub fn get_status(core: Core_<'_>) -> StatusDto {
         runs_version: core.runs_version.load(Ordering::SeqCst),
         live: core.live.lock().expect("live").clone(),
         records: core.personal_records(),
+        addon: core.addon_status(),
         settings,
     }
 }

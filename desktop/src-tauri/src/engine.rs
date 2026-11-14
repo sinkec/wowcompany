@@ -5,6 +5,7 @@
 //! * **uploader** – sends pending runs (`POST /companion/runs`) with backoff;
 //! * **linker** – one short-lived thread per "Sign in with Google" (polls the portal).
 
+use crate::addon::{self, AddonChar, AddonExport};
 use crate::api::{Api, Poll, Upload};
 use crate::locate::{self, Candidate, LogKind};
 use crate::queue::{self, Counts, Queue};
@@ -20,6 +21,8 @@ use wowrun::{Config, Detector, Personal, PersonalUpload, RunSummary};
 
 /// Personal records are uploaded at most this often.
 const RECORDS_UPLOAD_GAP_MS: i64 = 60_000;
+/// How far back stored runs get late data from the addon.
+const ADDON_BACKFILL_MS: i64 = 48 * 3_600_000;
 /// After the server refused them (4xx): try again this much later.
 const RECORDS_REJECTED_GAP_MS: i64 = 3_600_000;
 
@@ -199,6 +202,30 @@ pub enum Cmd {
     Finish(mpsc::Sender<()>),
 }
 
+/// What the app knows about the WowCompany addon (for the UI).
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddonStatus {
+    /// `Interface/AddOns/WowCompany` exists.
+    pub installed: bool,
+    /// Version the addon reported in its last export.
+    pub version: Option<String>,
+    /// When the addon last saved its data (UTC ms) – it only reaches the disk on `/reload` or logout.
+    pub data_at: Option<i64>,
+    pub runs: usize,
+    pub chars: Vec<AddonChar>,
+    /// Runs that got their party leader from the addon in this session.
+    pub leaders_added: u32,
+}
+
+#[derive(Default)]
+struct AddonState {
+    export: AddonExport,
+    mtime: Option<SystemTime>,
+    installed: bool,
+    leaders_added: u32,
+}
+
 pub struct Core {
     pub config_dir: PathBuf,
     pub settings: Mutex<Settings>,
@@ -211,6 +238,7 @@ pub struct Core {
     /// The log owner's personal bests (whole log, open world included); saved in `records.json`.
     pub personal: Mutex<Personal>,
     personal_path: PathBuf,
+    addon: Mutex<AddonState>,
     /// Bumped whenever the local run list changes (UI refreshes the Runs tab).
     pub runs_version: AtomicU64,
     /// Bumped to cancel a running link poller.
@@ -242,6 +270,7 @@ impl Core {
             live: Mutex::new(None),
             personal: Mutex::new(personal),
             personal_path,
+            addon: Mutex::new(AddonState::default()),
             runs_version: AtomicU64::new(0),
             link_gen: AtomicU64::new(0),
             wake_uploader: AtomicBool::new(false),
@@ -297,9 +326,97 @@ impl Core {
         }
     }
 
-    fn store_runs(&self, runs: Vec<RunSummary>) {
+    pub fn addon_status(&self) -> AddonStatus {
+        let a = self.addon.lock().expect("addon lock");
+        AddonStatus {
+            installed: a.installed,
+            version: a.export.version.clone(),
+            data_at: a.export.at,
+            runs: a.export.runs.len(),
+            chars: a.export.chars.clone(),
+            leaders_added: a.leaders_added,
+        }
+    }
+
+    /// Both directions of the addon link (called every few seconds by the watcher):
+    /// read the addon's export when its file changed and add what it knows to stored runs;
+    /// write the personal records where the addon can load them.
+    fn sync_addon(&self, logs_dir: &Path) {
+        let installed = addon::addon_dir(logs_dir).is_some_and(|d| d.is_dir());
+        let file = addon::saved_variables(logs_dir);
+        let mtime = file
+            .as_ref()
+            .and_then(|f| std::fs::metadata(f).and_then(|m| m.modified()).ok());
+        let changed = {
+            let mut a = self.addon.lock().expect("addon lock");
+            a.installed = installed;
+            let changed = mtime.is_some() && mtime != a.mtime;
+            if changed {
+                a.mtime = mtime;
+                a.export = file
+                    .as_ref()
+                    .and_then(|f| std::fs::read(f).ok())
+                    .map(|b| addon::parse_export(&String::from_utf8_lossy(&b)))
+                    .unwrap_or_default();
+            }
+            changed
+        };
+        if changed {
+            self.add_leaders_to_stored_runs();
+        }
+        if installed {
+            let records = self.personal_records();
+            if !records.characters.is_empty() {
+                let _ = addon::write_companion_data(logs_dir, &records);
+            }
+        }
+    }
+
+    /// The addon's data reaches the disk late (on `/reload`), often after the run was stored or
+    /// even uploaded: add the leader to recent runs that lack one and send them again.
+    fn add_leaders_to_stored_runs(&self) {
+        let export = self.addon.lock().expect("addon lock").export.clone();
+        if export.runs.is_empty() {
+            return;
+        }
+        let q = self.queue.lock().expect("queue lock");
+        let recent = q.recent_json(wall_ms() - ADDON_BACKFILL_MS).unwrap_or_default();
+        let mut added = 0u32;
+        for (run_key, json) in recent {
+            let Ok(mut run) = serde_json::from_str::<RunSummary>(&json) else {
+                continue;
+            };
+            if run.leader.is_some() {
+                continue;
+            }
+            let Some(leader) = addon::leader_for(&export, &run) else {
+                continue;
+            };
+            run.leader = Some(leader);
+            if let Ok(json) = serde_json::to_string(&run)
+                && q.update_json(&run_key, &json).is_ok()
+            {
+                added += 1;
+            }
+        }
+        drop(q);
+        if added > 0 {
+            self.addon.lock().expect("addon lock").leaders_added += added;
+            self.runs_version.fetch_add(1, Ordering::SeqCst);
+            self.kick_uploader();
+        }
+    }
+
+    fn store_runs(&self, mut runs: Vec<RunSummary>) {
         if runs.is_empty() {
             return;
+        }
+        // the party leader, when the addon already told us
+        {
+            let a = self.addon.lock().expect("addon lock");
+            for r in runs.iter_mut().filter(|r| r.leader.is_none()) {
+                r.leader = addon::leader_for(&a.export, r);
+            }
         }
         let q = self.queue.lock().expect("queue lock");
         let mut changed = false;
@@ -350,6 +467,7 @@ impl Core {
         let mut pipe = Pipeline::new(self.settings().min_players, utc_offset_ms());
         let mut last_scan = None;
         let mut last_tick = Instant::now();
+        let mut last_addon_sync: Option<Instant> = None;
         loop {
             while let Ok(cmd) = rx.try_recv() {
                 match cmd {
@@ -450,6 +568,15 @@ impl Core {
                         }
                     }
                     Err(e) => self.watch.lock().expect("watch lock").error = Some(format!("Cannot read chat log: {e}")),
+                }
+            }
+
+            // WowCompany addon: its export in, the personal records out
+            if last_addon_sync.is_none_or(|t| t.elapsed() >= Duration::from_secs(5)) {
+                last_addon_sync = Some(Instant::now());
+                let dir = self.watch.lock().expect("watch lock").logs_dir.clone();
+                if let Some(dir) = dir {
+                    self.sync_addon(Path::new(&dir));
                 }
             }
 
@@ -816,5 +943,64 @@ mod tests {
         assert_eq!(rows[0].zone, "Ragefire Chasm");
         assert_eq!(rows[0].bosses_killed, 1);
         assert_eq!(rows[0].deaths, 1);
+    }
+
+    #[test]
+    fn addon_leader_is_added_to_new_and_to_already_uploaded_runs() {
+        let t = crate::testutil::TempDir::new("addon-core");
+        let core = Core::open(&t.path().join("cfg"), &t.path().join("data")).unwrap();
+        let mut p = Pipeline::new(2, 0);
+        let mut personal = Personal::new(0);
+        let mut runs = Vec::new();
+        for l in fixture().lines() {
+            runs.extend(p.feed(l, &mut personal));
+        }
+        runs.extend(p.finish());
+        let mut run = runs.remove(0);
+        // the stored-run backfill only looks at recent runs
+        let len = run.ended_at - run.started_at;
+        run.started_at = wall_ms() - 3_600_000;
+        run.ended_at = run.started_at + len;
+
+        // 1) run stored and uploaded before the addon said anything → no leader
+        core.store_runs(vec![run.clone()]);
+        let stored = |core: &Core| -> RunSummary {
+            let q = core.queue.lock().unwrap();
+            serde_json::from_str(&q.get_json(&run.run_key).unwrap().unwrap()).unwrap()
+        };
+        assert_eq!(stored(&core).leader, None);
+        core.queue
+            .lock()
+            .unwrap()
+            .mark_uploaded(&run.run_key, "https://x/runs/1", wall_ms())
+            .unwrap();
+
+        // 2) the addon's export arrives (on /reload): the leader is added and the run goes out again
+        let line = format!(
+            "\"v1|RUN|{}|{}|{}|{}|Fizzle Boom\", -- [1]",
+            run.zone.instance_id,
+            run.started_at / 1000 - 120,
+            run.ended_at / 1000 + 60,
+            run.zone.name
+        );
+        core.addon.lock().unwrap().export = addon::parse_export(&line);
+        core.add_leaders_to_stored_runs();
+        assert_eq!(stored(&core).leader.as_deref(), Some("Fizzle Boom"));
+        assert_eq!(
+            core.queue.lock().unwrap().status_of(&run.run_key).unwrap(),
+            Some(queue::Status::Pending)
+        );
+        assert_eq!(core.addon_status().leaders_added, 1);
+        // again: nothing left to add
+        core.add_leaders_to_stored_runs();
+        assert_eq!(core.addon_status().leaders_added, 1);
+
+        // 3) a run that finishes after the addon spoke gets the leader straight away
+        let mut second = run.clone();
+        second.run_key = "feedfacefeedface".into();
+        core.store_runs(vec![second]);
+        let q = core.queue.lock().unwrap();
+        let json = q.get_json("feedfacefeedface").unwrap().unwrap();
+        assert!(json.contains("\"leader\":\"Fizzle Boom\""));
     }
 }

@@ -160,6 +160,25 @@ impl Queue {
         }
     }
 
+    /// Runs that started at or after `since`, with their stored summaries (the addon's data
+    /// arrives late – on `/reload` – and is added to runs that are already stored).
+    pub fn recent_json(&self, since: i64) -> rusqlite::Result<Vec<(String, String)>> {
+        let mut st = self
+            .db
+            .prepare("SELECT run_key, json FROM runs WHERE started_at >= ?1 ORDER BY started_at DESC")?;
+        let rows = st.query_map([since], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.collect()
+    }
+
+    /// Replaces the stored summary of a run and sends it again (the server merges it).
+    pub fn update_json(&self, run_key: &str, json: &str) -> rusqlite::Result<()> {
+        self.db.execute(
+            "UPDATE runs SET json=?2, status='pending', attempts=0, next_attempt_at=0, last_error=NULL WHERE run_key=?1",
+            params![run_key, json],
+        )?;
+        Ok(())
+    }
+
     pub fn due(&self, now: i64, limit: usize) -> rusqlite::Result<Vec<Due>> {
         let mut st = self.db.prepare(
             "SELECT run_key, json, attempts FROM runs WHERE status='pending' AND next_attempt_at <= ?1

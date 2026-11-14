@@ -89,8 +89,17 @@ end
 function GetInstanceInfo() return "Somewhere", game.instanceType, 1, "Normal", 5, 0, false, 43 end
 function UnitGUID() return "Player-1-0000000A" end
 function UnitName() return "Mottled Boar" end
-function UnitFullName() return "Grobos", "Stinkfoot" end
-function UnitIsGroupLeader(unit) return unit == "player" end
+function UnitLevel() return 18 end
+function UnitClass() return "Mage", "MAGE", 8 end
+function GetCritChance() return 2.124300241470337 end
+function UnitAttackPower() return 13, 2, 0 end
+function UnitArmor() return 0, 184, 184, 184 end
+function GetAverageItemLevel() return 11.75, 11.75, 11.75 end
+function UnitFullName(unit)
+    if unit == "party1" then return "Fizzle", "Boom" end
+    return "Grobos", "Stinkfoot"
+end
+function UnitIsGroupLeader(unit) return unit == (game.leaderUnit or "player") end
 function UnitExists(unit) return unit == "player" or unit == "party1" or unit == "target" end
 function GetNumGroupMembers() return 2 end
 function IsInGroup() return game.grouped end
@@ -110,7 +119,7 @@ local function runTimers()
     timers = {}
     for i = 1, #list do list[i]() end
 end
-C_AddOns = { GetAddOnMetadata = function() return "0.2.1" end }
+C_AddOns = { GetAddOnMetadata = function() return "0.3.0" end }
 C_CVar = {
     GetCVar = function() return game.advanced end,
     SetCVar = function(_, v) game.advanced = v end,
@@ -290,7 +299,7 @@ check(win.moving == false, "pinned window does not move")
 slash("reset")
 check(WowCompanyDB.settings.pos == nil and not WowCompanyDB.settings.pinned and win.point[1] == "TOP"
     and pin.label.text == "pin", "/wowco reset: back to the top, unpinned")
-for _, tab in ipairs({ "now", "meter", "fights", "logging" }) do
+for _, tab in ipairs({ "now", "meter", "fights", "records", "logging" }) do
     local ok, err = pcall(ns.UI.Show, tab)
     check(ok, "draws the " .. tab .. " tab" .. (ok and "" or (": " .. tostring(err))))
 end
@@ -345,6 +354,67 @@ check(ns.Meter.Run() ~= nil and WowCompanyDB.state.run.afterFight == 1, "coming 
 game.instanceType = "none"
 fire("ZONE_CHANGED_NEW_AREA")
 slash("log off")
+
+-- export for the Companion: run with its leader, character stats, only on our own party
+local function exported(pattern)
+    for _, l in ipairs(WowCompanyDB.export or {}) do
+        if string.find(l, pattern) then return l end
+    end
+end
+game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
+WowCompanyDB.state.run = nil
+fire("ZONE_CHANGED_NEW_AREA")
+fire("GROUP_ROSTER_UPDATE")
+check(exported("^v1|META|0%.3%.0|%d+$") ~= nil, "export: META line with the addon version")
+local runLine = exported("^v1|RUN|")
+check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
+    "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
+check(exported("^v1|CHAR|Grobos Stinkfoot|18|MAGE|2%.12|15|184|11%.75|%d+$") ~= nil, "export: character stats")
+game.leaderUnit = "player"
+fire("PARTY_LEADER_CHANGED")
+check(string.find(exported("^v1|RUN|"), "|Grobos Stinkfoot$") ~= nil, "export: leader change is picked up")
+game.instanceType = "none"
+fire("ZONE_CHANGED_NEW_AREA")
+check(string.find(exported("^v1|RUN|"), "|0|Somewhere|") == nil and said("/reload"), "export: leaving closes the run and asks for /reload")
+game.grouped, game.instanceType = false, "party"
+WowCompanyDB.state.run = nil
+WowCompanyDB.runs = {}
+fire("ZONE_CHANGED_NEW_AREA")
+check(string.find(exported("^v1|RUN|"), "|Somewhere|$") ~= nil, "export: alone in a dungeon there is no leader to name")
+game.instanceType = "none"
+fire("ZONE_CHANGED_NEW_AREA")
+fire("PLAYER_LOGOUT")
+check(#WowCompanyDB.export >= 3, "export is rebuilt right before the game saves")
+slash("log off")
+
+-- records written by the Companion (CompanionData.lua)
+check(ns.Export.Records() == nil, "no Companion data yet")
+ns.UI.Show("records")
+local emptyShown
+for i = 1, #frames do
+    local t = rawget(frames[i], "text")
+    if type(t) == "string" and string.find(t, "No records here yet", 1, true) then emptyShown = frames[i].shown end
+end
+check(emptyShown == true, "records: empty state explains what to do")
+WowCompanyCompanionData = { schema = 1, characters = {
+    ["someone-else"] = { name = "Someone Else", records = { { kind = "crit", amount = 99999, spell = "Nope" } } },
+    ["grobos-stinkfoot"] = { name = "Grobos Stinkfoot", records = {
+        { kind = "crit", amount = 1204, spell = "Fireball", unit = "Mottled Boar", zone = "Durotar", inDungeon = false },
+        { kind = "hitTaken", amount = 1890, spell = "Lava", zone = "Ragefire Chasm", inDungeon = true },
+    } },
+} }
+check(ns.Export.Records().name == "Grobos Stinkfoot", "records: picks this character, not another one on file")
+ns.UI.Refresh()
+local function hasText(pattern)
+    for i = 1, #frames do
+        local t = rawget(frames[i], "text")
+        if type(t) == "string" and string.find(t, pattern, 1, true) then return true end
+    end
+    return false
+end
+check(hasText("1,204") and hasText("Fireball into Mottled Boar") and hasText("open world, Durotar"), "records: crit with spell, target and place")
+check(hasText("1,890") and hasText("Lava") and not hasText("99999") and not hasText("99,999"), "records: hit taken shown, the other character's numbers are not")
+WowCompanyCompanionData = nil
 
 -- buttons explain themselves on hover and never break
 local hovered = 0

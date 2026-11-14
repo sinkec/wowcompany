@@ -74,6 +74,7 @@ export function checkRun(s: RunSummary, now: number): string | null {
 	if (slugs.size !== s.players.length || [...slugs].some((x) => !/^[\p{L}\p{N}'-]{2,64}$/u.test(x)))
 		return 'bad slugs';
 	if (s.recorder !== null && !slugs.has(s.recorder)) return 'recorder not in party';
+	if (s.leader !== undefined && (s.leader.length < 2 || s.leader.length > 80)) return 'bad leader';
 	const loot = s.loot ?? [];
 	if (loot.length > MAX_LOOT) return `too much loot (max ${MAX_LOOT})`;
 	if (

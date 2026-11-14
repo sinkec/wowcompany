@@ -285,6 +285,8 @@ export default defineSchema({
 		party: v.array(partyMember),
 		recordedBy: v.array(recorder),
 		awards: v.array(award),
+		/** vodja partyja (iz addona WowCompany prek Companiona); manjka, če ga nihče ni poslal */
+		leader: v.optional(v.string()),
 		/** število pobranih predmetov (za seznam; podrobnosti v runDetails.loot) */
 		lootCount: v.optional(v.number()),
 		/** popolnost posnetka – ob združevanju obdržimo boljšega */

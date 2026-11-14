@@ -25,17 +25,23 @@ samo prek SavedVariables, in to šele ob `/reload`, odjavi ali izhodu iz igre. Z
 
 Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez njega vse deluje kot v v0.1.2.
 
-## 1. Stanje (14. 11. 2026 zvečer) – ZAČNI TUKAJ
+## 1. Stanje (14. 11. 2026, pozno zvečer) – ZAČNI TUKAJ
 
-- **Vse commitano in na produkciji:** `main` = `877bd66`, Companion **v0.1.4** izdan (Windows + Linux), osebni rekordi iz open worlda
-  delujejo na prod (uporabnikovi so naloženi). Addon 0.2.1 je v uporabnikovi mapi igre in **deluje** (uporabnik potrdil).
-- Pri uporabniku teče lokalno zgrajen Companion 0.1.4 (`target/release/wowcompany-companion`); AppImage v `~/Applications` je še 0.1.3.
-- **Naslednji korak: povezava addon → Companion** (§4.1a, §4.4): addon piše `WowCompanyDB.export` (vodja partyja, loot s kakovostjo
-  in ID-jem, rolli, statistika lika, meter runa iz C_DamageMeter), Companion bere
-  `_forever_/WTF/Account/*/SavedVariables/WowCompany.lua` (ob `/reload` / odjavi) in dopolni run; zavihek »Addon« v Companionu
-  (nameščen? verzija? zadnji podatki). Nato Companion → addon (`CompanionData.lua`: rekordi, lestvice).
-- Odprto iz samotesta: CHAT_MSG_LOOT oblika, vodja v partyju, ali so vrednosti metra med bojem skrite (`/wowco probe` v dungeonu).
-- Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`).
+- Companion **v0.1.5** + addon **0.3.0**: povezava addon ↔ Companion v obe smeri (spodaj). Addon je v uporabnikovi mapi igre.
+- **Addon → Companion** (`addon/WowCompany/Export.lua` → `desktop/src-tauri/src/addon.rs`): addon v `WowCompanyDB.export` piše vrstice
+  `v1|META|…`, `v1|RUN|instanceId|start|end|zone|leader`, `v1|CHAR|…`; na disk pridejo ob `/reload` / odjavi. Companion vsakih 5 s
+  pogleda `WTF/Account/*/SavedVariables/WowCompany.lua`, ob spremembi doda **vodjo partyja** novim runom in za nazaj (48 h) že
+  shranjenim/naloženim runom (`Queue::update_json` → ponovno nalaganje; strežnik vodjo doda tudi enakemu posnetku).
+  Ujemanje po času (±10 min) in dungeonu. `RunSummary.leader` (neobvezno, brez dviga sheme), `runs.leader` na strežniku.
+  **V igri s pravim partyjem še ni preverjeno** (vodja, `/reload` po runu).
+- **Companion → addon:** Companion piše `Interface/AddOns/WowCompany/CompanionData.lua` (osebni rekordi), addon jih kaže na zavihku
+  **Records** po `/reload`. Preverjeno na pravih datotekah (Lua prebere datoteko, ki jo zapiše aplikacija).
+- Companion Guide kaže stanje addona (nameščen, verzija, zadnji podatki, dodani vodje).
+- **Še odprto:** loot s kakovostjo/ID-jem in rolli iz addona (CHAT_MSG_LOOT oblika ni preverjena), statistika lika na portalu,
+  gumb »Install addon« v Companionu (addon je treba zdaj ročno skopirati v `Interface/AddOns`), minimap gumb,
+  `/wowco probe` v dungeonu (ali so vrednosti metra med bojem skrite).
+- Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`;
+  v izvozu je edino tuje ime vodja LASTNEGA partyja).
 
 ## 2. Faza O – preostala optimizacija Convexa (majhno, najprej)
 

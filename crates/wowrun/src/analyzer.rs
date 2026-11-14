@@ -824,6 +824,7 @@ impl RunAcc {
             timeline,
             // loot after the last kill (boss corpse) belongs to the run too
             loot: self.loot.clone(),
+            leader: None,
         }
     }
 

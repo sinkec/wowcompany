@@ -1,5 +1,6 @@
 //! WowCompany Companion – desktop app (Tauri 2). See COMPANION.md §5 and §8.2a.
 
+pub mod addon;
 pub mod api;
 pub mod cleanup;
 mod commands;
