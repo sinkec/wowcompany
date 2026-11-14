@@ -27,7 +27,9 @@ Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez nje
 
 ## 1. Stanje (14. 11. 2026, pozno zvečer) – ZAČNI TUKAJ
 
-- Companion **v0.1.5** + addon **0.3.0**: povezava addon ↔ Companion v obe smeri (spodaj). Addon je v uporabnikovi mapi igre.
+- **Vse commitano in na produkciji:** `main` = `8de0008`, izdan Companion **v0.1.6** (addon 0.4.0 je vgrajen vanj), navodila na
+  portalu (`GetApp.svelte` na `/link`) so prepisana okoli addona. Addon 0.4.0 je v uporabnikovi mapi igre.
+- Povezava addon ↔ Companion v obe smeri (spodaj):
 - **Addon → Companion** (`addon/WowCompany/Export.lua` → `desktop/src-tauri/src/addon.rs`): addon v `WowCompanyDB.export` piše vrstice
   `v1|META|…`, `v1|RUN|instanceId|start|end|zone|leader`, `v1|CHAR|…`; na disk pridejo ob `/reload` / odjavi. Companion vsakih 5 s
   pogleda `WTF/Account/*/SavedVariables/WowCompany.lua`, ob spremembi doda **vodjo partyja** novim runom in za nazaj (48 h) že
