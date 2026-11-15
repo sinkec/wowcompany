@@ -63,11 +63,19 @@ pub fn display_name(name: &str) -> String {
 }
 
 /// Instance copy id from a creature GUID: `Creature-0-<server>-<instance>-<uid>-<npc>-<spawn>`.
-pub fn creature_uid(u: &Unit) -> Option<u32> {
+/// Instance copy id (5th GUID part) of an NPC that lives on map `instance_id` (4th part).
+/// NPCs from other maps are ignored: e.g. "Herald of Thrall" in Orgrimmar (map 1) puts a world
+/// buff on players inside the dungeon (seen in a real Wailing Caverns log, 15. 11. 2026).
+pub fn creature_uid(u: &Unit, instance_id: u32) -> Option<u32> {
     if !(u.guid.starts_with("Creature-") || u.guid.starts_with("Vehicle-")) {
         return None;
     }
-    u.guid.split('-').nth(4)?.parse().ok().filter(|&v| v != 0)
+    let mut parts = u.guid.split('-');
+    let map: u32 = parts.nth(3)?.parse().ok()?;
+    if map != instance_id {
+        return None;
+    }
+    parts.next()?.parse().ok().filter(|&v| v != 0)
 }
 
 #[derive(Debug, Clone, Default)]
@@ -254,12 +262,12 @@ impl RunAcc {
 
     /// Instance copy id seen in this record (first NPC-controlled creature – pets and
     /// guardians are skipped because they carry the uid of the zone they were summoned in).
-    pub fn observed_uid(rec: &Record) -> Option<u32> {
+    pub fn observed_uid(rec: &Record, instance_id: u32) -> Option<u32> {
         let npc = |u: &Unit| u.flags & flags::CONTROL_PLAYER == 0 && !u.is_group();
         [&rec.source, &rec.dest]
             .into_iter()
             .filter(|u| npc(u))
-            .find_map(creature_uid)
+            .find_map(|u| creature_uid(u, instance_id))
     }
 
     fn register(&mut self, u: &Unit) {
@@ -388,7 +396,7 @@ impl RunAcc {
             _ => {}
         }
         if self.instance_uid.is_none() {
-            self.instance_uid = Self::observed_uid(rec);
+            self.instance_uid = Self::observed_uid(rec, self.zone.instance_id);
         }
 
         let activity = self.is_activity(rec);
@@ -867,9 +875,15 @@ mod tests {
     fn names() {
         assert_eq!(display_name("Fizzle-Boom-PvP-EU"), "Fizzle Boom");
         let u = Unit {
-            guid: "Creature-0-1-0-23810-1548-000000BBBB".into(),
+            guid: "Creature-0-1-43-23810-1548-000000BBBB".into(),
             ..Default::default()
         };
-        assert_eq!(creature_uid(&u), Some(23810));
+        assert_eq!(creature_uid(&u, 43), Some(23810));
+        // an NPC from another map (world buff giver in a city) is not the dungeon copy
+        let herald = Unit {
+            guid: "Creature-0-7099-1-50227-10719-000079AC6D".into(),
+            ..Default::default()
+        };
+        assert_eq!(creature_uid(&herald, 43), None);
     }
 }

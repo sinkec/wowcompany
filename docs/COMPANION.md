@@ -453,21 +453,21 @@ Vse do zdaj je testirano samo na **solo vzorcu** (Tirisfal) in **sintetičnih** 
 Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 
 **A. Pravi dungeon log s partyjem** (`/console advancedCombatLogging 1`, `/combatlog`, `/chatlog`; najbolje 2 člana snemata isti run)
-- [ ] A1 `ZONE_CHANGE` ob vstopu v dungeon: instanceID se ujema s tabelo 3.1? (sicer rezerva `MAP_CHANGE` ime) – `dungeons.rs`
+- [x] A1 (15. 11. 2026, pravi WC run s partyjem 5) `ZONE_CHANGE,43,"Wailing Caverns",1` ob vstopu ✅ (prej `ZONE_CHANGE,1,"The Wailing Caverns",0` = jama v odprtem svetu). Ob vstopu v dungeon:: instanceID se ujema s tabelo 3.1? (sicer rezerva `MAP_CHANGE` ime) – `dungeons.rs`
 - [ ] A2 Ali se `ZONE_CHANGE` zapiše tudi ob izhodu / ob releasu na graveyard (corpse run logika, grace 15 min)?
-- [ ] A3 `ENCOUNTER_START/END` obstajata? Format (`instanceID` na koncu START, `fightTime` na koncu END)? encounterID-ji iz tabele 3.1 pravilni?
-- [ ] A4 Party zastavice `0x512` (party) / `0x514` (raid) pri soigralcih; `0x511` samo jaz
-- [ ] A5 Peti partyja: zastavice (`0x1112`?), GUID oblika (`Pet-…`/`Creature-…`), ali `ownerGUID` v naprednem bloku
-- [ ] A6 Uid kopije instance v GUID-u NPC-jev (5. del) – enak za vse člane in drugačen po resetu?
+- [x] A3 ✅ 6 bossov, ID-ji 585–590 pravilni, START ima instanceID 43, END ima fightTime. Prej: Format (`instanceID` na koncu START, `fightTime` na koncu END)? encounterID-ji iz tabele 3.1 pravilni?
+- [x] A4 ✅ `0x512` soigralci, `0x511` jaz, `0x518` tujci. Prej: Party zastavice `0x512` (party) / `0x514` (raid) pri soigralcih; `0x511` samo jaz
+- [x] A5 ✅ `Pet-0-…` GUID, zastavice `0x1112` (party pet) / `0x1118` (tuj), lastnik prek `ownerGUID` (hunterjev pet pravilno pripisan). Prej: Peti partyja: zastavice (`0x1112`?), GUID oblika (`Pet-…`/`Creature-…`), ali `ownerGUID` v naprednem bloku
+- [ ] A6 ✅ uid = 5. del (`Creature-0-6868-43-27750-…`); **napaka popravljena 15. 11.:** detektor je vzel uid NPC-ja z druge mape (Herald of Thrall, map 1, world buff na petu) → zdaj samo NPC-ji z mape = instanceID. Še odprto: drugačen po resetu. Uid kopije instance v GUID-u NPC-jev (5. del) – enak za vse člane in drugačen po resetu?
 - [ ] A7 `runKey` pri dveh snemalcih istega runa enak (obe datoteki skozi `wowrun`)
 - [ ] A8 Swing pravilo: `SWING_DAMAGE` vs `SWING_DAMAGE_LANDED` – vsota za igralca primerjana z in-game metrom (Details!, če obstaja)
-- [ ] A9 Polje `level` v naprednem bloku: level ali ilvl? (primerjaj s portalom)
-- [ ] A10 `COMBATANT_INFO` (oprema/talenti ob pullu) – format
-- [ ] A11 `SPELL_INTERRUPT`, `SPELL_DISPEL` – postavitev polj (zdaj po retail). ✅ `SPELL_ABSORBED`, `SPELL_AURA_BROKEN_SPELL`, `DAMAGE_SHIELD`, `SPELL_CAST_FAILED` potrjeni na pravem logu
+- [x] A9 ✅ to je **level lika** (13–15 v WC), ne ilvl. Polje `level` v naprednem bloku: level ali ilvl? (primerjaj s portalom)
+- [x] A10 ✅ ob vsakem ENCOUNTER_START za vsakega člana (5×), 150 polj: GUID, frakcija, statistike, talenti `[(id,node,rank)…]`, **oprema `[(itemId, ilvl, (enchant), (bonus), (gemi))…]`** – ilvl po predmetu ✅, aure. `COMBATANT_INFO` (oprema/talenti ob pullu) – format
+- [x] A11 ✅ oba se parsata (4 dispeli druida v runu; interrupti samo tujca zunaj). `SPELL_INTERRUPT`, `SPELL_DISPEL` – postavitev polj (zdaj po retail). ✅ `SPELL_ABSORBED`, `SPELL_AURA_BROKEN_SPELL`, `DAMAGE_SHIELD`, `SPELL_CAST_FAILED` potrjeni na pravem logu
 - [ ] A12 DPS/HPS iz `wowrun` ≈ in-game meter (±5 %)
 - [ ] A13 Smrt: `UNIT_DIED` za igralca + recap smiseln; Feign Death/Soulstone/rezi
 - [ ] A14 Ali se logiranje po prijavi izklopi? (`/reload` ✅ ostane v isti datoteki z novo glavo.) Nova datoteka sredi runa → tail preklopi (✅ testirano sintetično)
-- [ ] A15 Časovni žig: lokalni čas PC-ja (preveri UTC offset, poletni čas)
+- [x] A15 ✅ lokalni čas PC-ja, Companion (UTC+1) pravilno. Časovni žig: lokalni čas PC-ja (preveri UTC offset, poletni čas)
 - [ ] A17 **Party leader**: combat log ga ne vsebuje. Možnosti: `/chatlog` sistemska sporočila ("X is now the group leader") ali addon
   (`UnitIsGroupLeader`) → nato polje `leader` v shemi runa (schema 2). Portal zdaj kaže "Unknown".
 - [ ] A16 Scarlet Monastery / Dire Maul / Stratholme / BRD – več kril na enem instanceID: en run ali več?
@@ -477,7 +477,7 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
   `MM/DD HH:MM:SS.mmm` brez letnice; `You receive loot: Linen Clothx3` (brez pike) in `Ime Priimek receives loot: Wool Clothx2.` (s piko);
   **brez oklepajev in povezav** → kvaliteta in itemID nista znana. Ignorira `X creates …` (crafting) in `Your share of the loot is …`.
   v0.1.1 je imela napako (zahtevala `[...]`) → popravljeno v **v0.1.2**. Preverjanje: `cargo run -p wowlog --example chat_loot -- <WoWChatLog.txt>`.
-- [ ] B1b Loot v pravem dungeonu s partyjem: ujemanje "Ime Priimek" iz chata s člani partyja iz combat loga
+- [x] B1b ✅ 226 predmetov, vsi pripisani članom (tudi cirilsko ime). Kakovost/itemID šele iz addona po /reload. Loot v pravem dungeonu s partyjem: ujemanje "Ime Priimek" iz chata s člani partyja iz combat loga
 - [ ] B2 Brisanje logov ob izhodu na Windows (igra drži datoteko odprto → ostane) in Linux (ohrani aktivno datoteko)
 
 **C. Okolje / distribucija**
@@ -495,7 +495,7 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 - [ ] D1a Stran `/link` vizualno (prijavljen član, nečlan, potekla koda, My devices) – do zdaj preverjen le izris za neprijavljenega
 - [x] D1b `SITE_URL`: prod = `https://wowcompany.vercel.app` ✅; dev = `http://localhost:5173` (glej C8)
 - [ ] D1c Upload s slabim žetonom IN napačnim telesom vrne 400 (validator argumentov teče pred preverjanjem žetona) – razmisli o preverjanju žetona v HTTP plasti pred mutacijo
-- [ ] D2 Upload **pravega** runa (dev E2E je uporabil sintetičnega): velikost, validacija, združevanje dveh snemalcev z dveh PC-jev
+- [ ] D2 ✅ pravi run (30 KB JSON) naložen 15. 11. → **D2a gzip ni potreben**. Še odprto: dva snemalca z dveh PC-jev. Upload **pravega** runa (dev E2E je uporabil sintetičnega): velikost, validacija, združevanje dveh snemalcev z dveh PC-jev
 - [ ] D2a Ali je gzip potreben (pravi run > ~300 KB?) – strežnik ga zdaj ne podpira
 - [ ] D3 Poraba Convex po 1 tednu (klici, DB I/O, prostor) vs ocena v razdelku 10
 - [ ] D4 Vidnost (Website/Discord) za obiskovalca vs člana

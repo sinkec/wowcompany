@@ -103,7 +103,8 @@ impl Detector {
         }
 
         if self.resume_check
-            && let Some(uid) = RunAcc::observed_uid(rec)
+            && let Some(id) = self.run.as_ref().map(|r| r.zone.instance_id)
+            && let Some(uid) = RunAcc::observed_uid(rec, id)
         {
             self.resume_check = false;
             let reset = self
