@@ -78,6 +78,7 @@ local DEFAULTS = {
     moreKind = "interrupts", -- what the meter's 4th button shows (Meter.MORE)
     deferToDetails = false, -- /wowco details on: Details! does the meter, ours steps aside
     askSend = true, -- after a dungeon: ask whether to send the loot now (= reload) – /wowco ask on|off
+    chatTab = true, -- keep the "WowCompany" chat tab so loot/rolls reach the chat log – /wowco chat on|off
 }
 
 local function initDB()

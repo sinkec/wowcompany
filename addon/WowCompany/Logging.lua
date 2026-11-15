@@ -51,10 +51,92 @@ function Logging.InDungeon()
     return instanceType == "party" or instanceType == "raid"
 end
 
+-- ------------------------------------------------------------------ the "WowCompany" chat tab
+-- /chatlog writes only what some chat window shows. With "Item Loot" or "System Messages" switched
+-- off in every window (Chat settings → Other), the Companion gets no loot, no rolls and no leader
+-- (happened 15. 11. 2026). So the addon keeps a chat tab of its own that shows exactly what the
+-- Companion reads; the player's own chat stays as it is.
+local TAB = "WowCompany"
+local GROUPS = { "LOOT", "SYSTEM", "PARTY", "PARTY_LEADER", "RAID", "RAID_LEADER", "RAID_WARNING",
+    "INSTANCE_CHAT", "INSTANCE_CHAT_LEADER" }
+
+local function chatTab()
+    if type(GetChatWindowInfo) ~= "function" then return nil, nil end
+    for i = 1, (tonumber(NUM_CHAT_WINDOWS) or 10) do
+        local ok, name = pcall(GetChatWindowInfo, i)
+        if ok and name == TAB then return _G["ChatFrame" .. i], i end
+    end
+    return nil, nil
+end
+
+local function addGroup(frame, group)
+    if type(frame.AddMessageGroup) == "function" then return pcall(frame.AddMessageGroup, frame, group) end
+    if type(ChatFrame_AddMessageGroup) == "function" then return pcall(ChatFrame_AddMessageGroup, frame, group) end
+    return false
+end
+
+-- Makes sure the tab exists and shows what the logs need. Returns "created", "ok", "off",
+-- "combat" (try again later) or "unsupported" (the client has no such chat API).
+function Logging.EnsureChatTab()
+    if not ns.db or ns.db.settings.chatTab == false then return "off" end
+    if type(InCombatLockdown) == "function" and InCombatLockdown() then return "combat" end
+    local frame = chatTab()
+    local created = false
+    if not frame then
+        if type(FCF_OpenNewWindow) ~= "function" then return "unsupported" end
+        local ok, f = pcall(FCF_OpenNewWindow, TAB)
+        frame = (ok and type(f) == "table") and f or chatTab()
+        if not frame then return "unsupported" end
+        created = true
+        -- a new window starts with say/emote/…: ours shows only what the Companion reads
+        if type(ChatFrame_RemoveAllMessageGroups) == "function" then
+            pcall(ChatFrame_RemoveAllMessageGroups, frame)
+        elseif type(frame.RemoveAllMessageGroups) == "function" then
+            pcall(frame.RemoveAllMessageGroups, frame)
+        end
+    end
+    for i = 1, #GROUPS do addGroup(frame, GROUPS[i]) end
+    if created then
+        -- opening a window selects it: keep the player's main tab in front
+        if type(FCF_SelectDockFrame) == "function" and DEFAULT_CHAT_FRAME then
+            pcall(FCF_SelectDockFrame, DEFAULT_CHAT_FRAME)
+        end
+        ns.say("added a chat tab \"" .. TAB .. "\" so loot, rolls and the party leader reach the chat log "
+            .. "for the portal. Your own chat stays as it is. /wowco chat off removes it.")
+    end
+    return created and "created" or "ok"
+end
+
+function Logging.RemoveChatTab()
+    local frame = chatTab()
+    if frame and type(FCF_Close) == "function" then pcall(FCF_Close, frame) end
+end
+
+ns.command("chat", "chat on|off – the WowCompany chat tab that makes loot and rolls reach the chat log",
+    function(rest)
+        if rest == "off" then
+            ns.db.settings.chatTab = false
+            Logging.RemoveChatTab()
+            ns.say("chat tab removed. Loot reaches the chat log only if a chat window shows Item Loot.")
+            return
+        end
+        ns.db.settings.chatTab = true
+        local r = Logging.EnsureChatTab()
+        if r == "unsupported" then
+            ns.say("this client cannot add chat tabs. Turn on Item Loot and System Messages in a chat window "
+                .. "(Chat settings → Other) so loot reaches the log.")
+        elseif r == "combat" then
+            ns.say("after the fight, please.")
+        else
+            ns.say("chat tab \"" .. TAB .. "\" is ready.")
+        end
+    end)
+
 -- Switch both logs. `byUser` = typed by the player (then we never switch them off on our own).
 function Logging.Set(on, byUser)
     local state = ns.db.state
     if on then
+        Logging.EnsureChatTab()
         if Logging.CombatOn() == false and set(LoggingCombat, true) then state.weStartedCombat = not byUser end
         if Logging.ChatOn() == false and set(LoggingChat, true) then state.weStartedChat = not byUser end
     else

@@ -58,7 +58,9 @@ pub const DUNGEONS: &[Dungeon] = &[
     d!(
         2999,
         "Ruins of Lordaeron",
+        // verified on a real run 15. 11. 2026: 6 bosses, The Butcher was missing from the source
         [
+            (3355, "The Butcher"),
             (3353, "Witherfang"),
             (3357, "The Abandoned"),
             (3411, "Viktor the Vile"),

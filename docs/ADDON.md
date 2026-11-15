@@ -72,7 +72,14 @@ Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez nje
   *Send this run's loot (N items) to the portal now?* → **Send now** = `C_UI.Reload()` (igra shrani SavedVariables, Companion
   run dopolni v nekaj sekundah), **Later** = gre ob zaprtju igre (Companion brisanje logov počaka, da je run z dopolnitvijo na
   portalu), **Don't ask again** (`/wowco ask on|off`). Če se igra sesuje (brez shranjevanja), ostane run brez kakovosti lootu.
-- **Še odprto:** preizkus 0.5.0 v igri (posebej razčlenitev med bojem/po boju), `/wowco probe` v dungeonu.
+- ✅ **Zavihek chata "WowCompany" (addon 0.5.2, 15. 11. 2026):** `/chatlog` zapiše samo to, kar prikaže kakšno okno chata.
+  Uporabnik je v *Chat settings → Other* izklopil *Item Loot* in *System Messages* → v dungeonu Ruins of Lordaeron ni bilo
+  lootu, rollov ne vodje v `WoWChatLog.txt` (combat log je bil v redu). Addon ob vklopu logiranja ustvari svoj zavihek
+  (`FCF_OpenNewWindow`) s skupinami LOOT, SYSTEM, PARTY(_LEADER), RAID(_LEADER/WARNING), INSTANCE_CHAT(_LEADER); glavni zavihek
+  ostane izbran. `/wowco chat on|off`. Filtri *Combat Log Config* vplivajo samo na prikaz, ne na datoteko combat loga.
+  **Še ne preverjeno v igri**, ali Forever (Midnight) pozna `FCF_OpenNewWindow` – če ne, addon to pove in svetuje ročno nastavitev.
+- Ruins of Lordaeron (2999) ima 6 bossov – dodan The Butcher (3355), preverjeno na pravem logu.
+- **Še odprto:** preizkus 0.5.x v igri (posebej razčlenitev med bojem/po boju), `/wowco probe` v dungeonu.
 - Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`;
   v izvozu je edino tuje ime vodja LASTNEGA partyja).
 

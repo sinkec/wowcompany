@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.5.1" end,
+    GetAddOnMetadata = function() return "0.5.2" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -135,6 +135,31 @@ StaticPopupDialogs = {}
 local popups, reloads = {}, 0
 function StaticPopup_Show(name, arg) table.insert(popups, { name = name, arg = arg }) end
 C_UI = { Reload = function() reloads = reloads + 1 end }
+-- chat windows (for the WowCompany chat tab)
+NUM_CHAT_WINDOWS = 10
+local chatWindows = { [1] = "General", [2] = "Combat Log" }
+local chatSelected
+DEFAULT_CHAT_FRAME = { groups = {} }
+ChatFrame1 = DEFAULT_CHAT_FRAME
+function GetChatWindowInfo(i) return chatWindows[i] or "" end
+function FCF_OpenNewWindow(name)
+    local i = 3
+    while chatWindows[i] do i = i + 1 end
+    local f = { groups = { SAY = true, EMOTE = true } }
+    function f:AddMessageGroup(g) self.groups[g] = true end
+    chatWindows[i] = name
+    _G["ChatFrame" .. i] = f
+    chatSelected = f
+    return f
+end
+function ChatFrame_RemoveAllMessageGroups(f) f.groups = {} end
+function FCF_SelectDockFrame(f) chatSelected = f end
+function FCF_Close(f)
+    for i = 3, NUM_CHAT_WINDOWS do
+        if _G["ChatFrame" .. i] == f then chatWindows[i], _G["ChatFrame" .. i] = nil, nil end
+    end
+end
+function InCombatLockdown() return false end
 function SendChatMessage(msg, channel) table.insert(sent, { msg = msg, channel = channel }) end
 C_CVar = {
     GetCVar = function() return game.advanced end,
@@ -394,7 +419,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.5%.1|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.5%.2|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -680,6 +705,30 @@ runTimers()
 check(#popups == 0, "don't ask again: no popup after the next dungeon")
 slash("ask on")
 check(WowCompanyDB.settings.askSend == true, "/wowco ask on brings it back")
+
+-- ------------------------------------------------------------------ the WowCompany chat tab
+local function tabs()
+    local n, frame = 0, nil
+    for i = 1, NUM_CHAT_WINDOWS do
+        if chatWindows[i] == "WowCompany" then n, frame = n + 1, _G["ChatFrame" .. i] end
+    end
+    return n, frame
+end
+slash("log on")
+local nTabs, tabFrame = tabs()
+check(nTabs == 1 and tabFrame.groups.LOOT and tabFrame.groups.SYSTEM and tabFrame.groups.PARTY_LEADER
+    and not tabFrame.groups.SAY, "chat tab: shows loot, system, party leader – not say/emote")
+check(chatSelected == DEFAULT_CHAT_FRAME, "chat tab: the player's main tab stays in front")
+slash("log off")
+slash("log on")
+check(tabs() == 1, "chat tab: made once, not again on every log on")
+slash("chat off")
+check(tabs() == 0 and WowCompanyDB.settings.chatTab == false, "/wowco chat off removes it")
+slash("log on")
+check(tabs() == 0, "chat tab: stays away after chat off")
+slash("chat on")
+check(tabs() == 1, "/wowco chat on brings it back")
+slash("log off")
 
 realPrint(failures == 0 and "all addon checks passed" or (failures .. " addon check(s) FAILED"))
 os.exit(failures == 0 and 0 or 1)
