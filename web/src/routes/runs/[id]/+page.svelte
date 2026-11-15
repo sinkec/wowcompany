@@ -568,6 +568,28 @@
 													</table>
 												{/if}
 											{/each}
+											{#if bossQ.data?.some((x) => x.timeline)}
+												{@const bt = bossQ.data.filter((x) => x.timeline)}
+												<div>
+													<div class="mb-1 font-semibold text-muted-foreground">
+														The fight, {(bt[0].timeline?.bucketMs ?? 2000) / 1000} s at a time
+													</div>
+													<RunTimeline
+														timeline={{
+															bucketMs: bt[0].timeline?.bucketMs ?? 2000,
+															players: bt.map((x) => ({
+																slug: x.slug,
+																damage: x.timeline?.damage ?? [],
+																healing: x.timeline?.healing ?? [],
+																taken: x.timeline?.taken ?? []
+															}))
+														}}
+														segments={[]}
+														{names}
+														{classes}
+													/>
+												</div>
+											{/if}
 											{#if gearOf(p.slug).length}
 												<div>
 													<div class="mb-1 font-semibold text-muted-foreground">

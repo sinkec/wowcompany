@@ -34,6 +34,12 @@ export const castStat = v.object({
 export const targetStat = v.object({ name: v.string(), amount: v.number() });
 export const gearItem = v.object({ itemId: v.number(), ilvl: v.number() });
 export const auraStat = v.object({ id: v.number(), name: v.string(), uptimeMs: v.number() });
+export const bossTimeline = v.object({
+	bucketMs: v.number(),
+	damage: v.array(v.number()),
+	healing: v.array(v.number()),
+	taken: v.array(v.number())
+});
 
 export const recordKind = v.union(
 	v.literal('crit'),
@@ -107,6 +113,7 @@ export const segment = v.object({
 			targets: v.optional(v.array(targetStat)),
 			buffs: v.optional(v.array(auraStat)),
 			debuffs: v.optional(v.array(auraStat)),
+			timeline: v.optional(bossTimeline),
 			/** razčlenitev je v runBossDetails (strežnik jo prestavi tja ob uploadu) */
 			hasDetail: v.optional(v.boolean())
 		})
@@ -121,7 +128,8 @@ export const bossDetailPlayer = v.object({
 	casts: v.optional(v.array(castStat)),
 	targets: v.optional(v.array(targetStat)),
 	buffs: v.optional(v.array(auraStat)),
-	debuffs: v.optional(v.array(auraStat))
+	debuffs: v.optional(v.array(auraStat)),
+	timeline: v.optional(bossTimeline)
 });
 export type BossDetailPlayer = Infer<typeof bossDetailPlayer>;
 

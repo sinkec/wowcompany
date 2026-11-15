@@ -129,7 +129,12 @@ struct SegPlayerAcc {
     targets: HashMap<String, i64>,
     /// (spell id, debuff on enemies) → (name, uptime ms)
     uptime: HashMap<(u32, bool), (String, i64)>,
+    /// damage / healing / taken per `BOSS_BUCKET_MS` from the segment start
+    tl: [Vec<i64>; 3],
 }
+
+/// Resolution of a boss fight's timeline (the run timeline has 10 s buckets – too coarse for a 30 s boss).
+pub const BOSS_BUCKET_MS: i64 = 2_000;
 
 /// An aura being tracked for uptime: who holds the credit, on which units it is up right now.
 #[derive(Debug, Clone, Default)]
@@ -495,11 +500,18 @@ impl RunAcc {
             .map(|seg| seg.per.entry(guid.to_string()).or_default())
     }
 
-    fn seg_add(&mut self, guid: &str, dmg: i64, heal: i64, taken: i64) {
+    fn seg_add(&mut self, guid: &str, ts: i64, dmg: i64, heal: i64, taken: i64) {
+        let start = self.current_seg.as_ref().map_or(ts, |s| s.start);
+        let b = ((ts - start).max(0) / BOSS_BUCKET_MS) as usize;
         if let Some(e) = self.seg_player(guid) {
             e.damage += dmg;
             e.healing += heal;
             e.taken += taken;
+            for (i, v) in [dmg, heal, taken].into_iter().enumerate() {
+                if v != 0 {
+                    add_at(&mut e.tl[i], b, v);
+                }
+            }
         }
     }
 
@@ -721,7 +733,7 @@ impl RunAcc {
                         .or_insert_with(|| SpellAcc::named(&name))
                         .add(damage.amount, damage.critical);
                     add_at(&mut p.tl_damage, b, damage.amount);
-                    self.seg_add(&guid, damage.amount, 0, 0);
+                    self.seg_add(&guid, ts, damage.amount, 0, 0);
                     if let Some(sp) = self.seg_player(&guid) {
                         sp.dmg_spells
                             .entry((id, pet))
@@ -769,7 +781,7 @@ impl RunAcc {
                             max_hp,
                         },
                     );
-                    self.seg_add(&guid, 0, 0, damage.amount);
+                    self.seg_add(&guid, ts, 0, 0, damage.amount);
                 }
             }
             Kind::Missed { .. } => {
@@ -808,7 +820,7 @@ impl RunAcc {
                     s.add(effective, heal.critical);
                     s.overheal += heal.overheal;
                     add_at(&mut p.tl_healing, b, effective);
-                    self.seg_add(&guid, 0, effective, 0);
+                    self.seg_add(&guid, ts, 0, effective, 0);
                     if let Some(sp) = self.seg_player(&guid) {
                         let s = sp
                             .heal_spells
@@ -1040,6 +1052,22 @@ impl RunAcc {
                             targets: if boss { top_targets(&sp.targets, 8) } else { vec![] },
                             buffs: if boss { top_auras(&sp.uptime, false, 12) } else { vec![] },
                             debuffs: if boss { top_auras(&sp.uptime, true, 12) } else { vec![] },
+                            timeline: boss.then(|| {
+                                // every series as long as the fight
+                                let n = (((s.end - s.start).max(1) + BOSS_BUCKET_MS - 1) / BOSS_BUCKET_MS) as usize;
+                                let fit = |v: &Vec<i64>| {
+                                    let mut v = v.clone();
+                                    v.resize(n, 0);
+                                    v.truncate(n);
+                                    v
+                                };
+                                BossTimeline {
+                                    bucket_ms: BOSS_BUCKET_MS,
+                                    damage: fit(&sp.tl[0]),
+                                    healing: fit(&sp.tl[1]),
+                                    taken: fit(&sp.tl[2]),
+                                }
+                            }),
                         })
                     })
                     .collect(),

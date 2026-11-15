@@ -283,7 +283,15 @@ export function addRecorder<T extends { deviceId: string }>(
 	return { list: [...list, rec], added: true };
 }
 
-const DETAIL_KEYS = ['spells', 'heals', 'casts', 'targets', 'buffs', 'debuffs'] as const;
+const DETAIL_KEYS = [
+	'spells',
+	'heals',
+	'casts',
+	'targets',
+	'buffs',
+	'debuffs',
+	'timeline'
+] as const;
 
 /**
  * Razčlenitev boss bojev iz segmentov v ločene dokumente: segmenti ostanejo s seštevki in oznako
@@ -294,12 +302,18 @@ export function splitBossDetails(segments: RunSummary['segments']) {
 	const slim = segments.map((seg, index) => {
 		const players: BossDetailPlayer[] = [];
 		const slimPlayers = seg.players.map((p) => {
-			const has = DETAIL_KEYS.some((k) => (p[k]?.length ?? 0) > 0);
+			const has = DETAIL_KEYS.some((k) =>
+				k === 'timeline' ? !!p.timeline : ((p[k] as unknown[] | undefined)?.length ?? 0) > 0
+			);
 			const rest = { ...p };
 			for (const k of DETAIL_KEYS) delete rest[k];
 			if (!has) return rest;
 			const d: BossDetailPlayer = { slug: p.slug };
-			for (const k of DETAIL_KEYS) if (p[k]?.length) (d as Record<string, unknown>)[k] = p[k];
+			for (const k of DETAIL_KEYS) {
+				const val = p[k];
+				if (k === 'timeline' ? !!val : ((val as unknown[] | undefined)?.length ?? 0) > 0)
+					(d as Record<string, unknown>)[k] = val;
+			}
 			players.push(d);
 			return { ...rest, hasDetail: true };
 		});

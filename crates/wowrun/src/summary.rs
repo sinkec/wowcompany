@@ -308,6 +308,18 @@ pub struct SegmentPlayer {
     pub buffs: Vec<AuraStat>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub debuffs: Vec<AuraStat>,
+    /// Boss fights only: the fight in `bucket_ms` steps (for a per-boss graph).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeline: Option<BossTimeline>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BossTimeline {
+    pub bucket_ms: i64,
+    pub damage: Vec<i64>,
+    pub healing: Vec<i64>,
+    pub taken: Vec<i64>,
 }
 
 /// How long an aura was up during a fight (for debuffs: on at least one enemy).
@@ -419,6 +431,7 @@ impl RunSummary {
                 sp.targets.truncate(5);
                 sp.buffs.truncate(5);
                 sp.debuffs.truncate(5);
+                sp.timeline = None;
             }
         }
         if self.json_len() > max_bytes {
