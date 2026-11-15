@@ -18,11 +18,10 @@
   `/wowco details on|off`, `/wowco ask on|off`). Uporabnik je potrdil, da deluje (15. 11.).
 - Predmeti: imena/kakovost iz Blizzard **retail/classic** namespacea (Forever `item/{id}` = 404) – loot ima kakovost brez addona.
 
-**Čaka na uporabnika (zaščita mi ne dovoli):**
-- `git tag companion-v0.1.9 && git push origin companion-v0.1.9` – izdaja z addonom **0.5.2** (ob prijavi ni več povzetka
-  za star run; lasten zavihek chata, da loot/rolli/vodja vedno pridejo v chat log). Commit `78ebbb3` je na `main`.
-- V igri preveriti: po `/reload` se pojavi zavihek chata **WowCompany** (če ne: `/wowco chat on` in poročati, kaj izpiše).
-- Da lahko izdaje in `convex run --prod` poganja Claude: dovoljenja v `.claude/settings.json` (glej pogovor 15. 11.).
+**Izdaje:** Companion **0.1.10** (addon 0.5.2 z zavihkom chata "WowCompany"). 0.1.9 (addon 0.5.1) je bila izdana pred zavihkom.
+- V igri preveriti: po `/reload` in vklopu logiranja se pojavi zavihek chata **WowCompany** (če ne: `/wowco chat on` in poročati,
+  kaj izpiše).
+- Da lahko izdaje in `convex run --prod` poganja Claude brez potrditve: dovoljenja v `.claude/settings.json`.
 
 **Naslednji koraki (predlog):**
 1. Ko uporabnik odigra dungeon z novo verzijo: preveri run na portalu (rolli, ▸ razčlenitev, parsi), Discord objavo,
