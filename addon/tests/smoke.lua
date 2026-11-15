@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.5.0" end,
+    GetAddOnMetadata = function() return "0.5.1" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -394,7 +394,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.5%.0|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.5%.1|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -663,13 +663,21 @@ slash("report")
 check(#sent >= 2 and sent[1].channel == "PARTY" and string.find(sent[1].msg, "Wailing Caverns", 1, true),
     "report: the summary goes to /party only")
 game.grouped = false
+-- a run left long ago (old addon, then logout / game restart) is not announced at login
+for k in pairs(popups) do popups[k] = nil end
+local beforeLogin = #printed
+WowCompanyDB.state.run = { zone = "Wailing Caverns", startedAt = now - 7200, leftAt = now - 3600, afterFight = 0 }
+fire("PLAYER_ENTERING_WORLD")
+runTimers()
+check(#popups == 0 and #printed == beforeLogin and WowCompanyDB.state.run.summarized == true,
+    "login: an old run gets no summary and no send question")
 -- "don't ask again"
 dlg.OnAlt()
 check(WowCompanyDB.settings.askSend == false, "don't ask again: switches it off")
 WowCompanyDB.state.run = { zone = "Deadmines", startedAt = now - 100, leftAt = now, afterFight = 0 }
 fire("ZONE_CHANGED_NEW_AREA")
 runTimers()
-check(#popups == 1, "don't ask again: no popup after the next dungeon")
+check(#popups == 0, "don't ask again: no popup after the next dungeon")
 slash("ask on")
 check(WowCompanyDB.settings.askSend == true, "/wowco ask on brings it back")
 

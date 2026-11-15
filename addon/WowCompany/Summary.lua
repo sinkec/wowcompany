@@ -127,10 +127,15 @@ local function runFights(run)
 end
 
 -- Called after the meter noticed we left (Meter.lua sets run.leftAt).
+-- A run left long ago (before a logout or a game restart) is old news: no summary, no question –
+-- the game already saved the notes on logout, so the Companion has them anyway.
+local STALE = 15 * 60
+
 local function afterLeaving()
     local run = ns.db and ns.db.state.run
     if not run or not run.leftAt or run.summarized then return end
     run.summarized = true
+    if ns.now() - run.leftAt > STALE then return end
     local fights = runFights(run)
     if #fights > 0 then
         local lines = Summary.Lines(run, fights, ns.now())
