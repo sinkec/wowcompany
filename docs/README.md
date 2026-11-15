@@ -7,7 +7,35 @@
 | [ADDON.md](ADDON.md) | addon `WowCompany`: §1 stanje, §4.1 dejstva o Forever API-ju |
 | [STATS.md](STATS.md) | v0.3: statistika po vzoru Warcraft Logs + Details!, Company Parses, sezone, preureditev repozitorija |
 
-**ZAČNI TUKAJ:** [STATS.md](STATS.md) §9 (faze) → [ADDON.md](ADDON.md) §1 → [COMPANION.md](COMPANION.md) §14.
+## ZAČNI TUKAJ – stanje 15. 11. 2026 zvečer
+
+**V produkciji in pri uporabniku:**
+- Portal (`main` = `531c8ed`): dungeon runi z rolli, razčlenitvijo po bossih (klik ▸ na igralca: graf boja 2 s, uroki,
+  buffi/debuffi, oprema), Company Parses (lik → **Logs**, primerjava z najboljšim), **/rankings** (top 10, All-Stars,
+  Speed demons), sezone (Office → Settings), Discord objave runov + `/parses` (Office → Visibility → Discord → *Dungeon runs*).
+- Companion **v0.1.8** izdan in nameščen pri uporabniku (`~/Applications/WowCompany-Companion.AppImage`, stara 0.1.6 kot `.bak`).
+- Addon **0.5.1** v mapi igre (meter *More*, klik na vrstico = uroki, povzetek runa + vprašanje *Send now / Later*, `/wowco report`,
+  `/wowco details on|off`, `/wowco ask on|off`). Uporabnik je potrdil, da deluje (15. 11.).
+- Predmeti: imena/kakovost iz Blizzard **retail/classic** namespacea (Forever `item/{id}` = 404) – loot ima kakovost brez addona.
+
+**Čaka na uporabnika (zaščita mi ne dovoli):**
+- `git tag companion-v0.1.9 && git push origin companion-v0.1.9` – izdaja z addonom 0.5.1 (popravek: ob prijavi ni več
+  povzetka/vprašanja za star run). Commit `531c8ed` je že na `main`.
+- Da lahko izdaje in `convex run --prod` poganja Claude: dovoljenja v `.claude/settings.json` (glej pogovor 15. 11.).
+
+**Naslednji koraki (predlog):**
+1. Ko uporabnik odigra dungeon z novo verzijo: preveri run na portalu (rolli, ▸ razčlenitev, parsi), Discord objavo,
+   `/wowco probe` v dungeonu (oblika `combatSpells` med bojem – razčlenitev v igri je preverjena samo s smoke testom).
+2. Prijatelji (Chugga Zugga, Zadn Cajt …) naj posodobijo Companion – njihovi stari runi nimajo razčlenitve.
+3. Odprto iz načrta: **replay** (zemljevid pozicij/smrti iz X/Y v logu, C9), **poročilo runa v Companionu** (C5),
+   po potrebi loot/rolli/časovnica iz `runDetails` v ločene dokumente (PLAN.md §8a, samo če DB I/O raste).
+
+**Kje je kaj:** [STATS.md](STATS.md) §9.1 (kaj je narejeno), [ADDON.md](ADDON.md) §1 (addon), [COMPANION.md](COMPANION.md)
+§14/§14a (preverjanja, omejitve, brisanje logov), [PLAN.md](PLAN.md) §0 (ukazi) in §8a (DB I/O).
+
+**Uporabne orodja:** `wowrun <log> --chat <WoWChatLog.txt>` (analiza loga), `web/scripts/companion-upload.ts <run.json>`
+(nalaganje na dev), `bun run check:all`. Vzorci logov v `wowlog/` (gitignore). Aplikacijo ustavi po PID-u procesa
+`wowcompany-companion` (ne `pkill -f`, ujame lastno lupino).
 
 ## Struktura repozitorija
 

@@ -8,6 +8,8 @@ Vse mora delovati znotraj **brezplačnih paketov**.
 
 ## 0. Stanje projekta (14. 11. 2026) – kje nadaljujemo
 
+> **Novejše stanje (15. 11. 2026): [docs/README.md](README.md) → »ZAČNI TUKAJ«.** Spodnja tabela opisuje portal do 14. 11.
+
 **V produkciji in deluje:** https://wowcompany.vercel.app · GitHub `sinkec/wowcompany` (**javen** od 13. 11. 2026) · Convex projekt `wowcompany` (dev + prod).
 
 | Področje | Stanje |

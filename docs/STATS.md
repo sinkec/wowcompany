@@ -360,6 +360,12 @@ Izdaje: S0 brez izdaje · S2+S3 → **Companion v0.2.0** (z addonom 0.5) · S4+S
 - ⏳ Naprej: S2 addon 0.5 v igri, izdaja Companion v0.1.7 (shema 4 + rolli + omejitve). Na prod enkrat:
   `bunx convex run --prod seasons:checkPatch` in `bunx convex run --prod companion:backfillParses '{}'` (iz `web/`).
 
+- ✅ **DB I/O** (PLAN.md §8a): `parsePools`, `clears`, `runBossDetails`, Logs samo ob odprtju, oprema ob kliku.
+- ✅ **C8** graf boja po bossu (2 s), **C7/W8** primerjava z najboljšim v Logs, **C11** *Keep logs for N days*.
+- ✅ Predmeti iz retail/classic namespacea (`companion.enrichItems`), združevanje istega runa z drugim ključem (`cb4fe24`).
+- ✅ Izdaje: Companion 0.1.7, **0.1.8** (nameščena pri uporabniku); 0.1.9 commitana, oznako pushne uporabnik.
+- ⏳ Ostane: **C9 replay**, **C5 poročilo v Companionu**, preverjanje razčlenitve v igri (`/wowco probe`).
+
 ## 10. Odločitve za uporabnika
 
 1. ~~Struktura repozitorija~~ → izvedeno (S0, §8.3), Vercel ostane na korenu prek `vercel.json`.
