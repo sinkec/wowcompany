@@ -438,6 +438,16 @@
 							encounters. Trash is still murder, technically.
 						</div>
 					{/if}
+					{#if bossSegs.length && !bossSegs.some( (s) => s.players.some((p) => p.hasDetail || p.spells?.length) )}
+						<p class="text-xs text-muted-foreground">
+							No per-player breakdown (spells, buffs, gear, fight graph) for this run – it was
+							recorded by a Companion older than 0.1.8. Update the app and the next run has it.
+						</p>
+					{:else if bossSegs.length}
+						<p class="text-xs text-muted-foreground">
+							Click a name with ▸ for spells, buffs, gear and the fight graph.
+						</p>
+					{/if}
 					{#each bossSegs as s, i (i)}
 						{@const segDur = Math.max(1, (s.endMs - s.startMs) / 1000)}
 						{@const sp = [...s.players].sort((a, b) => b.damage - a.damage)}
