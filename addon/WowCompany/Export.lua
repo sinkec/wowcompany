@@ -137,15 +137,13 @@ local function sync()
             table.insert(list, last)
             while #list > MAX_RUNS do table.remove(list, 1) end
         end
-        local wasInside = last.endedAt == nil
         last.endedAt = run.leftAt
         if not run.leftAt then
             local leader = Export.Leader()
             if leader then last.leader = leader end
-        elseif wasInside then
-            ns.say("out of the dungeon. |cffffffff/reload|r when you have a moment hands the run's "
-                .. "extras (party leader) to the Companion.")
         end
+        -- no /reload needed: the Companion reads the leader from the chat log, and the game saves
+        -- these notes (loot colours) on logout and exit anyway
     end
     Export.Rebuild()
 end

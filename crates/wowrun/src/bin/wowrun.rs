@@ -47,6 +47,7 @@ fn main() -> ExitCode {
     enum Chat {
         Loot(wowlog::Loot),
         Roll(wowlog::Roll),
+        Group(wowlog::GroupLine),
     }
     let mut chat_lines: Vec<(i64, Chat)> = Vec::new();
     if let Some(c) = &chat {
@@ -58,6 +59,8 @@ fn main() -> ExitCode {
                         chat_lines.push((l.timestamp, Chat::Loot(l)));
                     } else if let Some(r) = wowlog::parse_roll_line(line, year) {
                         chat_lines.push((r.timestamp, Chat::Roll(r)));
+                    } else if let Some(g) = wowlog::parse_group_line(line, year) {
+                        chat_lines.push((g.timestamp, Chat::Group(g)));
                     }
                 }
             }
@@ -79,6 +82,7 @@ fn main() -> ExitCode {
                     match c {
                         Chat::Loot(l) => det.push_loot(&l),
                         Chat::Roll(r) => det.push_roll(&r),
+                        Chat::Group(g) => det.push_group(&g),
                     }
                 }
                 runs.extend(det.push(&rec));

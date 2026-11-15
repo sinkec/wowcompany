@@ -547,11 +547,11 @@ local function buildRecords(parent)
     main.recordsEmpty:SetPoint("CENTER", 0, 10)
     main.recordsEmpty:SetWidth(WIDTH - 4 * PAD)
     if main.recordsEmpty.SetWordWrap then main.recordsEmpty:SetWordWrap(true) end
-    main.recordsEmpty:SetText("No records here yet.\n\nKeep the Companion app running with the combat log on, "
-        .. "make something bleed, then type /reload.")
+    main.recordsEmpty:SetText("No records here yet.\n\nKeep the Companion app running with the combat log on "
+        .. "and make something bleed. New records show up at your next login.")
     main.recordsHint = text(parent, "GameFontHighlightSmall", "LEFT", C.faint)
     main.recordsHint:SetPoint("BOTTOMLEFT", 0, 0)
-    main.recordsHint:SetText("From the Companion app · refreshed on /reload")
+    main.recordsHint:SetText("From the Companion app · new ones at the next login")
 end
 
 local function refreshRecords()

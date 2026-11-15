@@ -228,6 +228,8 @@ pub struct RunAcc {
     wipes: u32,
     loot: Vec<LootDrop>,
     rolls: Vec<LootRoll>,
+    /// Leader from the chat log (see `Detector::push_group`): `Some(None)` = the log writer.
+    pub chat_leader: Option<Option<String>>,
 }
 
 /// Max rolls kept per run (a 1 h dungeon had 35).
@@ -262,6 +264,7 @@ impl RunAcc {
             wipes: 0,
             loot: Vec::new(),
             rolls: Vec::new(),
+            chat_leader: None,
         }
     }
 
@@ -1037,7 +1040,12 @@ impl RunAcc {
             // loot after the last kill (boss corpse) belongs to the run too
             loot: self.loot.clone(),
             rolls: self.rolls.clone(),
-            leader: None,
+            // only a party member of this run, by their display name (like the addon sends it)
+            leader: self
+                .chat_leader
+                .as_ref()
+                .and_then(|who| self.chat_player(who.as_ref()))
+                .map(|p| p.name.clone()),
         };
         summary.link_rolls_to_loot();
         summary

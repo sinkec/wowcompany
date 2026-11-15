@@ -400,7 +400,8 @@ fire("PARTY_LEADER_CHANGED")
 check(string.find(exported("^v1|RUN|"), "|Grobos Stinkfoot$") ~= nil, "export: leader change is picked up")
 game.instanceType = "none"
 fire("ZONE_CHANGED_NEW_AREA")
-check(string.find(exported("^v1|RUN|"), "|0|Somewhere|") == nil and said("/reload"), "export: leaving closes the run and asks for /reload")
+check(string.find(exported("^v1|RUN|"), "|0|Somewhere|") == nil and not said("/reload"),
+    "export: leaving closes the run, no /reload nagging (leader comes from the chat log)")
 game.grouped, game.instanceType = false, "party"
 WowCompanyDB.state.run = nil
 WowCompanyDB.runs = {}

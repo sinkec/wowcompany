@@ -160,8 +160,10 @@
 						shiny the loot was.
 					</li>
 					<li>
-						After a dungeon type <code class="text-primary">/reload</code> once — that is the only moment
-						the game lets an addon hand its notes to the app.
+						Nothing to do after a dungeon. The party leader comes from the chat log right away; the
+						loot colours follow when you log out or quit (the game saves the addon's notes then).
+						Type
+						<code class="text-primary">/reload</code> only if you can't wait.
 					</li>
 					<li>
 						Want your biggest crit counted <b class="text-foreground">everywhere</b>, not just in

@@ -62,6 +62,12 @@ Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez nje
   oblika povzeta po Details! kodi, na Forever še nepreverjena), klik znova = nazaj; `Summary.lua`: ob izhodu iz dungeona
   povzetek runa v chat (čas, bossi, MVP, Medic, Kicks, Floor inspector – seštevek vseh bojev runa, samo party),
   `/wowco report` ga pošlje v /party; `/wowco details on|off` – ob naloženem Details! se naš meter umakne (enkraten namig).
+- ✅ **Brez `/reload` (15. 11. 2026):** vodjo partyja Companion bere iz **chat loga** (`wowlog::parse_group_line`:
+  `X has invited you to join a group.`, `X/You is/are now the group leader.`, `[Party Leader] X:` – samo ime, nikoli besedilo;
+  `You leave the group.`), na pravem WC logu = Lil Nossral (enako kot addon). Kakovost/ID lootu iz addona pride, ko igra
+  sama shrani SavedVariables (odjava, izhod; `PLAYER_LOGOUT` → izvoz) – Companion run dopolni in ponovno naloži (48 h nazaj),
+  brisanje logov počaka na to. Addon ne prosi več za `/reload`. Smer Companion → addon (rekordi v igri) se osveži ob
+  naslednji prijavi (igra bere `CompanionData.lua` samo ob nalaganju – drugače ne gre).
 - **Še odprto:** preizkus 0.5.0 v igri (posebej razčlenitev med bojem/po boju), `/wowco probe` v dungeonu.
 - Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`;
   v izvozu je edino tuje ime vodja LASTNEGA partyja).

@@ -55,8 +55,8 @@
 			detail: !status.addon.installed
 				? 'The addon turns logging on by itself, shows a meter in game and tells us who led the party.'
 				: status.addon.dataAt
-					? `Last data from the addon ${ago(status.addon.dataAt)} · ${status.addon.runs} run${status.addon.runs === 1 ? '' : 's'} · ${status.addon.leadersAdded} leader${status.addon.leadersAdded === 1 ? '' : 's'} added. It arrives on /reload or logout.`
-					: 'No data from it yet – type /reload in game once.'
+					? `Last data from the addon ${ago(status.addon.dataAt)} · ${status.addon.runs} run${status.addon.runs === 1 ? '' : 's'} · ${status.addon.leadersAdded} leader${status.addon.leadersAdded === 1 ? '' : 's'} added. It arrives when you log out or quit (or /reload if you can't wait).`
+					: 'No data from it yet – it arrives when you log out or quit the game.'
 		}
 	]);
 	// namestitev / posodobitev addona, ki je priložen aplikaciji

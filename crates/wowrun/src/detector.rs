@@ -24,6 +24,9 @@ pub struct Detector {
     /// After re-entering the same dungeon: compare the next creature's instance uid.
     resume_check: bool,
     discarded: u32,
+    /// Group leader from the chat log, kept between runs (the invite comes before the dungeon):
+    /// `None` = unknown, `Some(None)` = the log writer, `Some(Some(name))` = a chat name.
+    leader: Option<Option<String>>,
 }
 
 impl Detector {
@@ -35,6 +38,7 @@ impl Detector {
             left_at: None,
             resume_check: false,
             discarded: 0,
+            leader: None,
         }
     }
 
@@ -114,7 +118,7 @@ impl Detector {
             if reset {
                 let zone = self.run.as_ref().map(|r| r.zone.clone()).expect("run exists");
                 self.finish_run(EndReason::InstanceReset, &mut out);
-                self.run = Some(RunAcc::new(zone, ts));
+                self.run = Some(self.new_run(zone, ts));
             }
         }
 
@@ -131,6 +135,28 @@ impl Detector {
         }
         if let Some(run) = self.run.as_mut() {
             run.push_loot(loot);
+        }
+    }
+
+    fn new_run(&self, zone: ZoneInfo, now: i64) -> RunAcc {
+        let mut run = RunAcc::new(zone, now);
+        run.chat_leader = self.leader.clone();
+        run
+    }
+
+    /// A chat line about the group leader (also outside dungeons: the invite comes first).
+    pub fn push_group(&mut self, g: &wowlog::GroupLine) {
+        use wowlog::GroupEvent;
+        self.leader = match &g.event {
+            GroupEvent::Leader(who) => Some(who.clone()),
+            GroupEvent::Invited(who) | GroupEvent::LeaderSpoke(who) => Some(Some(who.clone())),
+            GroupEvent::Left => None,
+        };
+        if let Some(run) = self.run.as_mut() {
+            // leaving the group mid-run does not erase who led it
+            if self.leader.is_some() {
+                run.chat_leader = self.leader.clone();
+            }
         }
     }
 
@@ -155,7 +181,7 @@ impl Detector {
             if now - run.last_activity > self.cfg.inactivity_ms {
                 let zone = run.zone.clone();
                 self.finish_run(EndReason::Inactivity, &mut out);
-                self.run = Some(RunAcc::new(zone, now));
+                self.run = Some(self.new_run(zone, now));
             }
         } else if self.left_at.is_some_and(|l| now - l > self.cfg.rejoin_grace_ms) {
             self.finish_run(EndReason::LeftInstance, &mut out);
@@ -182,7 +208,7 @@ impl Detector {
         let zone = self.run.as_ref().map(|r| (r.zone.clone(), r.last_event));
         self.finish_run(EndReason::Manual, &mut out);
         if let (true, Some((zone, now))) = (self.inside, zone) {
-            self.run = Some(RunAcc::new(zone, now));
+            self.run = Some(self.new_run(zone, now));
         }
         out
     }
@@ -206,7 +232,7 @@ impl Detector {
             difficulty_id,
             boss_count: d.boss_count,
         };
-        self.run = Some(RunAcc::new(zone, ts));
+        self.run = Some(self.new_run(zone, ts));
         self.inside = true;
         self.left_at = None;
         self.resume_check = false;

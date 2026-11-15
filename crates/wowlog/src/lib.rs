@@ -20,7 +20,9 @@ pub mod reader;
 pub mod time;
 pub mod unit;
 
-pub use chat::{Loot, Roll, RollChoice, RollEvent, parse_loot_line, parse_roll_line};
+pub use chat::{
+    GroupEvent, GroupLine, Loot, Roll, RollChoice, RollEvent, parse_group_line, parse_loot_line, parse_roll_line,
+};
 pub use event::{
     AuraChange, AuraType, CastPhase, Damage, DamageSource, DeathKind, Heal, Kind, Miss, ParseError, Record, parse_line,
 };

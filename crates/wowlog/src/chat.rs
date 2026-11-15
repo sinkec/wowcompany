@@ -239,6 +239,57 @@ pub fn parse_roll_line(line: &str, default_year: i64) -> Option<Roll> {
     })
 }
 
+/// Who leads the group, from system messages and party chat (the combat log does not say).
+#[derive(Debug, Clone, PartialEq)]
+pub enum GroupEvent {
+    /// `X is now the group leader.`; `None` = "You are now the group leader."
+    Leader(Option<String>),
+    /// `X has invited you to join a group.` (only the leader can invite).
+    Invited(String),
+    /// `[Party Leader] X: …` in party chat – only the name is kept, never the text.
+    LeaderSpoke(String),
+    /// `You leave the group.` / `Your group has been disbanded.`
+    Left,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct GroupLine {
+    /// Naive local milliseconds (same clock as the combat log).
+    pub timestamp: i64,
+    pub event: GroupEvent,
+}
+
+fn person(s: &str) -> Option<String> {
+    let s = s.trim();
+    (!s.is_empty() && s.len() <= 64 && !s.contains(':') && !s.contains('[')).then(|| s.to_string())
+}
+
+/// Parses one chat log line; `Some` only for lines that say who leads the group
+/// (shapes verified on a real Forever chat log, 15. 11. 2026).
+pub fn parse_group_line(line: &str, default_year: i64) -> Option<GroupLine> {
+    let line = line.trim_start_matches('\u{feff}').trim_end_matches(['\r', '\n']);
+    let (ts, text) = line.split_once("  ")?;
+    let timestamp = time::parse_with_year(ts, default_year)?;
+    let text = text.trim();
+    let event = if text == "You are now the group leader." {
+        GroupEvent::Leader(None)
+    } else if let Some(who) = text.strip_suffix(" is now the group leader.") {
+        GroupEvent::Leader(Some(person(who)?))
+    } else if let Some(who) = text.strip_suffix(" has invited you to join a group.") {
+        GroupEvent::Invited(person(who)?)
+    } else if text == "You leave the group." || text == "Your group has been disbanded." {
+        GroupEvent::Left
+    } else if let Some(i) = text.find("[Party Leader]") {
+        // "|Hchannel:PARTY|h[Party Leader]|h Name: text" or "[Party Leader] Name: text"
+        let rest = text[i + "[Party Leader]".len()..].trim_start_matches("|h").trim_start();
+        let (who, _) = rest.split_once(": ")?;
+        GroupEvent::LeaderSpoke(person(who)?)
+    } else {
+        return None;
+    };
+    Some(GroupLine { timestamp, event })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,5 +436,37 @@ mod tests {
             parse_roll_line("11/15 14:54:13.120  Loot: Need Roll - x for Sword by Fizzle", 2026),
             None
         );
+    }
+
+    #[test]
+    fn group_leader_lines() {
+        let p = |l: &str| parse_group_line(l, 2026).map(|g| g.event);
+        assert_eq!(
+            p("11/15 13:20:00.000  You are now the group leader."),
+            Some(GroupEvent::Leader(None))
+        );
+        assert_eq!(
+            p("11/15 13:20:01.000  Fizzle Boom is now the group leader."),
+            Some(GroupEvent::Leader(Some("Fizzle Boom".into())))
+        );
+        assert_eq!(
+            p("11/15 13:20:02.000  Fizzle Boom has invited you to join a group."),
+            Some(GroupEvent::Invited("Fizzle Boom".into()))
+        );
+        assert_eq!(
+            p("11/15 14:40:00.000  |Hchannel:PARTY|h[Party Leader]|h Fizzle Boom: yeah im trying :("),
+            Some(GroupEvent::LeaderSpoke("Fizzle Boom".into()))
+        );
+        assert_eq!(
+            p("11/15 14:40:01.000  [Party Leader] Воля Незламна: go"),
+            Some(GroupEvent::LeaderSpoke("Воля Незламна".into()))
+        );
+        assert_eq!(p("11/15 15:40:00.000  You leave the group."), Some(GroupEvent::Left));
+        // ordinary party chat and loot are not about the leader
+        assert_eq!(
+            p("11/15 14:40:02.000  |Hchannel:PARTY|h[Party]|h Fizzle Boom: is now the group leader."),
+            None
+        );
+        assert_eq!(p("11/15 14:40:03.000  Fizzle Boom receives loot: Linen Cloth."), None);
     }
 }

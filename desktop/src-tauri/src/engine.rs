@@ -114,6 +114,9 @@ impl Pipeline {
             self.det.push_loot(&loot);
         } else if let Some(roll) = wowlog::parse_roll_line(line, year) {
             self.det.push_roll(&roll);
+        } else if let Some(g) = wowlog::parse_group_line(line, year) {
+            // the party leader without the addon (and without /reload)
+            self.det.push_group(&g);
         }
     }
 
@@ -1029,6 +1032,35 @@ mod tests {
             ]
         );
         assert!(!serde_json::to_string(&runs[0]).unwrap().contains("Stranger"));
+    }
+
+    #[test]
+    fn leader_comes_from_the_chat_log_without_the_addon() {
+        let run_with = |chat: &str| {
+            let mut p = Pipeline::new(2, 0);
+            let mut personal = Personal::new(0);
+            // the invite comes before the dungeon
+            p.feed_chat(chat, 2026);
+            let mut runs = Vec::new();
+            for l in fixture().lines() {
+                runs.extend(p.feed(l, &mut personal));
+            }
+            runs.extend(p.finish());
+            runs.remove(0).leader
+        };
+        assert_eq!(
+            run_with("11/20 19:55:00.000  Fizzle Boom has invited you to join a group.").as_deref(),
+            Some("Fizzle Boom")
+        );
+        assert_eq!(
+            run_with("11/20 19:55:00.000  You are now the group leader.").as_deref(),
+            Some("Tankus Maximus")
+        );
+        // somebody who is not in the run's party is never named
+        assert_eq!(
+            run_with("11/20 19:55:00.000  Random Stranger is now the group leader."),
+            None
+        );
     }
 
     #[test]
