@@ -206,6 +206,23 @@ Po prvem tednu primerjaj ocene z Convex nadzorno ploščo; interval je nastavlji
 
 ---
 
+### 8a. DB I/O pri dungeon runih in parsih (15. 11. 2026)
+
+Izmerjeno na prod: vse skupaj < 1 MB (0,5 GB limit) – prostor ni problem. Ozko grlo je **branje** (1 GB/mesec):
+Convex šteje vsak prebran dokument v celoti ob vsakem ogledu. Ukrepi:
+
+| Stran | Prej | Zdaj |
+|---|---|---|
+| Lik → Logs | poizvedba ob **vsakem** ogledu lika (bits-ui riše vse zavihke), do 1000 parsov × skupina | samo ko je zavihek odprt; 1 dokument `parsePools` (~2 KB) na skupino |
+| Rankings | 300 runov × 2,2 KB + do 3000 parsov | `parsePools` sezone + majhne vrstice `clears` (top 5 po dungeonu) |
+| Run → razčlenitev bossa | v `runDetails` ob vsakem ogledu | `runBossDetails` (5–9 KB), naloži se ob kliku na igralca |
+| Run → oprema | ikone in imena za vso opremo ob vsakem ogledu | poizvedba `runs.gear` ob kliku na igralca |
+
+Ocena: run stran ~106 KB/ogled (od tega loot 34 KB + rolli 22 KB) → 500 ogledov ≈ 53 MB/mesec. **Naslednji korak, če poraba
+raste:** loot/rolli in časovnica v ločene dokumente, ki se naložijo šele ob odprtju zavihka (run stran → ~40 KB).
+Slike: ikone se nalagajo neposredno z Blizzard CDN (hranimo samo URL) – brez Vercel/Convex prometa.
+`parsePools`/`clears` vzdržuje `lib/pools.ts` ob vsakem zapisu parsov; za stare rune `companion:backfillParses`.
+
 ## 9. Faze dela
 
 ### Faza 0 – Priprava

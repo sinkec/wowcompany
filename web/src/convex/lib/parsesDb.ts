@@ -2,24 +2,16 @@
 import type { Doc } from '../_generated/dataModel.js';
 import type { QueryCtx } from '../_generated/server.js';
 import { heroLogs, metricOf, poolKey, standing } from './parses.js';
+import { poolDoc } from './pools.js';
 import { listSeasons } from '../seasons.js';
 
-/** Vsi parsi iste skupine (boss + težavnost + vloga + sezona), za primerjavo. ≤ 1000 vrstic. */
+/** Najboljši rezultat vsakega junaka v skupini (en dokument `parsePools`, ne vsi parsi – DB I/O). */
 export async function poolFor(
 	ctx: QueryCtx,
 	r: Pick<Doc<'parses'>, 'encounterId' | 'difficultyId' | 'role' | 'season'>
 ) {
-	const rows = await ctx.db
-		.query('parses')
-		.withIndex('by_encounterId_and_difficultyId_and_role_and_season', (q) =>
-			q
-				.eq('encounterId', r.encounterId)
-				.eq('difficultyId', r.difficultyId)
-				.eq('role', r.role)
-				.eq('season', r.season)
-		)
-		.take(1000);
-	return rows.map((x) => ({ slug: x.slug, value: metricOf(x) }));
+	const doc = await poolDoc(ctx, r);
+	return (doc?.entries ?? []).map((e) => ({ slug: e.slug, value: e.value }));
 }
 
 /** Zavihek Logs (in /parses) za junaka v sezoni (privzeto trenutni). */

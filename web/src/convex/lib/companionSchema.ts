@@ -106,10 +106,24 @@ export const segment = v.object({
 			casts: v.optional(v.array(castStat)),
 			targets: v.optional(v.array(targetStat)),
 			buffs: v.optional(v.array(auraStat)),
-			debuffs: v.optional(v.array(auraStat))
+			debuffs: v.optional(v.array(auraStat)),
+			/** razčlenitev je v runBossDetails (strežnik jo prestavi tja ob uploadu) */
+			hasDetail: v.optional(v.boolean())
 		})
 	)
 });
+
+/** Razčlenitev igralca v enem boss boju (ločen dokument `runBossDetails`, bere se ob kliku – DB I/O). */
+export const bossDetailPlayer = v.object({
+	slug: v.string(),
+	spells: v.optional(v.array(spellStat)),
+	heals: v.optional(v.array(spellStat)),
+	casts: v.optional(v.array(castStat)),
+	targets: v.optional(v.array(targetStat)),
+	buffs: v.optional(v.array(auraStat)),
+	debuffs: v.optional(v.array(auraStat))
+});
+export type BossDetailPlayer = Infer<typeof bossDetailPlayer>;
 
 export const death = v.object({
 	slug: v.string(),

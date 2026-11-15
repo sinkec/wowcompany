@@ -78,39 +78,9 @@ export const get = query({
 						.unique()
 				: null;
 		const classOf = await classesFor(ctx, [run]);
-		// ikone opreme ob zadnjem pullu (seznam, ne objekt: Convex ključi morajo biti ASCII imena)
-		const gearIcons: {
-			itemId: number;
-			url: string | null;
-			name: string | null;
-			quality: number | null;
-		}[] = [];
-		if (allowed('runDetails') && details) {
-			const ids = new Set(details.players.flatMap((p) => (p.gear ?? []).map((g) => g.itemId)));
-			for (const itemId of ids) {
-				const hit = await ctx.db
-					.query('itemIcons')
-					.withIndex('by_item', (q) => q.eq('itemId', itemId))
-					.first();
-				const info = await ctx.db
-					.query('itemInfo')
-					.withIndex('by_itemId', (q) => q.eq('itemId', itemId))
-					.first();
-				if (hit || info)
-					gearIcons.push({
-						itemId,
-						url: hit?.url ?? null,
-						name: info?.name ?? null,
-						quality: info?.quality ?? null
-					});
-			}
-		}
 		return {
 			locked: false as const,
-			run: {
-				...runDetail(run as RunDocLike, details as DetailsLike | null, classOf, allowed),
-				gearIcons
-			}
+			run: runDetail(run as RunDocLike, details as DetailsLike | null, classOf, allowed)
 		};
 	}
 });
@@ -162,6 +132,62 @@ export const heroLogs = query({
 });
 
 /**
+ * Ikone, imena in kakovost opreme enega igralca ob zadnjem pullu (ob kliku na igralca, ne ob vsakem
+ * ogledu runa – DB I/O). Seznam, ne objekt (Convex ključi morajo biti ASCII imena).
+ */
+export const gear = query({
+	args: { id: v.string(), slug: v.string() },
+	handler: async (ctx, { id, slug }) => {
+		const { allowed } = await visibility(ctx);
+		const runId = ctx.db.normalizeId('runs', id);
+		if (!runId || !allowed('runs') || !allowed('runDetails')) return [];
+		const details = await ctx.db
+			.query('runDetails')
+			.withIndex('by_run', (q) => q.eq('runId', runId))
+			.unique();
+		const items = details?.players.find((p) => p.slug === slug)?.gear ?? [];
+		const out: {
+			itemId: number;
+			url: string | null;
+			name: string | null;
+			quality: number | null;
+		}[] = [];
+		for (const { itemId } of items) {
+			const icon = await ctx.db
+				.query('itemIcons')
+				.withIndex('by_item', (q) => q.eq('itemId', itemId))
+				.first();
+			const info = await ctx.db
+				.query('itemInfo')
+				.withIndex('by_itemId', (q) => q.eq('itemId', itemId))
+				.first();
+			out.push({
+				itemId,
+				url: icon?.url ?? null,
+				name: info?.name ?? null,
+				quality: info?.quality ?? null
+			});
+		}
+		return out;
+	}
+});
+
+/** Razčlenitev enega boss boja (ob kliku na igralca na strani runa). Številke -> polje runDetails. */
+export const bossDetail = query({
+	args: { id: v.string(), index: v.number() },
+	handler: async (ctx, { id, index }) => {
+		const { allowed } = await visibility(ctx);
+		const runId = ctx.db.normalizeId('runs', id);
+		if (!runId || !allowed('runs') || !allowed('runDetails')) return null;
+		const doc = await ctx.db
+			.query('runBossDetails')
+			.withIndex('by_run_and_index', (q) => q.eq('runId', runId).eq('index', index))
+			.unique();
+		return doc?.players ?? null;
+	}
+});
+
+/**
  * Lestvice sezone (/rankings): po dungeonu in bossu top 10 DPS in HPS (en vnos na junaka) +
  * najhitrejši cleari po dungeonu. Bere ≤ 3000 parsov (~250 B) in ≤ 300 zadnjih runov.
  */
@@ -172,69 +198,81 @@ export const rankings = query({
 		if (!allowed('runs') || !allowed('runDetails')) return { locked: true as const };
 		const seasons = await listSeasons(ctx);
 		const chosen = season ?? seasons[0].number;
-		const s = seasons.find((x) => x.number === chosen) ?? seasons[0];
-		const next = seasons.find((x) => x.number === chosen + 1);
-		const rows = await ctx.db
-			.query('parses')
+		// najboljši po junaku in skupini že stoji v parsePools (en dokument na boss/vlogo)
+		const pools = await ctx.db
+			.query('parsePools')
 			.withIndex('by_season', (q) => q.eq('season', chosen))
-			.take(3000);
-		const boards = buildRankings(rows.map((r) => ({ ...r, runId: r.runId as string })));
+			.take(300);
+		const rows = pools.flatMap((p) =>
+			p.entries.map((e) => ({
+				slug: e.slug,
+				encounterId: p.encounterId,
+				encounter: p.encounter,
+				zone: p.zone,
+				difficultyId: p.difficultyId,
+				role: p.role,
+				dps: p.role === 'heal' ? 0 : e.value,
+				hps: p.role === 'heal' ? e.value : 0,
+				taken: 0,
+				durationMs: e.durationMs,
+				ilvl: e.ilvl,
+				at: e.at,
+				runId: e.runId as string
+			}))
+		);
+		const boards = buildRankings(rows);
 		const stars = allStars(rows);
 
-		// najhitrejši cleari (ves dungeon), v časovnem oknu sezone
-		const recent = await ctx.db
-			.query('runs')
-			.withIndex('by_started_at', (q) => {
-				const from = q.gte('startedAt', s.startedAt);
-				return next ? from.lt('startedAt', next.startedAt) : from;
-			})
-			.order('desc')
-			.take(300);
-		const fastest = new Map<string, Doc<'runs'>[]>();
-		for (const r of recent) {
-			if (!r.result.cleared) continue;
-			fastest.set(r.zone.name, [...(fastest.get(r.zone.name) ?? []), r]);
+		// najhitrejši cleari: majhne vrstice `clears`, top 5 po dungeonu
+		const clears = await ctx.db
+			.query('clears')
+			.withIndex('by_season_and_zone_and_durationMs', (q) => q.eq('season', chosen))
+			.take(500);
+		const byZone = new Map<string, typeof clears>();
+		for (const c of clears) {
+			const list = byZone.get(c.zone) ?? [];
+			if (list.length < 5) list.push(c);
+			byZone.set(c.zone, list);
 		}
-		const classOf = await classesFor(ctx, recent);
-		const slugs = new Set([
-			...rows.map((r) => r.slug),
-			...recent.flatMap((r) => r.party.map((p) => p.slug))
-		]);
-		// seznam, ne objekt: slugi so lahko cirilični (Convex dovoli samo ASCII ključe)
+
+		// imena in razredi (seznam, ne objekt: slugi so lahko cirilični)
 		const names = new Map<string, string>();
-		for (const r of recent) for (const p of r.party) names.set(p.slug, p.name);
+		for (const c of clears) for (const p of c.party) names.set(p.slug, p.name);
+		const slugs = new Set([...rows.map((r) => r.slug), ...names.keys()]);
+		const people = [];
 		for (const slug of slugs) {
-			if (names.has(slug)) continue;
-			const p = await ctx.db
-				.query('players')
-				.withIndex('by_slug', (q) => q.eq('slug', slug))
-				.first();
-			if (p) names.set(slug, p.displayName);
+			let name = names.get(slug);
+			if (!name) {
+				const p = await ctx.db
+					.query('players')
+					.withIndex('by_slug', (q) => q.eq('slug', slug))
+					.first();
+				name = p?.displayName ?? slug;
+			}
+			const sum = allowed('classId')
+				? await ctx.db
+						.query('summaries')
+						.withIndex('by_slug', (q) => q.eq('slug', slug))
+						.first()
+				: null;
+			people.push({ slug, name, classId: sum?.classId ?? null });
 		}
-		const people = [...slugs].map((slug) => ({
-			slug,
-			name: names.get(slug) ?? slug,
-			classId: allowed('classId') ? (classOf.get(slug) ?? null) : null
-		}));
 		return {
 			locked: false as const,
 			seasons,
 			season: chosen,
 			boards,
 			stars,
-			speed: [...fastest.entries()]
+			speed: [...byZone.entries()]
 				.map(([zone, list]) => ({
 					zone,
-					runs: list
-						.sort((a, b) => a.durationMs - b.durationMs)
-						.slice(0, 5)
-						.map((r) => ({
-							id: r._id,
-							durationMs: r.durationMs,
-							startedAt: r.startedAt,
-							deaths: r.party.reduce((n, p) => n + p.deaths, 0),
-							party: r.party.map((p) => p.slug)
-						}))
+					runs: list.map((c) => ({
+						id: c.runId,
+						durationMs: c.durationMs,
+						startedAt: c.startedAt,
+						deaths: c.deaths,
+						party: c.party.map((p) => p.slug)
+					}))
 				}))
 				.sort((a, b) => a.zone.localeCompare(b.zone)),
 			people

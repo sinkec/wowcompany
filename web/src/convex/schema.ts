@@ -7,6 +7,7 @@ import {
 	linkStatus,
 	lootDrop,
 	lootRoll,
+	bossDetailPlayer,
 	partyMember,
 	playerSummary,
 	recordKind,
@@ -324,6 +325,14 @@ export default defineSchema({
 		rolls: v.optional(v.array(lootRoll))
 	}).index('by_run', ['runId']),
 
+	// Razčlenitev po boss boju (uroki, casti, tarče, uptime) – en dokument na boss; stran runa ga
+	// prebere šele ob kliku na igralca, zato runDetails ostane majhen (DB I/O).
+	runBossDetails: defineTable({
+		runId: v.id('runs'),
+		index: v.number(),
+		players: v.array(bossDetailPlayer)
+	}).index('by_run_and_index', ['runId', 'index']),
+
 	// Vseživljenjski rekordi spremljanih junakov (največji crit …): ena vrstica na junaka in vrsto.
 	// Posodobi jih ingestRun, ko run prinese večjo številko. Vidnost: polje 'runDetails'.
 	heroRecords: defineTable({
@@ -374,6 +383,47 @@ export default defineSchema({
 		])
 		.index('by_slug_and_season', ['slug', 'season'])
 		.index('by_season', ['season'])
+		.index('by_run', ['runId']),
+
+	// Najboljši parse vsakega junaka v skupini (boss + težavnost + vloga + sezona) – en majhen dokument
+	// na skupino. Logs in Rankings berejo te namesto vseh parsov (DB I/O). Vzdržuje lib/pools.ts.
+	parsePools: defineTable({
+		encounterId: v.number(),
+		difficultyId: v.number(),
+		role: v.union(v.literal('dps'), v.literal('heal'), v.literal('tank')),
+		season: v.number(),
+		encounter: v.string(),
+		zone: v.string(),
+		entries: v.array(
+			v.object({
+				slug: v.string(),
+				value: v.number(),
+				runId: v.id('runs'),
+				at: v.number(),
+				ilvl: v.union(v.number(), v.null()),
+				durationMs: v.number()
+			})
+		)
+	})
+		.index('by_encounterId_and_difficultyId_and_role_and_season', [
+			'encounterId',
+			'difficultyId',
+			'role',
+			'season'
+		])
+		.index('by_season', ['season']),
+
+	// Celotni cleari (za "Speed demons"): majhna vrstica na run, da Rankings ne bere celih runov.
+	clears: defineTable({
+		runId: v.id('runs'),
+		season: v.number(),
+		zone: v.string(),
+		durationMs: v.number(),
+		startedAt: v.number(),
+		deaths: v.number(),
+		party: v.array(v.object({ slug: v.string(), name: v.string() }))
+	})
+		.index('by_season_and_zone_and_durationMs', ['season', 'zone', 'durationMs'])
 		.index('by_run', ['runId']),
 
 	// Sezone (particije lestvic): nova ob večjem patchu, ko jo potrdi admin. Brez vrstic = Season 1.

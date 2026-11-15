@@ -1,5 +1,6 @@
 // Čiste funkcije za Companion (brez ctx) – testirane v tests/companion.test.ts.
 import type {
+	BossDetailPlayer,
 	Award,
 	LootDrop,
 	PersonalUpload,
@@ -280,4 +281,30 @@ export function addRecorder<T extends { deviceId: string }>(
 ): { list: T[]; added: boolean } {
 	if (list.some((r) => r.deviceId === rec.deviceId)) return { list, added: false };
 	return { list: [...list, rec], added: true };
+}
+
+const DETAIL_KEYS = ['spells', 'heals', 'casts', 'targets', 'buffs', 'debuffs'] as const;
+
+/**
+ * Razčlenitev boss bojev iz segmentov v ločene dokumente: segmenti ostanejo s seštevki in oznako
+ * `hasDetail`, razčlenitev gre v `runBossDetails` (po indeksu segmenta).
+ */
+export function splitBossDetails(segments: RunSummary['segments']) {
+	const details: { index: number; players: BossDetailPlayer[] }[] = [];
+	const slim = segments.map((seg, index) => {
+		const players: BossDetailPlayer[] = [];
+		const slimPlayers = seg.players.map((p) => {
+			const has = DETAIL_KEYS.some((k) => (p[k]?.length ?? 0) > 0);
+			const rest = { ...p };
+			for (const k of DETAIL_KEYS) delete rest[k];
+			if (!has) return rest;
+			const d: BossDetailPlayer = { slug: p.slug };
+			for (const k of DETAIL_KEYS) if (p[k]?.length) (d as Record<string, unknown>)[k] = p[k];
+			players.push(d);
+			return { ...rest, hasDetail: true };
+		});
+		if (players.length) details.push({ index, players });
+		return { ...seg, players: slimPlayers };
+	});
+	return { slim, details };
 }

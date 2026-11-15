@@ -9,7 +9,8 @@ import {
 	makeLinkCode,
 	MAX_LOOT,
 	normalizeCode,
-	runScore
+	runScore,
+	splitBossDetails
 } from '../src/convex/lib/companion.ts';
 import type { PlayerSummary, RunSummary } from '../src/convex/lib/companionSchema.ts';
 
@@ -300,5 +301,46 @@ describe('party leader (from the addon)', () => {
 		expect(checkRun(RUN({ schema: 3, leader: 'Fizzle Boom' }), NOW)).toBeNull();
 		expect(checkRun(RUN({ schema: 3, leader: 'x' }), NOW)).toBe('bad leader');
 		expect(checkRun(RUN({ schema: 3, leader: 'x'.repeat(81) }), NOW)).toBe('bad leader');
+	});
+});
+
+describe('boss details are stored apart (DB I/O)', () => {
+	test('heavy lists move out, totals stay, players without detail untouched', () => {
+		const seg = {
+			kind: 'boss' as const,
+			name: 'Skum',
+			encounterId: 589,
+			startMs: 0,
+			endMs: 30_000,
+			result: 'kill' as const,
+			players: [
+				{
+					slug: 'fizzle-boom',
+					damage: 3000,
+					healing: 0,
+					damageTaken: 100,
+					spells: [{ id: 133, name: 'Fireball', amount: 3000, hits: 10, crits: 2, pet: false }],
+					buffs: [{ id: 1459, name: 'Arcane Intellect', uptimeMs: 30_000 }]
+				},
+				{ slug: 'mendy-bandage', damage: 10, healing: 900, damageTaken: 0 }
+			]
+		};
+		const { slim, details } = splitBossDetails([seg]);
+		expect(slim[0].players[0]).toEqual({
+			slug: 'fizzle-boom',
+			damage: 3000,
+			healing: 0,
+			damageTaken: 100,
+			hasDetail: true
+		});
+		expect(slim[0].players[1]).toEqual(seg.players[1]);
+		expect(details).toEqual([
+			{
+				index: 0,
+				players: [
+					{ slug: 'fizzle-boom', spells: seg.players[0].spells, buffs: seg.players[0].buffs }
+				]
+			}
+		]);
 	});
 });

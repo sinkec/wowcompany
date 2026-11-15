@@ -52,6 +52,7 @@
 		s?.kills != null && s?.deaths != null ? s.kills / Math.max(1, s.deaths) : null
 	);
 
+	let tab = $state('gear');
 	let statFilter = $state('');
 	const statGroups = $derived.by(() => {
 		const list = (d?.allStats ?? null) as StatLine[] | null;
@@ -166,7 +167,7 @@
 				{/each}
 			</section>
 
-			<Tabs.Root value="gear">
+			<Tabs.Root bind:value={tab}>
 				<Tabs.List class="flex-wrap">
 					<Tabs.Trigger value="gear">Gear & Guts</Tabs.Trigger>
 					<Tabs.Trigger value="talents">Talents</Tabs.Trigger>
@@ -179,7 +180,8 @@
 
 				<!-- LOGS: Company Parses po bossih -->
 				<Tabs.Content value="logs" class="mt-4 space-y-3">
-					<HeroLogs {slug} />
+					<!-- bits-ui riše vse zavihke: poizvedba za parse naj teče šele, ko je zavihek odprt (DB I/O) -->
+					{#if tab === 'logs'}<HeroLogs {slug} />{/if}
 				</Tabs.Content>
 
 				<!-- DUNGEON RUNS -->

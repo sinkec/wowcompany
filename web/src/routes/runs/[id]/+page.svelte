@@ -42,7 +42,10 @@
 	const maxTaken = $derived(Math.max(1, ...players.map((p) => p.damageTaken)));
 	const totalDmg = $derived(players.reduce((n, p) => n + p.damage, 0));
 	const totalHeal = $derived(players.reduce((n, p) => n + p.healing, 0));
-	const bossSegs = $derived((run?.segments ?? []).filter((s) => s.kind === 'boss'));
+	// boss segmenti z indeksom v run.segments (razčlenitev se naloži po tem indeksu)
+	const bossSegs = $derived(
+		(run?.segments ?? []).map((s, idx) => ({ ...s, idx })).filter((s) => s.kind === 'boss')
+	);
 	const totalDeaths = $derived(run?.totalDeaths ?? null);
 
 	// ?tab=meter|bosses|deaths|timeline|spells → povezava naravnost na zavihek
@@ -73,11 +76,26 @@
 		return [...m.values()].sort((a, b) => b.items - a.items);
 	});
 
-	// Bosses: odprta razčlenitev igralca (`${boss}:${slug}`)
+	// Bosses: odprta razčlenitev igralca (`${segment index}:${slug}`); naloži se šele ob kliku (DB I/O)
 	let openBoss = $state<string | null>(null);
+	const bossQ = useQuery(api.runs.bossDetail, () =>
+		openBoss ? { id: page.params.id ?? '', index: Number(openBoss.split(':')[0]) } : 'skip'
+	);
+	type SegP = NonNullable<typeof run>['segments'] extends (infer S)[] | null
+		? S extends { players: (infer P)[] }
+			? P
+			: never
+		: never;
+	/** razčlenitev igralca: iz ločenega dokumenta ali (starejši runi) kar iz segmenta */
+	const dp = (p: SegP) => bossQ.data?.find((x) => x.slug === p.slug) ?? p;
 	// oprema ob zadnjem pullu (COMBATANT_INFO) + ikone iz cachea
-	const iconOf = $derived(new Map((run?.gearIcons ?? []).map((g) => [g.itemId, g.url] as const)));
-	const itemOf = $derived(new Map((run?.gearIcons ?? []).map((g) => [g.itemId, g] as const)));
+	const gearQ = useQuery(api.runs.gear, () =>
+		openBoss
+			? { id: page.params.id ?? '', slug: openBoss.slice(openBoss.indexOf(':') + 1) }
+			: 'skip'
+	);
+	const iconOf = $derived(new Map((gearQ.data ?? []).map((g) => [g.itemId, g.url] as const)));
+	const itemOf = $derived(new Map((gearQ.data ?? []).map((g) => [g.itemId, g] as const)));
 	const gearOf = (slug: string) => players.find((x) => x.slug === slug)?.gear ?? [];
 
 	// need/greed rolli: po predmetih + kocke po igralcih (srečnež, preklete kocke)
@@ -446,8 +464,13 @@
 							</div>
 							<div class="mt-3 space-y-1.5">
 								{#each sp as p (p.slug)}
-									{@const k = `${i}:${p.slug}`}
-									{@const detail = !!(p.spells?.length || p.heals?.length || p.casts?.length)}
+									{@const k = `${s.idx}:${p.slug}`}
+									{@const detail = !!(
+										p.hasDetail ||
+										p.spells?.length ||
+										p.heals?.length ||
+										p.casts?.length
+									)}
 									<button
 										class="grid w-full grid-cols-[9rem_1fr_6rem_5rem] items-center gap-3 text-left text-sm {detail
 											? 'cursor-pointer rounded hover:bg-muted/30'
@@ -490,7 +513,7 @@
 													>{/if}
 												{#if p.deaths}<span class="text-destructive">died {p.deaths}×</span>{/if}
 											</div>
-											{#each [{ title: 'Damage', list: p.spells ?? [], total: p.damage }, { title: 'Healing', list: p.heals ?? [], total: p.healing }] as part (part.title)}
+											{#each [{ title: 'Damage', list: dp(p).spells ?? [], total: p.damage }, { title: 'Healing', list: dp(p).heals ?? [], total: p.healing }] as part (part.title)}
 												{#if part.list.length}
 													<table class="w-full">
 														<thead class="text-muted-foreground">
@@ -583,10 +606,10 @@
 												</div>
 											{/if}
 											<div class="grid gap-3 sm:grid-cols-2">
-												{#if p.targets?.length}
+												{#if dp(p).targets?.length}
 													<div>
 														<div class="mb-1 font-semibold text-muted-foreground">Beat up</div>
-														{#each p.targets as t (t.name)}
+														{#each dp(p).targets as t (t.name)}
 															<div class="flex justify-between">
 																<span class="truncate">{t.name}</span><span class="tabular-nums"
 																	>{fmtNum(t.amount)}</span
@@ -595,7 +618,7 @@
 														{/each}
 													</div>
 												{/if}
-												{#each [{ title: 'Buffs (uptime)', list: p.buffs ?? [] }, { title: 'Debuffs kept on enemies', list: p.debuffs ?? [] }] as au (au.title)}
+												{#each [{ title: 'Buffs (uptime)', list: dp(p).buffs ?? [] }, { title: 'Debuffs kept on enemies', list: dp(p).debuffs ?? [] }] as au (au.title)}
 													{#if au.list.length}
 														<div>
 															<div class="mb-1 font-semibold text-muted-foreground">{au.title}</div>
@@ -618,12 +641,12 @@
 														</div>
 													{/if}
 												{/each}
-												{#if p.casts?.length}
+												{#if dp(p).casts?.length}
 													<div>
 														<div class="mb-1 font-semibold text-muted-foreground">
 															Button presses
 														</div>
-														{#each p.casts as c (c.id + ':' + c.pet)}
+														{#each dp(p).casts as c (c.id + ':' + c.pet)}
 															<div class="flex justify-between">
 																<span class="truncate"
 																	>{c.name}{#if c.pet}<span class="text-muted-foreground">

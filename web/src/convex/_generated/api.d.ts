@@ -33,6 +33,7 @@ import type * as lib_normalize from "../lib/normalize.js";
 import type * as lib_parses from "../lib/parses.js";
 import type * as lib_parsesDb from "../lib/parsesDb.js";
 import type * as lib_players from "../lib/players.js";
+import type * as lib_pools from "../lib/pools.js";
 import type * as lib_profile from "../lib/profile.js";
 import type * as lib_runsView from "../lib/runsView.js";
 import type * as lib_same from "../lib/same.js";
@@ -76,6 +77,7 @@ declare const fullApi: ApiFromModules<{
   "lib/parses": typeof lib_parses;
   "lib/parsesDb": typeof lib_parsesDb;
   "lib/players": typeof lib_players;
+  "lib/pools": typeof lib_pools;
   "lib/profile": typeof lib_profile;
   "lib/runsView": typeof lib_runsView;
   "lib/same": typeof lib_same;

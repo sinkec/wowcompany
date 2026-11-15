@@ -3,7 +3,7 @@
 import { HOUR, MINUTE, RateLimiter } from '@convex-dev/rate-limiter';
 import { ConvexError, v } from 'convex/values';
 import { components, internal } from './_generated/api.js';
-import type { Id } from './_generated/dataModel.js';
+import type { Doc, Id } from './_generated/dataModel.js';
 import {
 	internalAction,
 	internalMutation,
@@ -23,10 +23,17 @@ import {
 	computeAwards,
 	LINK_TTL_MS,
 	normalizeCode,
-	runScore
+	runScore,
+	splitBossDetails
 } from './lib/companion.js';
-import { personalUpload, runSummary, type RunSummary } from './lib/companionSchema.js';
+import {
+	personalUpload,
+	runSummary,
+	type BossDetailPlayer,
+	type RunSummary
+} from './lib/companionSchema.js';
 import { parseRows } from './lib/parses.js';
+import { updatePools, writeClear } from './lib/pools.js';
 import { seasonAt } from './seasons.js';
 
 const limiter = new RateLimiter(components.rateLimiter, {
@@ -304,20 +311,46 @@ async function writeParses(
 	ctx: MutationCtx,
 	runId: Id<'runs'>,
 	s: RunSummary,
-	party: { slug: string; playerId?: Id<'players'> }[]
+	party: { slug: string; name?: string; playerId?: Id<'players'>; deaths?: number }[]
 ) {
+	const removed: Doc<'parses'>[] = [];
 	for await (const old of ctx.db.query('parses').withIndex('by_run', (q) => q.eq('runId', runId))) {
+		removed.push(old);
 		await ctx.db.delete('parses', old._id);
 	}
 	const ids = new Map(party.filter((p) => p.playerId).map((p) => [p.slug, p.playerId!]));
+	const added: Doc<'parses'>[] = [];
 	for (const row of parseRows(s, new Set(ids.keys()))) {
-		await ctx.db.insert('parses', {
+		const doc = {
 			...row,
 			runId,
 			playerId: ids.get(row.slug)!,
 			season: await seasonAt(ctx, row.at)
-		});
+		};
+		const id = await ctx.db.insert('parses', doc);
+		added.push({ ...doc, _id: id, _creationTime: Date.now() });
 	}
+	await updatePools(ctx, removed, added);
+	await writeClear(
+		ctx,
+		runId,
+		s,
+		party.map((p) => ({ slug: p.slug, name: p.name ?? p.slug, deaths: p.deaths ?? 0 })),
+		await seasonAt(ctx, s.endedAt)
+	);
+}
+
+async function writeBossDetails(
+	ctx: MutationCtx,
+	runId: Id<'runs'>,
+	details: { index: number; players: BossDetailPlayer[] }[]
+) {
+	for await (const old of ctx.db
+		.query('runBossDetails')
+		.withIndex('by_run_and_index', (q) => q.eq('runId', runId))) {
+		await ctx.db.delete('runBossDetails', old._id);
+	}
+	for (const d of details) await ctx.db.insert('runBossDetails', { runId, ...d });
 }
 
 async function writeParticipants(
@@ -378,9 +411,11 @@ export const ingestRun = internalMutation({
 
 		const loot = s.loot ?? [];
 		const rolls = s.rolls ?? [];
+		// razčlenitev po bossih v ločene dokumente (bere se ob kliku), segmenti ostanejo majhni
+		const split = splitBossDetails(s.segments);
 		const details = {
 			players: s.players,
-			segments: s.segments,
+			segments: split.slim,
 			deaths: s.deaths,
 			timeline: s.timeline,
 			loot,
@@ -412,6 +447,7 @@ export const ingestRun = internalMutation({
 				updatedAt: now
 			});
 			await ctx.db.insert('runDetails', { runId, ...details });
+			await writeBossDetails(ctx, runId, split.details);
 			await writeParticipants(ctx, runId, party, s.startedAt);
 			await writeHeroRecords(ctx, runId, s, party);
 			await writeParses(ctx, runId, s, party);
@@ -432,6 +468,7 @@ export const ingestRun = internalMutation({
 				.unique();
 			if (old) await ctx.db.replace('runDetails', old._id, { runId: existing._id, ...details });
 			else await ctx.db.insert('runDetails', { runId: existing._id, ...details });
+			await writeBossDetails(ctx, existing._id, split.details);
 			await writeParticipants(ctx, existing._id, party, s.startedAt);
 			await writeHeroRecords(ctx, existing._id, s, party);
 			await writeParses(ctx, existing._id, s, party);
@@ -571,8 +608,19 @@ export const deleteRun = internalMutation({
 			.withIndex('by_run', (q) => q.eq('runId', runId))) {
 			await ctx.db.delete('heroRecords', r._id);
 		}
+		const removed: Doc<'parses'>[] = [];
 		for await (const p of ctx.db.query('parses').withIndex('by_run', (q) => q.eq('runId', runId))) {
+			removed.push(p);
 			await ctx.db.delete('parses', p._id);
+		}
+		await updatePools(ctx, removed, []);
+		for await (const b of ctx.db
+			.query('runBossDetails')
+			.withIndex('by_run_and_index', (q) => q.eq('runId', runId))) {
+			await ctx.db.delete('runBossDetails', b._id);
+		}
+		for await (const c of ctx.db.query('clears').withIndex('by_run', (q) => q.eq('runId', runId))) {
+			await ctx.db.delete('clears', c._id);
 		}
 		if (await ctx.db.get('runs', runId)) await ctx.db.delete('runs', runId);
 		return null;
