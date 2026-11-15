@@ -7,24 +7,25 @@
 | [ADDON.md](ADDON.md) | addon `WowCompany`: §1 stanje, §4.1 dejstva o Forever API-ju |
 | [STATS.md](STATS.md) | v0.3: statistika po vzoru Warcraft Logs + Details!, Company Parses, sezone, preureditev repozitorija |
 
-## ZAČNI TUKAJ – stanje 15. 11. 2026 zvečer
+## ZAČNI TUKAJ – stanje 16. 11. 2026 ponoči
 
 **V produkciji in pri uporabniku:**
-- Portal (`main` = `531c8ed`): dungeon runi z rolli, razčlenitvijo po bossih (klik ▸ na igralca: graf boja 2 s, uroki,
-  buffi/debuffi, oprema), Company Parses (lik → **Logs**, primerjava z najboljšim), **/rankings** (top 10, All-Stars,
-  Speed demons), sezone (Office → Settings), Discord objave runov + `/parses` (Office → Visibility → Discord → *Dungeon runs*).
-- Companion **v0.1.8** izdan in nameščen pri uporabniku (`~/Applications/WowCompany-Companion.AppImage`, stara 0.1.6 kot `.bak`).
-- Addon **0.5.2** v mapi igre (meter *More*, klik na vrstico = uroki, povzetek runa + vprašanje *Send now / Later*, `/wowco report`,
-  `/wowco details on|off`, `/wowco ask on|off`). Uporabnik je potrdil, da deluje (15. 11.).
-- Predmeti: imena/kakovost iz Blizzard **retail/classic** namespacea (Forever `item/{id}` = 404) – loot ima kakovost brez addona.
-
-**Izdaje:** Companion **0.1.11** izdan in nameščen pri uporabniku (16. 11. 2026); addon **0.5.3** v mapi igre. Vsebuje: zavihek
-chata "WowCompany", XP/denar/reputacijo/veščine, statistiko po kategorijah Combat Log Config, neuspele caste z nagradami.
-Naslednji korak: dungeon z novo verzijo in preveriti run (Loot → *coin & glory*, Bosses ▸, Combat Log, nagrade, Rankings).
+- Portal (`main` = zadnji commit, Vercel + Convex prod): dungeon runi z rolli in kakovostjo lootu (Blizzard retail/classic
+  namespace – Forever `item/{id}` = 404), razčlenitev po bossih (klik ▸: graf 2 s, uroki, buffi/debuffi, oprema, kategorije
+  *My actions* / *What happened to me?* kot v igrinem Combat Log Config), zavihek **Combat Log** za cel run, *coin & glory*
+  (XP, zlato, reputacija, veščine, neuspeli casti), nagrade za neuspele caste, Company Parses (lik → **Logs**), **/rankings**
+  (top 10, All-Stars, Speed demons, Best value, Keyboard Hall of Shame), sezone, Discord objave runov + `/parses`
+  (Office → Visibility → Discord → *Dungeon runs*; po deployu *Register commands*).
+- Companion **v0.1.11** izdan in nameščen (`~/Applications/WowCompany-Companion.AppImage`; `0.1.6.AppImage.bak` lahko gre).
+- Addon **0.5.3** v mapi igre: lasten zavihek chata **WowCompany** (loot, rolli, sistem, party, XP, denar, reputacija, veščine –
+  preverjeno, da ga Forever dovoli), meter *More*, klik na vrstico = uroki, povzetek runa + *Send now / Later*,
+  `/wowco report|details|ask|chat`.
+- Filtri v igrinem *Combat Log Config* vplivajo samo na prikaz v chatu, ne na datoteko combat loga (preverjeno).
+- Chat log pa zapiše samo, kar prikaže kakšno okno chata → zato zavihek WowCompany.
 
 **Naslednji koraki (predlog):**
-1. Ko uporabnik odigra dungeon z novo verzijo: preveri run na portalu (rolli, ▸ razčlenitev, parsi), Discord objavo,
-   `/wowco probe` v dungeonu (oblika `combatSpells` med bojem – razčlenitev v igri je preverjena samo s smoke testom).
+1. Ko uporabnik odigra dungeon z 0.1.11: preveri run na portalu (*coin & glory*, nagrade, ▸ kategorije, Combat Log, rolli,
+   parsi, Rankings), Discord objavo, `/wowco probe` v dungeonu (oblika `combatSpells` med bojem – razčlenitev v igri je preverjena samo s smoke testom).
 2. Prijatelji (Chugga Zugga, Zadn Cajt …) naj posodobijo Companion – njihovi stari runi nimajo razčlenitve.
 3. Odprto iz načrta: **replay** (zemljevid pozicij/smrti iz X/Y v logu, C9), **poročilo runa v Companionu** (C5),
    po potrebi loot/rolli/časovnica iz `runDetails` v ločene dokumente (PLAN.md §8a, samo če DB I/O raste).
