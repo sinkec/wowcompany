@@ -5,6 +5,7 @@ import type { Doc } from './_generated/dataModel.js';
 import { query, type QueryCtx } from './_generated/server.js';
 import { canSeePrivate } from './lib/access.js';
 import { recordKind } from './lib/companionSchema.js';
+import { castFailAwards } from './lib/companion.js';
 import { runDetail, runListItem, type DetailsLike, type RunDocLike } from './lib/runsView.js';
 import { allStars, rankings as buildRankings } from './lib/parses.js';
 import { loadHeroLogs } from './lib/parsesDb.js';
@@ -91,7 +92,9 @@ export const get = query({
 			locked: false as const,
 			run: {
 				...runDetail(run as RunDocLike, details as DetailsLike | null, classOf, allowed),
-				progress
+				progress,
+				// nagrade za neuspele caste (vsak snemalec ima v logu samo svoje)
+				failAwards: castFailAwards(progress)
 			}
 		};
 	}
@@ -286,6 +289,34 @@ export const rankings = query({
 			e.hours += Math.max(g.durationMs, 60_000) / 3_600_000;
 			byZoneValue.set(g.zone, e);
 		}
+		// Keyboard Hall of Shame: pritiski, preden je bil urok pripravljen, na uro (samo snemalci)
+		const mash = new Map<string, { spam: number; hours: number }>();
+		for (const g of gains) {
+			if (!g.castFails) continue;
+			const e = mash.get(g.slug) ?? { spam: 0, hours: 0 };
+			e.spam += g.castFails.spam;
+			e.hours += Math.max(g.durationMs, 60_000) / 3_600_000;
+			mash.set(g.slug, e);
+		}
+		const mashers = [...mash.entries()]
+			.filter(([, e]) => e.spam >= 20)
+			.map(([slug, e]) => ({ slug, spam: e.spam, perHour: Math.round(e.spam / e.hours) }))
+			.sort((a, b) => b.perHour - a.perHour)
+			.slice(0, 10);
+		for (const m of mashers) {
+			if (people.some((p) => p.slug === m.slug)) continue;
+			const p = await ctx.db
+				.query('players')
+				.withIndex('by_slug', (q) => q.eq('slug', m.slug))
+				.first();
+			const sum = allowed('classId')
+				? await ctx.db
+						.query('summaries')
+						.withIndex('by_slug', (q) => q.eq('slug', m.slug))
+						.first()
+				: null;
+			people.push({ slug: m.slug, name: p?.displayName ?? m.slug, classId: sum?.classId ?? null });
+		}
 		const value = [...byZoneValue.entries()]
 			.map(([zone, e]) => ({
 				zone,
@@ -301,6 +332,7 @@ export const rankings = query({
 			boards,
 			stars,
 			value,
+			mashers,
 			speed: [...byZone.entries()]
 				.map(([zone, list]) => ({
 					zone,

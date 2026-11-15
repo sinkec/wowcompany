@@ -1420,11 +1420,31 @@ impl RunAcc {
             // loot after the last kill (boss corpse) belongs to the run too
             loot: self.loot.clone(),
             rolls: self.rolls.clone(),
-            progress: self.progress.clone().map(|mut p| {
-                p.reputation
-                    .sort_by(|a, b| b.amount.cmp(&a.amount).then(a.faction.cmp(&b.faction)));
-                p
-            }),
+            progress: {
+                // failed casts exist only for the log owner: they go with the recorder's gains
+                let fails = self.players.values().find(|p| p.mine).and_then(|p| {
+                    let mut all: Vec<NamedCount> = p
+                        .combat
+                        .fail_reasons
+                        .iter()
+                        .map(|(name, &count)| NamedCount {
+                            name: name.clone(),
+                            count,
+                        })
+                        .collect();
+                    all.sort_by(|a, b| b.count.cmp(&a.count).then(a.name.cmp(&b.name)));
+                    (!all.is_empty()).then(|| CastFails::from_reasons(&all))
+                });
+                let mut progress = self.progress.clone();
+                if fails.is_some() {
+                    progress.get_or_insert_with(RunProgress::default).cast_fails = fails;
+                }
+                progress.map(|mut p| {
+                    p.reputation
+                        .sort_by(|a, b| b.amount.cmp(&a.amount).then(a.faction.cmp(&b.faction)));
+                    p
+                })
+            },
             // only a party member of this run, by their display name (like the addon sends it)
             leader: self
                 .chat_leader

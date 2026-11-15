@@ -8,6 +8,7 @@ import {
 	lootDrop,
 	lootRoll,
 	bossDetailPlayer,
+	castFails,
 	partyMember,
 	playerSummary,
 	recordKind,
@@ -426,7 +427,8 @@ export default defineSchema({
 		copper: v.number(),
 		reputation: v.array(v.object({ faction: v.string(), amount: v.number() })),
 		skills: v.array(v.object({ skill: v.string(), from: v.number(), to: v.number() })),
-		levels: v.array(v.number())
+		levels: v.array(v.number()),
+		castFails: v.optional(castFails)
 	})
 		.index('by_run_and_slug', ['runId', 'slug'])
 		.index('by_season', ['season']),

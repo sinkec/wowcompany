@@ -58,6 +58,84 @@ pub struct RunProgress {
     pub skills: Vec<SkillUp>,
     /// Levels reached during the run.
     pub levels: Vec<u32>,
+    /// The recorder's failed casts by kind (`SPELL_CAST_FAILED` is logged only for the log owner).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cast_fails: Option<CastFails>,
+}
+
+/// Failed casts sorted into what they say about the player (see `fail_kind`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CastFails {
+    pub total: u32,
+    /// "Not yet recovered", "Another action is in progress" … – pressing before it is ready.
+    pub spam: u32,
+    /// "No target", "Invalid target", "Your target is dead" – casting at nothing.
+    pub targeting: u32,
+    /// "Out of range", "Target needs to be in front of you.", "not in line of sight".
+    pub range: u32,
+    /// "Not enough mana/rage/energy".
+    pub resources: u32,
+    /// "Interrupted", "Can't do that while moving".
+    pub interrupted: u32,
+    /// "Can't do that while stunned/silenced/asleep …".
+    pub control: u32,
+    pub other: u32,
+    /// The most common reasons as the game wrote them.
+    pub reasons: Vec<NamedCount>,
+}
+
+/// Which kind of failure a `SPELL_CAST_FAILED` reason is (real Forever reasons, 15. 11. 2026).
+pub fn fail_kind(reason: &str) -> &'static str {
+    let r = reason.to_ascii_lowercase();
+    if r.contains("not yet recovered")
+        || r.contains("another action is in progress")
+        || r.contains("not ready yet")
+        || r.contains("busy")
+    {
+        "spam"
+    } else if r.contains("no target")
+        || r.contains("invalid target")
+        || r.contains("target is dead")
+        || r.contains("not a valid target")
+    {
+        "targeting"
+    } else if r.contains("out of range")
+        || r.contains("in front of you")
+        || r.contains("line of sight")
+        || r.contains("too close")
+        || r.contains("facing the wrong way")
+    {
+        "range"
+    } else if r.starts_with("not enough") {
+        "resources"
+    } else if r.contains("interrupted") || r.contains("while moving") {
+        "interrupted"
+    } else if r.starts_with("can't do that while") || r.contains("you are dead") {
+        "control"
+    } else {
+        "other"
+    }
+}
+
+impl CastFails {
+    pub fn from_reasons(reasons: &[NamedCount]) -> CastFails {
+        let mut f = CastFails::default();
+        for r in reasons {
+            f.total += r.count;
+            match fail_kind(&r.name) {
+                "spam" => f.spam += r.count,
+                "targeting" => f.targeting += r.count,
+                "range" => f.range += r.count,
+                "resources" => f.resources += r.count,
+                "interrupted" => f.interrupted += r.count,
+                "control" => f.control += r.count,
+                _ => f.other += r.count,
+            }
+        }
+        f.reasons = reasons.iter().take(8).cloned().collect();
+        f
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -640,5 +718,50 @@ mod size_tests {
         // only grey loot may go, never the good stuff
         assert!(r.loot.iter().all(|l| l.quality != Some(0)));
         assert_eq!(r.loot.iter().filter(|l| l.quality == Some(2)).count(), green);
+    }
+}
+
+#[cfg(test)]
+mod fail_tests {
+    use super::*;
+
+    #[test]
+    fn real_forever_reasons_sort_into_kinds() {
+        for (reason, kind) in [
+            ("Not yet recovered", "spam"),
+            ("Another action is in progress", "spam"),
+            ("You are busy looting", "spam"),
+            ("Item is not ready yet", "spam"),
+            ("No target", "targeting"),
+            ("Invalid target", "targeting"),
+            ("Your target is dead", "targeting"),
+            ("That item is not a valid target.", "targeting"),
+            ("Out of range", "range"),
+            ("Target needs to be in front of you.", "range"),
+            ("Target not in line of sight", "range"),
+            ("Not enough mana", "resources"),
+            ("Interrupted", "interrupted"),
+            ("Can't do that while moving", "interrupted"),
+            ("Can't do that while asleep", "control"),
+            ("Can't do that while stunned", "control"),
+            ("You are in combat", "other"),
+        ] {
+            assert_eq!(fail_kind(reason), kind, "{reason}");
+        }
+        let f = CastFails::from_reasons(&[
+            NamedCount {
+                name: "Not yet recovered".into(),
+                count: 176,
+            },
+            NamedCount {
+                name: "No target".into(),
+                count: 74,
+            },
+            NamedCount {
+                name: "Not enough mana".into(),
+                count: 3,
+            },
+        ]);
+        assert_eq!((f.total, f.spam, f.targeting, f.resources), (253, 176, 74, 3));
     }
 }

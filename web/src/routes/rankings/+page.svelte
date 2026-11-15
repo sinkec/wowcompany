@@ -120,6 +120,24 @@
 			</section>
 		{/if}
 
+		{#if d.mashers.length}
+			<section class="wow-frame rounded-lg p-4">
+				<h2 class="font-display text-lg font-semibold text-primary">Keyboard Hall of Shame</h2>
+				<p class="text-xs text-muted-foreground italic">
+					button presses before the spell was ready, per hour inside. only counts whoever had the
+					Companion running – the game logs failed casts for the log owner alone.
+				</p>
+				{#each d.mashers as m, i (m.slug)}
+					<div class="flex items-baseline gap-2 text-sm">
+						<span class="w-5 text-xs">{MEDAL[i] ?? `${i + 1}.`}</span>
+						<span class="min-w-0 flex-1 truncate">{@render who(m.slug)}</span>
+						<span class="tabular-nums">{fmtNum(m.perHour)}</span>
+						<span class="text-xs text-muted-foreground">mashes/h · {fmtNum(m.spam)} total</span>
+					</div>
+				{/each}
+			</section>
+		{/if}
+
 		{#if !d.boards.length}
 			<div class="wow-frame rounded-lg p-10 text-center text-sm text-muted-foreground">
 				No boss kills this season yet. The ladder is empty, the throne is open, the bosses are

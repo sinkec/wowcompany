@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
 	addRecorder,
 	beatsRecord,
+	castFailAwards,
 	checkPersonal,
 	checkRun,
 	computeAwards,
@@ -366,5 +367,49 @@ describe('recorder progress (XP, money, reputation)', () => {
 			)
 		).toBe('bad progress');
 		expect(checkRun(RUN({ schema: 4, progress: G({ levels: [0] }) }), NOW)).toBe('bad progress');
+	});
+});
+
+describe('failed-cast awards', () => {
+	const F = (o: object) => ({
+		total: 0,
+		spam: 0,
+		targeting: 0,
+		range: 0,
+		resources: 0,
+		interrupted: 0,
+		control: 0,
+		other: 0,
+		reasons: [],
+		...o
+	});
+	test('the worst recorder above the bar gets it, quiet runs get nothing', () => {
+		const a = castFailAwards([
+			{ slug: 'fizzle-boom', castFails: F({ spam: 191, targeting: 97, resources: 3 }) },
+			{ slug: 'mendy-bandage', castFails: F({ spam: 60, resources: 40 }) },
+			{ slug: 'no-companion' }
+		]);
+		// at most two per hero, the ones furthest above the bar (191/50 spam, 97/20 targeting)
+		expect(a.map((x) => [x.title, x.slug])).toEqual([
+			['Shadowboxer', 'fizzle-boom'],
+			['Keyboard Diarrhea', 'fizzle-boom'],
+			['Running on Fumes', 'mendy-bandage']
+		]);
+		expect(a[1].detail).toContain('191 times');
+		const alone = castFailAwards([
+			{
+				slug: 'x',
+				castFails: F({
+					spam: 191,
+					targeting: 97,
+					interrupted: 80,
+					resources: 56,
+					range: 22,
+					control: 7
+				})
+			}
+		]);
+		expect(alone).toHaveLength(2);
+		expect(castFailAwards([{ slug: 'x', castFails: F({ spam: 10 }) }])).toEqual([]);
 	});
 });

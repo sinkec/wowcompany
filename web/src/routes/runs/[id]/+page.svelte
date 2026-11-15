@@ -269,9 +269,9 @@
 		</section>
 
 		<!-- AWARDS -->
-		{#if run.awards?.length}
+		{#if run.awards?.length || run.failAwards?.length}
 			<section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-				{#each run.awards as a (a.key)}
+				{#each [...(run.awards ?? []), ...(run.failAwards ?? [])] as a (a.key)}
 					<div class="wow-frame rounded-lg p-4">
 						<div class="flex items-center gap-2 font-display font-semibold text-primary">
 							<Trophy class="size-4" />
@@ -817,6 +817,22 @@
 										<div class="text-xs text-muted-foreground">
 											Reputation: {g.reputation
 												.map((r) => `${r.faction} ${r.amount > 0 ? '+' : ''}${r.amount}`)
+												.join(' · ')}
+										</div>
+									{/if}
+									{#if g.castFails}
+										{@const f = g.castFails}
+										<div class="text-xs text-muted-foreground">
+											Failed casts: <b class="text-foreground tabular-nums">{fmtNum(f.total)}</b>
+											– {[
+												f.spam && `${f.spam} button mashing`,
+												f.targeting && `${f.targeting} at nothing`,
+												f.interrupted && `${f.interrupted} interrupted`,
+												f.resources && `${f.resources} out of mana`,
+												f.range && `${f.range} out of range`,
+												f.control && `${f.control} while CC'd`
+											]
+												.filter(Boolean)
 												.join(' · ')}
 										</div>
 									{/if}

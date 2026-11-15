@@ -369,6 +369,11 @@ Izdaje: S0 brez izdaje · S2+S3 → **Companion v0.2.0** (z addonom 0.5) · S4+S
   okolje, smrti) – po bossu (Bosses → ▸) in za cel run (zavihek **Combat Log**, prej Spells). Filtri v igrinem *Combat Log Config*
   vplivajo samo na prikaz v chatu, **ne** na datoteko (preverjeno na logu po spremembi filtrov). Kategorije se seštejejo v
   škodo/prejeto škodo (test). Neuspeli casti so v logu samo za snemalca.
+- ✅ **Neuspeli casti (16. 11. 2026):** `SPELL_CAST_FAILED` je v logu samo za lastnika → gredo k snemalčevim pridobitvam
+  (`RunProgress.castFails`, razvrščeni s `wowrun::summary::fail_kind`: spam, targeting, range, resources, interrupted, control,
+  other). Run stran: vrstica v *coin & glory* + nagrade (`castFailAwards`, prag po vrsti, največ 2 na junaka): Keyboard Diarrhea,
+  Shadowboxer, Running on Fumes, Long-Distance Relationship, Commitment Issues, Hostage Situation. `/rankings`: *Keyboard Hall of
+  Shame* (button mashing na uro). Pravi WC: 454 neuspehov, 191 mashing, 97 v prazno, 80 prekinjenih, 56 brez mane.
 - ⏳ Ostane: **C9 replay**, **C5 poročilo v Companionu**, preverjanje razčlenitve v igri (`/wowco probe`).
 
 ## 10. Odločitve za uporabnika

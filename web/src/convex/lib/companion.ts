@@ -1,6 +1,7 @@
 // Čiste funkcije za Companion (brez ctx) – testirane v tests/companion.test.ts.
 import type {
 	BossDetailPlayer,
+	CastFails,
 	Award,
 	LootDrop,
 	PersonalUpload,
@@ -114,7 +115,12 @@ export function checkRun(s: RunSummary, now: number): string | null {
 			g.levels.length > 20 ||
 			g.reputation.some((r) => !okText(r.faction) || Math.abs(r.amount) > 1_000_000) ||
 			g.skills.some((k) => !okText(k.skill) || k.from < 0 || k.to < k.from || k.to > 1000) ||
-			g.levels.some((l) => l < 1 || l > 100)
+			g.levels.some((l) => l < 1 || l > 100) ||
+			(g.castFails &&
+				(g.castFails.total < 0 ||
+					g.castFails.total > 100_000 ||
+					g.castFails.reasons.length > 20 ||
+					g.castFails.reasons.some((r) => !okText(r.name) || r.count < 0)))
 		)
 			return 'bad progress';
 	}
@@ -339,4 +345,87 @@ export function splitBossDetails(segments: RunSummary['segments']) {
 		return { ...seg, players: slimPlayers };
 	});
 	return { slim, details };
+}
+
+/**
+ * Nagrade za neuspele caste (črni humor) med snemalci runa – vsak ima v logu samo svoje.
+ * Nagrado dobi tisti z največ v vrsti, če preseže prag (tudi ko snema sam).
+ */
+const FAIL_AWARDS: {
+	kind: 'spam' | 'targeting' | 'resources' | 'range' | 'interrupted' | 'control';
+	key: string;
+	title: string;
+	min: number;
+	detail: (n: number) => string;
+}[] = [
+	{
+		kind: 'spam',
+		key: 'keyboardDiarrhea',
+		title: 'Keyboard Diarrhea',
+		min: 50,
+		detail: (n) => `Pressed it ${n} times before it was ready. The keyboard has filed for divorce.`
+	},
+	{
+		kind: 'targeting',
+		key: 'shadowboxer',
+		title: 'Shadowboxer',
+		min: 20,
+		detail: (n) => `${n} spells cast at nothing. Fighting demons only you can see.`
+	},
+	{
+		kind: 'resources',
+		key: 'runningOnFumes',
+		title: 'Running on Fumes',
+		min: 15,
+		detail: (n) => `Tried ${n} times on an empty tank. Mana doesn't grow on trees. Mostly.`
+	},
+	{
+		kind: 'range',
+		key: 'longDistance',
+		title: 'Long-Distance Relationship',
+		min: 15,
+		detail: (n) =>
+			`${n} casts from too far, behind a wall or facing the wrong way. Wrong side of the boss, wrong side of history.`
+	},
+	{
+		kind: 'interrupted',
+		key: 'commitmentIssues',
+		title: 'Commitment Issues',
+		min: 30,
+		detail: (n) => `${n} casts ruined by moving or getting kicked. Started strong, finished never.`
+	},
+	{
+		kind: 'control',
+		key: 'hostageSituation',
+		title: 'Hostage Situation',
+		min: 5,
+		detail: (n) => `${n} attempts while stunned, silenced or asleep. Struggling is cute.`
+	}
+];
+
+export function castFailAwards(rows: { slug: string; castFails?: CastFails }[]): Award[] {
+	// najslabši v vsaki vrsti nad pragom; razvrščeno po tem, kolikokrat presega prag
+	const candidates: { award: Award; ratio: number }[] = [];
+	for (const a of FAIL_AWARDS) {
+		let best: { slug: string; n: number } | null = null;
+		for (const r of rows) {
+			const n = r.castFails?.[a.kind] ?? 0;
+			if (n >= a.min && (!best || n > best.n)) best = { slug: r.slug, n };
+		}
+		if (best)
+			candidates.push({
+				award: { key: a.key, title: a.title, slug: best.slug, detail: a.detail(best.n) },
+				ratio: best.n / a.min
+			});
+	}
+	// največ dve sramoti na junaka – tisti dve, kjer je res izstopal
+	const perHero = new Map<string, number>();
+	return candidates
+		.sort((x, y) => y.ratio - x.ratio)
+		.filter(({ award }) => {
+			const n = perHero.get(award.slug) ?? 0;
+			perHero.set(award.slug, n + 1);
+			return n < 2;
+		})
+		.map((c) => c.award);
 }

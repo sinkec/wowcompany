@@ -261,6 +261,19 @@ export const lootRoll = v.object({
 	entries: v.array(rollEntry)
 });
 
+export const castFails = v.object({
+	total: v.number(),
+	spam: v.number(),
+	targeting: v.number(),
+	range: v.number(),
+	resources: v.number(),
+	interrupted: v.number(),
+	control: v.number(),
+	other: v.number(),
+	reasons: v.array(v.object({ name: v.string(), count: v.number() }))
+});
+export type CastFails = Infer<typeof castFails>;
+
 /** Kar je snemalec pridobil v runu (iz /chatlog): XP, denar, reputacija, veščine, leveli. Samo snemalec. */
 export const runProgress = v.object({
 	xp: v.number(),
@@ -269,7 +282,9 @@ export const runProgress = v.object({
 	copper: v.number(),
 	reputation: v.array(v.object({ faction: v.string(), amount: v.number() })),
 	skills: v.array(v.object({ skill: v.string(), from: v.number(), to: v.number() })),
-	levels: v.array(v.number())
+	levels: v.array(v.number()),
+	/** snemalčevi neuspeli casti po vrstah (SPELL_CAST_FAILED je v logu samo za lastnika) */
+	castFails: v.optional(castFails)
 });
 export type RunProgress = Infer<typeof runProgress>;
 
