@@ -68,6 +68,10 @@ Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez nje
   sama shrani SavedVariables (odjava, izhod; `PLAYER_LOGOUT` → izvoz) – Companion run dopolni in ponovno naloži (48 h nazaj),
   brisanje logov počaka na to. Addon ne prosi več za `/reload`. Smer Companion → addon (rekordi v igri) se osveži ob
   naslednji prijavi (igra bere `CompanionData.lua` samo ob nalaganju – drugače ne gre).
+- ✅ **Vprašanje po dungeonu (addon 0.5.0):** ob izhodu iz dungeona, če je addon v runu zabeležil loot, okno
+  *Send this run's loot (N items) to the portal now?* → **Send now** = `C_UI.Reload()` (igra shrani SavedVariables, Companion
+  run dopolni v nekaj sekundah), **Later** = gre ob zaprtju igre (Companion brisanje logov počaka, da je run z dopolnitvijo na
+  portalu), **Don't ask again** (`/wowco ask on|off`). Če se igra sesuje (brez shranjevanja), ostane run brez kakovosti lootu.
 - **Še odprto:** preizkus 0.5.0 v igri (posebej razčlenitev med bojem/po boju), `/wowco probe` v dungeonu.
 - Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`;
   v izvozu je edino tuje ime vodja LASTNEGA partyja).

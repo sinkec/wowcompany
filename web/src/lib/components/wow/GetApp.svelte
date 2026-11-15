@@ -160,10 +160,10 @@
 						shiny the loot was.
 					</li>
 					<li>
-						Nothing to do after a dungeon. The party leader comes from the chat log right away; the
-						loot colours follow when you log out or quit (the game saves the addon's notes then).
-						Type
-						<code class="text-primary">/reload</code> only if you can't wait.
+						After a dungeon the addon asks whether to send the loot now:
+						<b class="text-foreground">Send now</b> reloads the interface for a second,
+						<b class="text-foreground">Later</b> sends it when you close the game (the app keeps your
+						logs until then). The party leader comes from the chat log either way.
 					</li>
 					<li>
 						Want your biggest crit counted <b class="text-foreground">everywhere</b>, not just in
