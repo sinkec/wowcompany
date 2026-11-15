@@ -125,7 +125,7 @@ local function runTimers()
     timers = {}
     for i = 1, #list do list[i]() end
 end
-C_AddOns = { GetAddOnMetadata = function() return "0.4.0" end }
+C_AddOns = { GetAddOnMetadata = function() return "0.4.1" end }
 C_CVar = {
     GetCVar = function() return game.advanced end,
     SetCVar = function(_, v) game.advanced = v end,
@@ -400,6 +400,9 @@ check(l1 and l1.itemId == 2084 and l1.quality == 3 and l1.count == 1 and l1.name
     "loot link: id, quality from the colour, name")
 local l2 = P("Fizzle Boom receives loot: |cnIQ2:|Hitem:2589::::|h[Linen Cloth]|h|rx3.")
 check(l2 and l2.itemId == 2589 and l2.quality == 2 and l2.count == 3, "loot link: new colour form and stack count")
+check(P("|HlootHistory:7|h[Loot]|h: Fizzle Boom has selected Greed for: |cff1eff00|Hitem:3184::::|h[Hook Dagger]|h|r") == nil
+    and P("|HlootHistory:7|h[Loot]|h: Fizzle Boom won: |cff1eff00|Hitem:3184::::|h[Hook Dagger]|h|r") == nil,
+    "roll messages (they start with a [Loot] link) are not loot")
 check(P("You receive loot: Linen Clothx3") == nil and P(SECRET) == nil and P(nil) == nil,
     "loot without a link (or a secret line) is skipped")
 WowCompanyDB.loot = {}

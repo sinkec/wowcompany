@@ -468,7 +468,7 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 - [ ] A13 Smrt: `UNIT_DIED` za igralca + recap smiseln; Feign Death/Soulstone/rezi
 - [ ] A14 Ali se logiranje po prijavi izklopi? (`/reload` ✅ ostane v isti datoteki z novo glavo.) Nova datoteka sredi runa → tail preklopi (✅ testirano sintetično)
 - [x] A15 ✅ lokalni čas PC-ja, Companion (UTC+1) pravilno. Časovni žig: lokalni čas PC-ja (preveri UTC offset, poletni čas)
-- [ ] A17 **Party leader**: combat log ga ne vsebuje. Možnosti: `/chatlog` sistemska sporočila ("X is now the group leader") ali addon
+- [x] A17 ✅ (15. 11. 2026) vodja iz addona (`v1|RUN|43|…|Lil Nossral`), Companion ga je dodal naloženemu runu. **Party leader**: combat log ga ne vsebuje. Možnosti: `/chatlog` sistemska sporočila ("X is now the group leader") ali addon
   (`UnitIsGroupLeader`) → nato polje `leader` v shemi runa (schema 2). Portal zdaj kaže "Unknown".
 - [ ] A16 Scarlet Monastery / Dire Maul / Stratholme / BRD – več kril na enem instanceID: en run ali več?
 

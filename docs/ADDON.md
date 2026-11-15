@@ -47,7 +47,15 @@ Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez nje
     enakem posnetku zamenja samo loot, če prinese več podatkov. **Oblika CHAT_MSG_LOOT v Forever ni preverjena** (če sporočilo
     nima povezave `|Hitem:`, addon vrstice preskoči in ostane vse kot prej).
   - **Minimap gumb** (`Minimap.lua`): levi klik okno, desni klik logiranje, vlečenje okoli minimape, `/wowco minimap`.
-- **Še odprto:** rolli need/greed (dogodki niso preverjeni), statistika lika na portalu, `/wowco probe` v dungeonu.
+- **Preverjeno v pravem dungeonu (15. 11. 2026, WC s partyjem 5, addon 0.4.0):** vodja partyja ✅ (Companion ga je sam dodal
+  že naloženemu runu po `/reload`); `CHAT_MSG_LOOT` **ima povezave `|Hitem:`** ✅ (itemId + kakovost). Napake, popravljene v **0.4.1**:
+  roll sporočila se začnejo s povezavo `[Loot]` (`[Loot]: X has selected Greed for: [item]`) in so se zapisala kot loot z imenom
+  "Loot" → zdaj se upošteva samo sporočilo, kjer je prva povezava predmet; meja 200 vrstic lootu je bila dosežena → 1000;
+  instanceId se shrani ob vstopu (prej ob izvozu, zunaj = ID kontinenta).
+- **Rolli need/greed so v chat logu** kot navaden tekst (`Loot: X has selected Greed for: Item`, `Loot: X passed on: Item`,
+  `Loot: Greed Roll - 97 for Item by X`, `Loot: X won: Item`, `You won:` / `You have selected …`) → bere jih lahko Companion iz
+  `WoWChatLog.txt`, addon ni potreben (naslednji korak).
+- **Še odprto:** rolli v Companionu in na portalu, statistika lika na portalu, `/wowco probe` v dungeonu.
 - Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`;
   v izvozu je edino tuje ime vodja LASTNEGA partyja).
 

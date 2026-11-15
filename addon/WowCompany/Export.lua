@@ -15,7 +15,7 @@ local Export = {}
 ns.Export = Export
 
 local MAX_RUNS = 30
-local MAX_LOOT = 200
+local MAX_LOOT = 1000 -- a long dungeon with a full party drops ~250 items (WC, 15. 11. 2026)
 
 -- Item quality from a link colour: classic hex colours and the newer "|cnIQ3:" form.
 local QUALITY = {
@@ -27,8 +27,11 @@ local QUALITY = {
 function Export.ParseLoot(msg)
     msg = ns.plain(msg)
     if type(msg) ~= "string" then return nil end
+    -- Roll messages start with another link ("[Loot]: X has selected Greed for: [item]", seen in
+    -- Forever 15. 11. 2026); the Companion reads rolls from the chat log, here only received items count.
+    if string.match(msg, "|H(%a+):") ~= "item" then return nil end
     local itemId = tonumber(string.match(msg, "|Hitem:(%d+)"))
-    local name = string.match(msg, "|h%[(.-)%]|h")
+    local name = string.match(msg, "|Hitem:[^|]*|h%[(.-)%]|h")
     if not itemId or not name or name == "" then return nil end
     local quality = tonumber(string.match(msg, "|cnIQ(%d):"))
     if not quality then
