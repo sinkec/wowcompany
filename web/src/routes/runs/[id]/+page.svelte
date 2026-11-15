@@ -590,6 +590,29 @@
 														{/each}
 													</div>
 												{/if}
+												{#each [{ title: 'Buffs (uptime)', list: p.buffs ?? [] }, { title: 'Debuffs kept on enemies', list: p.debuffs ?? [] }] as au (au.title)}
+													{#if au.list.length}
+														<div>
+															<div class="mb-1 font-semibold text-muted-foreground">{au.title}</div>
+															{#each au.list as a (a.id)}
+																{@const pct = Math.min(
+																	100,
+																	Math.round((a.uptimeMs / 1000 / segDur) * 100)
+																)}
+																<div class="flex items-center gap-2">
+																	<span class="w-32 truncate">{a.name}</span>
+																	<div class="h-1.5 flex-1 overflow-hidden rounded bg-muted">
+																		<div
+																			class="h-full rounded bg-primary/70"
+																			style="width: {pct}%"
+																		></div>
+																	</div>
+																	<span class="w-9 text-right tabular-nums">{pct}%</span>
+																</div>
+															{/each}
+														</div>
+													{/if}
+												{/each}
 												{#if p.casts?.length}
 													<div>
 														<div class="mb-1 font-semibold text-muted-foreground">

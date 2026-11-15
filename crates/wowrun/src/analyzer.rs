@@ -1,7 +1,7 @@
 //! Accumulates one dungeon run from parsed records and produces a [`RunSummary`].
 
 use crate::summary::*;
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use wowlog::unit::flags;
 use wowlog::{DamageSource, Kind, Record, Unit};
 
@@ -127,6 +127,16 @@ struct SegPlayerAcc {
     heal_spells: SpellMap,
     casts: CastMap,
     targets: HashMap<String, i64>,
+    /// (spell id, debuff on enemies) → (name, uptime ms)
+    uptime: HashMap<(u32, bool), (String, i64)>,
+}
+
+/// An aura being tracked for uptime: who holds the credit, on which units it is up right now.
+#[derive(Debug, Clone, Default)]
+struct AuraTrack {
+    name: String,
+    targets: HashSet<String>,
+    since: Option<i64>,
 }
 
 #[derive(Debug, Clone)]
@@ -228,6 +238,8 @@ pub struct RunAcc {
     wipes: u32,
     loot: Vec<LootDrop>,
     rolls: Vec<LootRoll>,
+    /// Open aura intervals: (credited player guid, spell id, debuff on enemies).
+    auras: HashMap<(String, u32, bool), AuraTrack>,
     /// Leader from the chat log (see `Detector::push_group`): `Some(None)` = the log writer.
     pub chat_leader: Option<Option<String>>,
 }
@@ -264,6 +276,7 @@ impl RunAcc {
             wipes: 0,
             loot: Vec::new(),
             rolls: Vec::new(),
+            auras: HashMap::new(),
             chat_leader: None,
         }
     }
@@ -490,7 +503,67 @@ impl RunAcc {
         }
     }
 
+    /// Adds `ms` of uptime to the current segment of `guid`.
+    fn credit_aura(&mut self, guid: &str, spell: u32, debuff: bool, name: &str, ms: i64) {
+        if ms <= 0 {
+            return;
+        }
+        if let Some(sp) = self.seg_player(guid) {
+            sp.uptime
+                .entry((spell, debuff))
+                .or_insert_with(|| (name.to_string(), 0))
+                .1 += ms;
+        }
+    }
+
+    /// An aura went up or down on `target` (see `push` for who gets the credit).
+    fn aura_change(&mut self, key: (String, u32, bool), name: &str, target: &str, up: bool, ts: i64) {
+        let t = self.auras.entry(key.clone()).or_insert_with(|| AuraTrack {
+            name: name.to_string(),
+            ..Default::default()
+        });
+        if up {
+            t.targets.insert(target.to_string());
+            if t.since.is_none() {
+                t.since = Some(ts);
+            }
+            return;
+        }
+        t.targets.remove(target);
+        if t.targets.is_empty()
+            && let Some(since) = t.since.take()
+        {
+            let name = t.name.clone();
+            self.credit_aura(&key.0, key.1, key.2, &name, ts - since);
+        }
+    }
+
+    /// A unit died: whatever it carried is gone (the game does not always log the removals).
+    fn aura_unit_gone(&mut self, unit: &str, ts: i64) {
+        let keys: Vec<_> = self
+            .auras
+            .iter()
+            .filter(|(_, t)| t.targets.contains(unit))
+            .map(|(k, t)| (k.clone(), t.name.clone()))
+            .collect();
+        for (k, name) in keys {
+            self.aura_change(k, &name, unit, false, ts);
+        }
+    }
+
     fn close_segment(&mut self, ts: i64) {
+        // time of auras still up belongs to the closing segment; the next one counts from here
+        let open: Vec<_> = self
+            .auras
+            .iter()
+            .filter_map(|(k, t)| t.since.map(|s| (k.clone(), t.name.clone(), s)))
+            .collect();
+        for ((guid, spell, debuff), name, since) in open {
+            self.credit_aura(&guid, spell, debuff, &name, ts - since);
+            if let Some(t) = self.auras.get_mut(&(guid, spell, debuff)) {
+                t.since = Some(ts);
+            }
+        }
         if let Some(mut seg) = self.current_seg.take() {
             seg.end = ts;
             if !(seg.kind == SegmentKind::Trash && seg.is_empty()) {
@@ -810,6 +883,36 @@ impl RunAcc {
                     }
                 }
             }
+            Kind::Aura {
+                spell,
+                change,
+                aura_type,
+                ..
+            } => {
+                use wowlog::{AuraChange, AuraType};
+                let up = match change {
+                    AuraChange::Applied | AuraChange::Refresh | AuraChange::AppliedDose => Some(true),
+                    AuraChange::Removed | AuraChange::Broken | AuraChange::BrokenSpell => Some(false),
+                    AuraChange::RemovedDose => None,
+                };
+                if let Some(up) = up {
+                    if *aura_type == AuraType::Buff && self.players.contains_key(&rec.dest.guid) {
+                        // a buff on a party member (whoever cast it)
+                        let key = (rec.dest.guid.clone(), spell.id, false);
+                        self.aura_change(key, &spell.name, &rec.dest.guid.clone(), up, ts);
+                    } else if *aura_type == AuraType::Debuff
+                        && !self.is_group_side(&rec.dest)
+                        && let Some((owner, _)) = self.actor(&rec.source)
+                    {
+                        // a debuff a party member (or their pet) keeps on an enemy
+                        let key = (owner, spell.id, true);
+                        self.aura_change(key, &spell.name, &rec.dest.guid.clone(), up, ts);
+                    }
+                }
+            }
+            Kind::Died { .. } if !rec.dest.is_player() => {
+                self.aura_unit_gone(&rec.dest.guid.clone(), ts);
+            }
             Kind::Died { unconscious: false, .. } if rec.dest.is_player() => {
                 let start = self.started_at.unwrap_or(ts);
                 if self.players.contains_key(&rec.dest.guid)
@@ -935,6 +1038,8 @@ impl RunAcc {
                                 vec![]
                             },
                             targets: if boss { top_targets(&sp.targets, 8) } else { vec![] },
+                            buffs: if boss { top_auras(&sp.uptime, false, 12) } else { vec![] },
+                            debuffs: if boss { top_auras(&sp.uptime, true, 12) } else { vec![] },
                         })
                     })
                     .collect(),
@@ -1091,6 +1196,21 @@ fn top_casts(m: &CastMap, n: usize) -> Vec<CastStat> {
         })
         .collect();
     v.sort_by(|a, b| b.count.cmp(&a.count).then(a.id.cmp(&b.id)));
+    v.truncate(n);
+    v
+}
+
+fn top_auras(m: &HashMap<(u32, bool), (String, i64)>, debuffs: bool, n: usize) -> Vec<AuraStat> {
+    let mut v: Vec<AuraStat> = m
+        .iter()
+        .filter(|&(&(_, d), &(_, ms))| d == debuffs && ms > 0)
+        .map(|(&(id, _), (name, ms))| AuraStat {
+            id,
+            name: name.clone(),
+            uptime_ms: *ms,
+        })
+        .collect();
+    v.sort_by(|a, b| b.uptime_ms.cmp(&a.uptime_ms).then(a.id.cmp(&b.id)));
     v.truncate(n);
     v
 }

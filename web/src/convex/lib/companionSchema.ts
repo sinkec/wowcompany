@@ -33,6 +33,7 @@ export const castStat = v.object({
 });
 export const targetStat = v.object({ name: v.string(), amount: v.number() });
 export const gearItem = v.object({ itemId: v.number(), ilvl: v.number() });
+export const auraStat = v.object({ id: v.number(), name: v.string(), uptimeMs: v.number() });
 
 export const recordKind = v.union(
 	v.literal('crit'),
@@ -103,7 +104,9 @@ export const segment = v.object({
 			spells: v.optional(v.array(spellStat)),
 			heals: v.optional(v.array(spellStat)),
 			casts: v.optional(v.array(castStat)),
-			targets: v.optional(v.array(targetStat))
+			targets: v.optional(v.array(targetStat)),
+			buffs: v.optional(v.array(auraStat)),
+			debuffs: v.optional(v.array(auraStat))
 		})
 	)
 });

@@ -303,6 +303,20 @@ pub struct SegmentPlayer {
     pub casts: Vec<CastStat>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub targets: Vec<TargetStat>,
+    /// Boss fights only: auras on the player, and debuffs the player kept on enemies (uptime).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub buffs: Vec<AuraStat>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub debuffs: Vec<AuraStat>,
+}
+
+/// How long an aura was up during a fight (for debuffs: on at least one enemy).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuraStat {
+    pub id: u32,
+    pub name: String,
+    pub uptime_ms: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -403,6 +417,8 @@ impl RunSummary {
                 sp.heals.truncate(10);
                 sp.casts.truncate(10);
                 sp.targets.truncate(5);
+                sp.buffs.truncate(5);
+                sp.debuffs.truncate(5);
             }
         }
         if self.json_len() > max_bytes {

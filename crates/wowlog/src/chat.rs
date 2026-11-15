@@ -279,13 +279,12 @@ pub fn parse_group_line(line: &str, default_year: i64) -> Option<GroupLine> {
         GroupEvent::Invited(person(who)?)
     } else if text == "You leave the group." || text == "Your group has been disbanded." {
         GroupEvent::Left
-    } else if let Some(i) = text.find("[Party Leader]") {
+    } else {
         // "|Hchannel:PARTY|h[Party Leader]|h Name: text" or "[Party Leader] Name: text"
+        let i = text.find("[Party Leader]")?;
         let rest = text[i + "[Party Leader]".len()..].trim_start_matches("|h").trim_start();
         let (who, _) = rest.split_once(": ")?;
         GroupEvent::LeaderSpoke(person(who)?)
-    } else {
-        return None;
     };
     Some(GroupLine { timestamp, event })
 }

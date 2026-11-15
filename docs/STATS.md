@@ -348,7 +348,10 @@ Izdaje: S0 brez izdaje · S2+S3 → **Companion v0.2.0** (z addonom 0.5) · S4+S
 - ✅ **W7** oprema ob zadnjem boss pullu (COMBATANT_INFO: ID + ilvl) na strani runa (Bosses → igralec), ikone iz Blizzard
   media v cache `itemIcons` (akcija po uploadu). Imen ni: Forever `data/wow/item/{id}` vrača 404, iskalni indeks nima večine predmetov.
 - ✅ **W6** Company All-Stars na `/rankings` (po bossu 120 × najboljši/najboljši v skupini, boljša od DPS/Healer table, vsota po dungeonu).
-- ⏳ Naprej: C2 uptime buffov/debuffov, S2 addon 0.5 v igri, izdaja Companion v0.1.7 (shema 4 + rolli + omejitve). Na prod enkrat:
+- ✅ **C2** uptime po boss boju: buffi na igralcu in debuffi, ki jih igralec (ali pet) drži na vsaj enem nasprotniku
+  (odprti intervali se zaključijo ob koncu segmenta; smrt nasprotnika zapre njegove debuffe). Strani runa → Bosses → igralec.
+  Pravi WC: Thorns 100 %, Serpent Sting 99 % na Pythasu; run 124 KB.
+- ⏳ Naprej: S2 addon 0.5 v igri, izdaja Companion v0.1.7 (shema 4 + rolli + omejitve). Na prod enkrat:
   `bunx convex run --prod seasons:checkPatch` in `bunx convex run --prod companion:backfillParses '{}'` (iz `web/`).
 
 ## 10. Odločitve za uporabnika
