@@ -79,7 +79,12 @@ export const get = query({
 				: null;
 		const classOf = await classesFor(ctx, [run]);
 		// ikone opreme ob zadnjem pullu (seznam, ne objekt: Convex ključi morajo biti ASCII imena)
-		const gearIcons: { itemId: number; url: string | null }[] = [];
+		const gearIcons: {
+			itemId: number;
+			url: string | null;
+			name: string | null;
+			quality: number | null;
+		}[] = [];
 		if (allowed('runDetails') && details) {
 			const ids = new Set(details.players.flatMap((p) => (p.gear ?? []).map((g) => g.itemId)));
 			for (const itemId of ids) {
@@ -87,7 +92,17 @@ export const get = query({
 					.query('itemIcons')
 					.withIndex('by_item', (q) => q.eq('itemId', itemId))
 					.first();
-				if (hit) gearIcons.push({ itemId, url: hit.url });
+				const info = await ctx.db
+					.query('itemInfo')
+					.withIndex('by_itemId', (q) => q.eq('itemId', itemId))
+					.first();
+				if (hit || info)
+					gearIcons.push({
+						itemId,
+						url: hit?.url ?? null,
+						name: info?.name ?? null,
+						quality: info?.quality ?? null
+					});
 			}
 		}
 		return {

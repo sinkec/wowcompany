@@ -14,7 +14,7 @@ import {
 	type QueryCtx
 } from './_generated/server.js';
 import { getViewer } from './lib/access.js';
-import { itemIcon, mapLimit } from './lib/blizzard.js';
+import { itemById, itemByName, itemIcon, mapLimit } from './lib/blizzard.js';
 import {
 	addRecorder,
 	beatsRecord,
@@ -417,7 +417,7 @@ export const ingestRun = internalMutation({
 			await writeParses(ctx, runId, s, party);
 			// Discord: enkrat, čez 5 min (drugi snemalec, dopolnitev iz addona); postRun preveri vidnost
 			await ctx.scheduler.runAfter(5 * 60_000, internal.discord.postRun, { runId });
-			await ctx.scheduler.runAfter(0, internal.companion.fetchGearIcons, { runId });
+			await ctx.scheduler.runAfter(0, internal.companion.enrichItems, { runId });
 			return { runId, created: true, recorderAdded: true, replaced: false };
 		}
 
@@ -435,7 +435,7 @@ export const ingestRun = internalMutation({
 			await writeParticipants(ctx, existing._id, party, s.startedAt);
 			await writeHeroRecords(ctx, existing._id, s, party);
 			await writeParses(ctx, existing._id, s, party);
-			await ctx.scheduler.runAfter(0, internal.companion.fetchGearIcons, { runId: existing._id });
+			await ctx.scheduler.runAfter(0, internal.companion.enrichItems, { runId: existing._id });
 		} else {
 			// isti posnetek z več podatki o lootu (ID/kakovost iz addona pride pozno) ali z rolli
 			// (novejša aplikacija): zamenjaj samo to
@@ -649,34 +649,68 @@ export const deleteDevice = internalMutation({
 	}
 });
 
-// ------------------------------------------------------------------ ikone opreme (oprema ob killu)
+// ------------------------------------------------------------------ predmeti: ikone, imena, kakovost
 
-/** ID-ji predmetov opreme runa, ki še nimajo ikone v cacheu. */
-export const missingGearIcons = internalQuery({
-	args: { runId: v.id('runs') },
-	handler: async (ctx, { runId }) => {
+/** Kaj o predmetih runa še manjka v cacheu (ikone in imena opreme, kakovost lootu po imenu). */
+export const itemWork = internalQuery({
+	args: { runId: v.id('runs'), now: v.number() },
+	handler: async (ctx, { runId, now }) => {
+		// neuspeh se ponovno poskusi po tednu (pravila iskanja se lahko izboljšajo)
+		const fresh = (hit: { quality: number | null; at: number } | null) =>
+			!!hit && (hit.quality !== null || now - hit.at < 7 * 86_400_000);
 		const d = await ctx.db
 			.query('runDetails')
 			.withIndex('by_run', (q) => q.eq('runId', runId))
 			.unique();
-		const ids = [
+		const gearIds = [
 			...new Set((d?.players ?? []).flatMap((p) => (p.gear ?? []).map((g) => g.itemId)))
 		];
-		const out: number[] = [];
-		for (const itemId of ids) {
-			const hit = await ctx.db
-				.query('itemIcons')
-				.withIndex('by_item', (q) => q.eq('itemId', itemId))
+		const icons: number[] = [];
+		const ids: number[] = [];
+		for (const itemId of gearIds) {
+			if (
+				!(await ctx.db
+					.query('itemIcons')
+					.withIndex('by_item', (q) => q.eq('itemId', itemId))
+					.first())
+			)
+				icons.push(itemId);
+			const info = await ctx.db
+				.query('itemInfo')
+				.withIndex('by_itemId', (q) => q.eq('itemId', itemId))
 				.first();
-			if (!hit) out.push(itemId);
+			if (!fresh(info)) ids.push(itemId);
 		}
-		return out.slice(0, 100);
+		const lootNames = [
+			...new Set([
+				...(d?.loot ?? []).filter((l) => l.quality === null).map((l) => l.item),
+				...(d?.rolls ?? []).filter((r) => r.quality === null).map((r) => r.item)
+			])
+		];
+		const names: string[] = [];
+		for (const name of lootNames) {
+			const info = await ctx.db
+				.query('itemInfo')
+				.withIndex('by_name', (q) => q.eq('name', name))
+				.first();
+			if (!fresh(info)) names.push(name);
+		}
+		return { icons: icons.slice(0, 100), ids: ids.slice(0, 100), names: names.slice(0, 150) };
 	}
 });
 
-export const saveItemIcons = internalMutation({
-	args: { icons: v.array(v.object({ itemId: v.number(), url: v.union(v.string(), v.null()) })) },
-	handler: async (ctx, { icons }) => {
+export const saveItems = internalMutation({
+	args: {
+		icons: v.array(v.object({ itemId: v.number(), url: v.union(v.string(), v.null()) })),
+		infos: v.array(
+			v.object({
+				itemId: v.union(v.number(), v.null()),
+				name: v.string(),
+				quality: v.union(v.number(), v.null())
+			})
+		)
+	},
+	handler: async (ctx, { icons, infos }) => {
 		for (const icon of icons) {
 			const hit = await ctx.db
 				.query('itemIcons')
@@ -684,20 +718,97 @@ export const saveItemIcons = internalMutation({
 				.first();
 			if (!hit) await ctx.db.insert('itemIcons', icon);
 		}
+		const now = Date.now();
+		for (const info of infos) {
+			const hit = await ctx.db
+				.query('itemInfo')
+				.withIndex('by_name', (q) => q.eq('name', info.name))
+				.first();
+			if (!hit) await ctx.db.insert('itemInfo', { ...info, at: now });
+			else if (hit.quality === null)
+				await ctx.db.replace('itemInfo', hit._id, { ...info, at: now });
+		}
 	}
 });
 
-/** Po uploadu: ikone za opremo iz COMBATANT_INFO (Blizzard media, enkrat na predmet za vedno). */
-export const fetchGearIcons = internalAction({
+/** Kakovost in ID iz cachea v loot in rolle runa, kjer ju še ni (addon ima prednost: ne prepiše). */
+export const applyItems = internalMutation({
 	args: { runId: v.id('runs') },
 	handler: async (ctx, { runId }) => {
-		const ids: number[] = await ctx.runQuery(internal.companion.missingGearIcons, { runId });
-		if (!ids.length) return 0;
-		const icons = await mapLimit(ids, 4, async (itemId) => ({
+		const d = await ctx.db
+			.query('runDetails')
+			.withIndex('by_run', (q) => q.eq('runId', runId))
+			.unique();
+		if (!d) return 0;
+		const cache = new Map<string, { itemId: number | null; quality: number | null }>();
+		const info = async (name: string) => {
+			if (!cache.has(name)) {
+				const hit = await ctx.db
+					.query('itemInfo')
+					.withIndex('by_name', (q) => q.eq('name', name))
+					.first();
+				cache.set(name, { itemId: hit?.itemId ?? null, quality: hit?.quality ?? null });
+			}
+			return cache.get(name)!;
+		};
+		let changed = 0;
+		const fill = async <T extends { item: string; itemId: number | null; quality: number | null }>(
+			x: T
+		) => {
+			if (x.quality !== null) return x;
+			const i = await info(x.item);
+			if (i.quality === null) return x;
+			changed++;
+			return { ...x, quality: i.quality, itemId: x.itemId ?? i.itemId };
+		};
+		const loot = await Promise.all((d.loot ?? []).map(fill));
+		const rolls = await Promise.all((d.rolls ?? []).map(fill));
+		if (changed) await ctx.db.patch('runDetails', d._id, { loot, ...(d.rolls ? { rolls } : {}) });
+		return changed;
+	}
+});
+
+/**
+ * Po uploadu: ikone in imena opreme (po ID-ju) ter kakovost lootu in rollov (po imenu iz chat loga)
+ * iz Blizzardovega API-ja – brez addona in brez /reload. Vse se shrani za vedno (tudi neuspeh).
+ */
+export const enrichItems = internalAction({
+	args: { runId: v.id('runs') },
+	handler: async (ctx, { runId }) => {
+		const work: { icons: number[]; ids: number[]; names: string[] } = await ctx.runQuery(
+			internal.companion.itemWork,
+			{ runId, now: Date.now() }
+		);
+		const icons = await mapLimit(work.icons, 4, async (itemId) => ({
 			itemId,
 			url: await itemIcon(itemId)
 		}));
-		await ctx.runMutation(internal.companion.saveItemIcons, { icons });
-		return icons.length;
+		const byId = await mapLimit(work.ids, 4, async (itemId) => {
+			const r = await itemById(itemId).catch(() => null);
+			return r ? { itemId, name: r.name, quality: r.quality } : null;
+		});
+		const byName = await mapLimit(work.names, 4, async (name) => {
+			const r = await itemByName(name).catch(() => null);
+			return { name, itemId: r?.itemId ?? null, quality: r?.quality ?? null };
+		});
+		const infos = [...byId.filter((x): x is NonNullable<typeof x> => x !== null), ...byName];
+		if (icons.length || infos.length)
+			await ctx.runMutation(internal.companion.saveItems, { icons, infos });
+		const filled: number = await ctx.runMutation(internal.companion.applyItems, { runId });
+		return { icons: icons.length, ids: byId.length, names: byName.length, filled };
+	}
+});
+
+/** CLI/enkratno: dopolni predmete (imena, kakovost, ikone) za vse rune (`companion:enrichAllRuns '{}'`). */
+export const enrichAllRuns = internalMutation({
+	args: {},
+	handler: async (ctx) => {
+		const runs = await ctx.db.query('runs').withIndex('by_started_at').order('desc').take(300);
+		for (let i = 0; i < runs.length; i++) {
+			await ctx.scheduler.runAfter(i * 3000, internal.companion.enrichItems, {
+				runId: runs[i]._id
+			});
+		}
+		return runs.length;
 	}
 });

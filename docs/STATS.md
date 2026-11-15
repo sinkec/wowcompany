@@ -347,6 +347,12 @@ Izdaje: S0 brez izdaje · S2+S3 → **Companion v0.2.0** (z addonom 0.5) · S4+S
   Visibility (Discord stolpec, privzeto izklopljena!). Po deployu: **Register commands** v Portal Room (nov ukaz).
 - ✅ **W7** oprema ob zadnjem boss pullu (COMBATANT_INFO: ID + ilvl) na strani runa (Bosses → igralec), ikone iz Blizzard
   media v cache `itemIcons` (akcija po uploadu). Imen ni: Forever `data/wow/item/{id}` vrača 404, iskalni indeks nima večine predmetov.
+- ✅ **Predmeti brez addona (15. 11. 2026):** Forever `item/{id}` vrača 404, **retail `static-eu` in `static-classic-eu` pa
+  klasične predmete poznata** (6449 Glowing Lizardscale Cloak RARE). Po uploadu `companion.enrichItems`: oprema po ID-ju →
+  ime + kakovost (retail → classic → Forever iskalnik), loot in rolli po imenu iz chat loga → ID + kakovost (retail/Forever
+  iskanje, natančno ime; naključna pripona → osnova). Pravi WC: **223/226 loot s kakovostjo brez addona** (addon prej 70).
+  Ostanejo samo-Forever predmeti (Slither Cord) → addon. Cache `itemInfo` (neuspeh se ponovi po 7 dneh). Za stare rune:
+  `bunx convex run [--prod] companion:enrichAllRuns '{}'`.
 - ✅ **W6** Company All-Stars na `/rankings` (po bossu 120 × najboljši/najboljši v skupini, boljša od DPS/Healer table, vsota po dungeonu).
 - ✅ **C2** uptime po boss boju: buffi na igralcu in debuffi, ki jih igralec (ali pet) drži na vsaj enem nasprotniku
   (odprti intervali se zaključijo ob koncu segmenta; smrt nasprotnika zapre njegove debuffe). Strani runa → Bosses → igralec.

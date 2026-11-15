@@ -77,6 +77,7 @@
 	let openBoss = $state<string | null>(null);
 	// oprema ob zadnjem pullu (COMBATANT_INFO) + ikone iz cachea
 	const iconOf = $derived(new Map((run?.gearIcons ?? []).map((g) => [g.itemId, g.url] as const)));
+	const itemOf = $derived(new Map((run?.gearIcons ?? []).map((g) => [g.itemId, g] as const)));
 	const gearOf = (slug: string) => players.find((x) => x.slug === slug)?.gear ?? [];
 
 	// need/greed rolli: po predmetih + kocke po igralcih (srečnež, preklete kocke)
@@ -558,8 +559,12 @@
 													<div class="flex flex-wrap gap-1">
 														{#each gearOf(p.slug) as g, gi (gi)}
 															<div
-																class="relative size-8 overflow-hidden rounded border border-border/60 bg-muted"
-																title="Item {g.itemId} · ilvl {g.ilvl}"
+																class="relative size-8 overflow-hidden rounded border bg-muted"
+																style="border-color: {itemOf.get(g.itemId)?.quality != null
+																	? lootColor(itemOf.get(g.itemId)?.quality)
+																	: 'var(--border)'}"
+																title="{itemOf.get(g.itemId)?.name ??
+																	`Item ${g.itemId}`} · ilvl {g.ilvl}"
 															>
 																{#if iconOf.get(g.itemId)}<img
 																		src={iconOf.get(g.itemId)}

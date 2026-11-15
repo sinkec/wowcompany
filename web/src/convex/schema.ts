@@ -218,6 +218,17 @@ export default defineSchema({
 	}).index('by_class', ['classId']),
 
 	// Trajni predpomnilnik ikon predmetov.
+	// Imena/kakovost predmetov (lib/items.ts): po ID-ju (oprema) ali po imenu (loot iz chat loga).
+	// Neuspeh se tudi zapiše (quality null), da se isti predmet ne išče znova.
+	itemInfo: defineTable({
+		itemId: v.union(v.number(), v.null()),
+		name: v.string(),
+		quality: v.union(v.number(), v.null()),
+		at: v.number()
+	})
+		.index('by_itemId', ['itemId'])
+		.index('by_name', ['name']),
+
 	itemIcons: defineTable({
 		itemId: v.number(),
 		url: v.union(v.string(), v.null())

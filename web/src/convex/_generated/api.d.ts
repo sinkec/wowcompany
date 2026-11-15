@@ -28,6 +28,7 @@ import type * as lib_discordConfig from "../lib/discordConfig.js";
 import type * as lib_discordEmbed from "../lib/discordEmbed.js";
 import type * as lib_discordRuns from "../lib/discordRuns.js";
 import type * as lib_humor from "../lib/humor.js";
+import type * as lib_items from "../lib/items.js";
 import type * as lib_normalize from "../lib/normalize.js";
 import type * as lib_parses from "../lib/parses.js";
 import type * as lib_parsesDb from "../lib/parsesDb.js";
@@ -70,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   "lib/discordEmbed": typeof lib_discordEmbed;
   "lib/discordRuns": typeof lib_discordRuns;
   "lib/humor": typeof lib_humor;
+  "lib/items": typeof lib_items;
   "lib/normalize": typeof lib_normalize;
   "lib/parses": typeof lib_parses;
   "lib/parsesDb": typeof lib_parsesDb;

@@ -1,4 +1,5 @@
 // Battle.net klient za WoW Forever (client credentials). Teče v Convex akcijah (fetch).
+import { QUALITY_BY_TYPE, baseName, exactHit } from './items.js';
 
 const env = (k: string, d?: string) => {
 	const v = process.env[k] ?? d;
@@ -20,7 +21,10 @@ export async function getToken(force = false): Promise<string> {
 	const basic = btoa(`${env('BLIZZARD_CLIENT_ID')}:${env('BLIZZARD_CLIENT_SECRET')}`);
 	const res = await fetch('https://oauth.battle.net/token', {
 		method: 'POST',
-		headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+		headers: {
+			Authorization: `Basic ${basic}`,
+			'Content-Type': 'application/x-www-form-urlencoded'
+		},
 		body: 'grant_type=client_credentials'
 	});
 	if (!res.ok) throw new Error(`Blizzard token: ${res.status} ${await res.text()}`);
@@ -30,26 +34,36 @@ export async function getToken(force = false): Promise<string> {
 }
 
 export type GetResult =
-	| { status: 200; body: any; lastModified?: string }
-	| { status: 304 }
-	| { status: 404 };
+	{ status: 200; body: any; lastModified?: string } | { status: 304 } | { status: 404 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** GET z If-Modified-Since, ponovnim poskusom ob 429/5xx in osvežitvijo tokena ob 401. */
-export async function get(path: string[], ns: string, ifModifiedSince?: string): Promise<GetResult> {
+export async function get(
+	path: string[],
+	ns: string,
+	ifModifiedSince?: string,
+	params?: Record<string, string>
+): Promise<GetResult> {
 	const url = new URL(`https://${region()}.api.blizzard.com/`);
 	url.pathname = '/' + path.map(encodeURIComponent).join('/');
 	url.searchParams.set('namespace', ns);
 	url.searchParams.set('locale', locale());
+	for (const [k, val] of Object.entries(params ?? {})) url.searchParams.set(k, val);
 
 	let forceToken = false;
 	for (let attempt = 0; attempt < 4; attempt++) {
-		const headers: Record<string, string> = { Authorization: `Bearer ${await getToken(forceToken)}` };
+		const headers: Record<string, string> = {
+			Authorization: `Bearer ${await getToken(forceToken)}`
+		};
 		if (ifModifiedSince) headers['If-Modified-Since'] = ifModifiedSince;
 		const res = await fetch(url, { headers });
 		if (res.status === 200) {
-			return { status: 200, body: await res.json(), lastModified: res.headers.get('last-modified') ?? undefined };
+			return {
+				status: 200,
+				body: await res.json(),
+				lastModified: res.headers.get('last-modified') ?? undefined
+			};
 		}
 		if (res.status === 304) return { status: 304 };
 		if (res.status === 404) return { status: 404 };
@@ -111,13 +125,17 @@ export async function itemIcon(itemId: number): Promise<string | null> {
 }
 
 /** Največji rang talenta + ikona njegovega uroka (shrani se za vedno). */
-export async function talentInfo(talentId: number, spellId: number | null): Promise<{ maxRank: number; icon: string | null }> {
+export async function talentInfo(
+	talentId: number,
+	spellId: number | null
+): Promise<{ maxRank: number; icon: string | null }> {
 	const t = await get(['data', 'wow', 'talent', String(talentId)], staticNs());
 	const maxRank = t.status === 200 ? (t.body.rank_descriptions?.length ?? 1) : 1;
 	let icon: string | null = null;
 	if (spellId) {
 		const m = await get(['data', 'wow', 'media', 'spell', String(spellId)], staticNs());
-		if (m.status === 200) icon = (m.body.assets ?? []).find((a: any) => a.key === 'icon')?.value ?? null;
+		if (m.status === 200)
+			icon = (m.body.assets ?? []).find((a: any) => a.key === 'icon')?.value ?? null;
 	}
 	return { maxRank, icon };
 }
@@ -126,11 +144,18 @@ export async function talentInfo(talentId: number, spellId: number | null): Prom
 export async function classSpecs(classId: number): Promise<{ id: number; name: string }[] | null> {
 	const r = await get(['data', 'wow', 'playable-class', String(classId)], staticNs());
 	if (r.status !== 200) return null;
-	return (r.body.specializations ?? []).map((s: any) => ({ id: Number(s.id), name: String(s.name) }));
+	return (r.body.specializations ?? []).map((s: any) => ({
+		id: Number(s.id),
+		name: String(s.name)
+	}));
 }
 
 /** Izvede `fn` nad elementi z omejeno sočasnostjo. */
-export async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+export async function mapLimit<T, R>(
+	items: T[],
+	limit: number,
+	fn: (t: T) => Promise<R>
+): Promise<R[]> {
 	const out: R[] = new Array(items.length);
 	let i = 0;
 	const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -144,4 +169,53 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Pr
 }
 
 /** "Sinek Helgater" -> "sinek-helgater" */
-export const slugify = (name: string) => name.trim().toLowerCase().split(/\s+/).filter(Boolean).join('-');
+export const slugify = (name: string) =>
+	name.trim().toLowerCase().split(/\s+/).filter(Boolean).join('-');
+
+// ------------------------------------------------------------------ predmeti (lib/items.ts)
+
+const retailNs = () => `static-${region()}`;
+const classicNs = () => `static-classic-${region()}`;
+
+/** Ime in kakovost po ID-ju: Forever ga ne vrne (404), retail/classic za klasične predmete da. */
+export async function itemById(
+	itemId: number
+): Promise<{ name: string; quality: number | null } | null> {
+	for (const ns of [retailNs(), classicNs()]) {
+		const r = await get(['data', 'wow', 'item', String(itemId)], ns);
+		if (r.status === 200 && r.body?.name)
+			return {
+				name: String(r.body.name),
+				quality: QUALITY_BY_TYPE[r.body.quality?.type ?? ''] ?? null
+			};
+	}
+	// samo-Forever predmet: včasih ga pozna Forever iskalnik
+	const s = await get(['data', 'wow', 'search', 'item'], staticNs(), undefined, {
+		id: String(itemId)
+	});
+	const hit = s.status === 200 ? s.body?.results?.[0]?.data : null;
+	if (hit?.name) {
+		const name = typeof hit.name === 'string' ? hit.name : (hit.name.en_GB ?? hit.name.en_US);
+		if (name) return { name, quality: QUALITY_BY_TYPE[hit.quality?.type ?? ''] ?? null };
+	}
+	return null;
+}
+
+/** ID in kakovost po natančnem imenu (iz chat loga): retail, Forever, nato osnova brez naključne pripone. */
+export async function itemByName(
+	name: string
+): Promise<{ itemId: number | null; quality: number | null } | null> {
+	const search = async (ns: string, n: string) => {
+		const r = await get(['data', 'wow', 'search', 'item'], ns, undefined, {
+			[`name.${locale()}`]: n,
+			_pageSize: '100'
+		});
+		return r.status === 200 ? exactHit(r.body?.results ?? [], n) : null;
+	};
+	const direct = (await search(retailNs(), name)) ?? (await search(staticNs(), name));
+	if (direct) return direct;
+	const base = baseName(name);
+	const b = base ? ((await search(retailNs(), base)) ?? (await search(staticNs(), base))) : null;
+	// predmet z naključno pripono ima svoj ID samo v igri; kakovost je od osnove
+	return b ? { itemId: null, quality: b.quality } : null;
+}
