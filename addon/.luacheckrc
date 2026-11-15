@@ -9,6 +9,7 @@ globals = {
     "SLASH_WOWCOMPANY2",
     "SlashCmdList",
     "UISpecialFrames",
+    "StaticPopupDialogs",
 }
 -- game API the addon reads (verified in WoW Forever by the self-test, see ADDON.md §4.1)
 read_globals = {
@@ -16,6 +17,9 @@ read_globals = {
     "BreakUpLargeNumbers",
     "C_AddOns",
     "C_Spell",
+    "C_UI",
+    "ReloadUI",
+    "StaticPopup_Show",
     "SendChatMessage",
     "C_CVar",
     "C_DamageMeter",

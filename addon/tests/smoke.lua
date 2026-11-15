@@ -131,6 +131,10 @@ C_AddOns = {
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
 local sent = {}
+StaticPopupDialogs = {}
+local popups, reloads = {}, 0
+function StaticPopup_Show(name, arg) table.insert(popups, { name = name, arg = arg }) end
+C_UI = { Reload = function() reloads = reloads + 1 end }
 function SendChatMessage(msg, channel) table.insert(sent, { msg = msg, channel = channel }) end
 C_CVar = {
     GetCVar = function() return game.advanced end,
@@ -633,7 +637,10 @@ check(widgetWith("Grobos Stinkfoot") ~= nil, "details off: our meter is back")
 game.details = false
 -- run summary after leaving the dungeon
 local now = GetServerTime()
+WowCompanyDB.loot = { { at = now - 600, count = 2, itemId = 2589, quality = 1, name = "Linen Cloth" },
+    { at = now - 7200, count = 1, itemId = 1, quality = 0, name = "From an older run" } }
 WowCompanyDB.state.run = { zone = "Wailing Caverns", startedAt = now - 3552, leftAt = now, afterFight = 0 }
+for k in pairs(popups) do popups[k] = nil end -- earlier test dungeons asked too
 fire("ZONE_CHANGED_NEW_AREA")
 runTimers()
 check(said("Wailing Caverns done in 59:12") and said("1 boss, 3 fights"), "summary: time, bosses and fights in chat")
@@ -642,6 +649,13 @@ local before = #printed
 fire("ZONE_CHANGED_NEW_AREA")
 runTimers()
 check(#printed == before, "summary: said once per run")
+check(#popups == 1 and popups[1].name == "WOWCOMPANY_SEND" and popups[1].arg == "2",
+    "send question: asked once, counts only this run's loot")
+local dlg = StaticPopupDialogs.WOWCOMPANY_SEND
+check(dlg and dlg.button1 == "Send now" and dlg.button2 == "Later", "send question: Send now / Later")
+dlg.OnAccept()
+check(reloads == 1, "send now: reloads (the game saves the notes for the Companion)")
+
 slash("report")
 check(said("not in a party") and #sent == 0, "report: nobody to tell outside a party")
 game.grouped = true
@@ -649,6 +663,15 @@ slash("report")
 check(#sent >= 2 and sent[1].channel == "PARTY" and string.find(sent[1].msg, "Wailing Caverns", 1, true),
     "report: the summary goes to /party only")
 game.grouped = false
+-- "don't ask again"
+dlg.OnAlt()
+check(WowCompanyDB.settings.askSend == false, "don't ask again: switches it off")
+WowCompanyDB.state.run = { zone = "Deadmines", startedAt = now - 100, leftAt = now, afterFight = 0 }
+fire("ZONE_CHANGED_NEW_AREA")
+runTimers()
+check(#popups == 1, "don't ask again: no popup after the next dungeon")
+slash("ask on")
+check(WowCompanyDB.settings.askSend == true, "/wowco ask on brings it back")
 
 realPrint(failures == 0 and "all addon checks passed" or (failures .. " addon check(s) FAILED"))
 os.exit(failures == 0 and 0 or 1)

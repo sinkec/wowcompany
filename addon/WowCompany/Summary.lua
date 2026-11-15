@@ -66,6 +66,57 @@ function Summary.Lines(run, fights, now)
     return lines
 end
 
+-- ------------------------------------------------------------------ "send the loot now?"
+-- The game saves the addon's notes (loot colours for the portal) only on reload, logout and exit.
+-- After a dungeon we ask once: Send now = reload right away; Later = they go when the game closes
+-- (the Companion keeps the logs until then); Don't ask again = never this popup.
+
+local function reloadUI()
+    if type(C_UI) == "table" and type(C_UI.Reload) == "function" then
+        C_UI.Reload()
+    elseif type(ReloadUI) == "function" then
+        ReloadUI()
+    end
+end
+
+-- Loot the addon noted during this run (what a reload would hand over now).
+function Summary.RunLoot(run)
+    local n = 0
+    for _, l in ipairs(type(ns.db.loot) == "table" and ns.db.loot or {}) do
+        if type(l.at) == "number" and l.at >= run.startedAt and l.at <= (run.leftAt or ns.now()) + 300 then
+            n = n + (tonumber(l.count) or 1)
+        end
+    end
+    return n
+end
+
+function Summary.Ask(items)
+    if type(StaticPopupDialogs) ~= "table" or type(StaticPopup_Show) ~= "function" then return false end
+    StaticPopupDialogs.WOWCOMPANY_SEND = StaticPopupDialogs.WOWCOMPANY_SEND or {
+        text = "WowCompany\n\nSend this run's loot (%s items) to the portal now?\n"
+            .. "It reloads the interface for a second.\nLater: it goes when you close the game.",
+        button1 = "Send now",
+        button2 = "Later",
+        button3 = "Don't ask again",
+        OnAccept = reloadUI,
+        OnAlt = function()
+            ns.db.settings.askSend = false
+            ns.say("won't ask again. /wowco ask on brings the question back.")
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+    StaticPopup_Show("WOWCOMPANY_SEND", tostring(items))
+    return true
+end
+
+ns.command("ask", "ask on|off – after a dungeon, ask whether to send the loot now", function(rest)
+    if rest == "on" or rest == "off" then ns.db.settings.askSend = rest == "on" end
+    ns.say(ns.db.settings.askSend and "will ask after each dungeon." or "won't ask; loot goes when the game closes.")
+end)
+
 -- Fights that belong to the run: after the one before we walked in.
 local function runFights(run)
     local out = {}
@@ -81,11 +132,14 @@ local function afterLeaving()
     if not run or not run.leftAt or run.summarized then return end
     run.summarized = true
     local fights = runFights(run)
-    if #fights == 0 then return end
-    local lines = Summary.Lines(run, fights, ns.now())
-    ns.db.state.lastSummary = lines
-    for i = 1, #lines do ns.say(lines[i]) end
-    ns.say("|cff9d9d9d/wowco report says this in /party.|r")
+    if #fights > 0 then
+        local lines = Summary.Lines(run, fights, ns.now())
+        ns.db.state.lastSummary = lines
+        for i = 1, #lines do ns.say(lines[i]) end
+        ns.say("|cff9d9d9d/wowco report says this in /party.|r")
+    end
+    local items = Summary.RunLoot(run)
+    if items > 0 and ns.db.settings.askSend ~= false then Summary.Ask(items) end
 end
 
 local function later()
