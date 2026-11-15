@@ -18,6 +18,8 @@
 		return [...m.entries()];
 	});
 	const pctText = (p: number | null) => (p === null ? '—' : String(Math.floor(p)));
+	const nameOf = (s: string) =>
+		d && !d.locked ? (d.people.find((p) => p.slug === s)?.name ?? s) : s;
 </script>
 
 {#if d?.locked}
@@ -106,6 +108,27 @@
 							<tr class="border-b border-border/30 bg-muted/20">
 								<td colspan="6" class="px-3 py-2">
 									<p class="mb-2 text-xs text-muted-foreground italic">{parseQuip(e.bestPct)}</p>
+									{#if e.top}
+										<p class="mb-2 text-xs">
+											{#if e.top.slug === slug}
+												<span class="text-primary">Company best on this boss.</span> Everyone else is
+												chasing you.
+											{:else}
+												Company best:
+												<a href="/c/{e.top.slug}" class="font-semibold hover:underline"
+													>{nameOf(e.top.slug)}</a
+												>
+												<a
+													href="/runs/{e.top.runId}?tab=bosses"
+													class="tabular-nums hover:underline">{fmtRate(e.top.value)}</a
+												>
+												· your best is
+												<b class="tabular-nums"
+													>{Math.round((e.best / Math.max(e.top.value, 0.1)) * 100)}%</b
+												> of that.
+											{/if}
+										</p>
+									{/if}
 									<table class="w-full text-xs">
 										<thead class="text-muted-foreground">
 											<tr>

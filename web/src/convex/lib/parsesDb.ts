@@ -11,7 +11,11 @@ export async function poolFor(
 	r: Pick<Doc<'parses'>, 'encounterId' | 'difficultyId' | 'role' | 'season'>
 ) {
 	const doc = await poolDoc(ctx, r);
-	return (doc?.entries ?? []).map((e) => ({ slug: e.slug, value: e.value }));
+	return (doc?.entries ?? []).map((e) => ({
+		slug: e.slug,
+		value: e.value,
+		runId: e.runId as string
+	}));
 }
 
 /** Zavihek Logs (in /parses) za junaka v sezoni (privzeto trenutni). */
@@ -22,7 +26,7 @@ export async function loadHeroLogs(ctx: QueryCtx, slug: string, season?: number)
 		.query('parses')
 		.withIndex('by_slug_and_season', (q) => q.eq('slug', slug).eq('season', chosen))
 		.take(500);
-	const pools = new Map<string, { slug: string; value: number }[]>();
+	const pools = new Map<string, { slug: string; value: number; runId: string }[]>();
 	for (const r of mine) {
 		const k = poolKey(r);
 		if (!pools.has(k)) pools.set(k, await poolFor(ctx, r));
@@ -32,7 +36,24 @@ export async function loadHeroLogs(ctx: QueryCtx, slug: string, season?: number)
 		mine.map((r) => ({ ...r, runId: r.runId as string })),
 		pools
 	);
-	return { seasons, season: chosen, ...logs };
+	// najboljši v druščini po bossu (za primerjavo) + imena (seznam: slugi so lahko cirilični)
+	const encounters = logs.encounters.map((e) => {
+		const pool = pools.get(poolKey(e)) ?? [];
+		const top = pool.reduce<(typeof pool)[number] | null>(
+			(a, b) => (!a || b.value > a.value ? b : a),
+			null
+		);
+		return { ...e, top };
+	});
+	const people = [];
+	for (const s of new Set(encounters.flatMap((e) => (e.top ? [e.top.slug] : [])))) {
+		const p = await ctx.db
+			.query('players')
+			.withIndex('by_slug', (q) => q.eq('slug', s))
+			.first();
+		people.push({ slug: s, name: p?.displayName ?? s });
+	}
+	return { seasons, season: chosen, ...logs, encounters, people };
 }
 
 /** Parsi enega runa z mestom med drugimi: po junaku povprečje in najboljši boss. */
