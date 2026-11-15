@@ -7,6 +7,7 @@ import {
 	checkRun,
 	computeAwards,
 	makeLinkCode,
+	MAX_LOOT,
 	normalizeCode,
 	runScore
 } from '../src/convex/lib/companion.ts';
@@ -151,7 +152,7 @@ describe('loot (schema 2)', () => {
 	test('schema 2 run with loot is accepted, absurd loot is not', () => {
 		expect(checkRun(RUN({ schema: 2, loot: [L('fizzle-boom')] }), NOW)).toBeNull();
 		expect(
-			checkRun(RUN({ schema: 2, loot: Array.from({ length: 401 }, () => L('fizzle-boom')) }), NOW)
+			checkRun(RUN({ schema: 2, loot: Array.from({ length: MAX_LOOT + 1 }, () => L('fizzle-boom')) }), NOW)
 		).toContain('too much loot');
 		expect(checkRun(RUN({ schema: 2, loot: [L('fizzle-boom', '')] }), NOW)).toBe('bad loot entry');
 		expect(checkRun(RUN({ schema: 2, loot: [L('fizzle-boom', 'x', 0)] }), NOW)).toBe(
