@@ -5,6 +5,7 @@
 	import { Toaster } from '#lib/components/ui/sonner/index.js';
 	import { page } from '$app/state';
 	import Swords from '@lucide/svelte/icons/swords';
+	import Trophy from '@lucide/svelte/icons/trophy';
 	import Users from '@lucide/svelte/icons/users';
 	import UserMenu from '#lib/components/wow/UserMenu.svelte';
 	import { GITHUB_URL } from '#lib/site.js';
@@ -21,6 +22,12 @@
 			label: 'Dungeon Runs',
 			icon: Swords,
 			match: (p: string) => p.startsWith('/runs')
+		},
+		{
+			href: '/rankings',
+			label: 'Rankings',
+			icon: Trophy,
+			match: (p: string) => p.startsWith('/rankings')
 		}
 	];
 	import type { LayoutProps } from './$types';
@@ -62,7 +69,7 @@
 						: 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'}"
 				>
 					<item.icon class="size-4 {active ? 'text-primary' : ''}" />
-					<span class="hidden min-[420px]:inline">{item.label}</span>
+					<span class="hidden md:inline">{item.label}</span>
 					{#if active}<span class="absolute inset-x-3 -bottom-[13px] h-0.5 rounded bg-primary"
 						></span>{/if}
 				</a>

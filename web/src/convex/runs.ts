@@ -6,7 +6,7 @@ import { query, type QueryCtx } from './_generated/server.js';
 import { canSeePrivate } from './lib/access.js';
 import { recordKind } from './lib/companionSchema.js';
 import { runDetail, runListItem, type DetailsLike, type RunDocLike } from './lib/runsView.js';
-import { heroLogs as buildHeroLogs, poolKey } from './lib/parses.js';
+import { heroLogs as buildHeroLogs, poolKey, rankings as buildRankings } from './lib/parses.js';
 import { getSettings } from './lib/settings.js';
 import { listSeasons } from './seasons.js';
 
@@ -157,6 +157,85 @@ export const heroLogs = query({
 			pools
 		);
 		return { locked: false as const, seasons, season: chosen, ...logs };
+	}
+});
+
+/**
+ * Lestvice sezone (/rankings): po dungeonu in bossu top 10 DPS in HPS (en vnos na junaka) +
+ * najhitrejši cleari po dungeonu. Bere ≤ 3000 parsov (~250 B) in ≤ 300 zadnjih runov.
+ */
+export const rankings = query({
+	args: { season: v.optional(v.number()) },
+	handler: async (ctx, { season }) => {
+		const { allowed } = await visibility(ctx);
+		if (!allowed('runs') || !allowed('runDetails')) return { locked: true as const };
+		const seasons = await listSeasons(ctx);
+		const chosen = season ?? seasons[0].number;
+		const s = seasons.find((x) => x.number === chosen) ?? seasons[0];
+		const next = seasons.find((x) => x.number === chosen + 1);
+		const rows = await ctx.db
+			.query('parses')
+			.withIndex('by_season', (q) => q.eq('season', chosen))
+			.take(3000);
+		const boards = buildRankings(rows.map((r) => ({ ...r, runId: r.runId as string })));
+
+		// najhitrejši cleari (ves dungeon), v časovnem oknu sezone
+		const recent = await ctx.db
+			.query('runs')
+			.withIndex('by_started_at', (q) => {
+				const from = q.gte('startedAt', s.startedAt);
+				return next ? from.lt('startedAt', next.startedAt) : from;
+			})
+			.order('desc')
+			.take(300);
+		const fastest = new Map<string, Doc<'runs'>[]>();
+		for (const r of recent) {
+			if (!r.result.cleared) continue;
+			fastest.set(r.zone.name, [...(fastest.get(r.zone.name) ?? []), r]);
+		}
+		const classOf = await classesFor(ctx, recent);
+		const slugs = new Set([
+			...rows.map((r) => r.slug),
+			...recent.flatMap((r) => r.party.map((p) => p.slug))
+		]);
+		// seznam, ne objekt: slugi so lahko cirilični (Convex dovoli samo ASCII ključe)
+		const names = new Map<string, string>();
+		for (const r of recent) for (const p of r.party) names.set(p.slug, p.name);
+		for (const slug of slugs) {
+			if (names.has(slug)) continue;
+			const p = await ctx.db
+				.query('players')
+				.withIndex('by_slug', (q) => q.eq('slug', slug))
+				.first();
+			if (p) names.set(slug, p.displayName);
+		}
+		const people = [...slugs].map((slug) => ({
+			slug,
+			name: names.get(slug) ?? slug,
+			classId: allowed('classId') ? (classOf.get(slug) ?? null) : null
+		}));
+		return {
+			locked: false as const,
+			seasons,
+			season: chosen,
+			boards,
+			speed: [...fastest.entries()]
+				.map(([zone, list]) => ({
+					zone,
+					runs: list
+						.sort((a, b) => a.durationMs - b.durationMs)
+						.slice(0, 5)
+						.map((r) => ({
+							id: r._id,
+							durationMs: r.durationMs,
+							startedAt: r.startedAt,
+							deaths: r.party.reduce((n, p) => n + p.deaths, 0),
+							party: r.party.map((p) => p.slug)
+						}))
+				}))
+				.sort((a, b) => a.zone.localeCompare(b.zone)),
+			people
+		};
 	}
 });
 

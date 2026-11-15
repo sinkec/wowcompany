@@ -339,7 +339,10 @@ Izdaje: S0 brez izdaje · S2+S3 → **Companion v0.2.0** (z addonom 0.5) · S4+S
   (`seasons.checkPatch`, `settings.gamePatch`), Office → *Parse seasons*, stran lika → zavihek **Logs**
   (Best/Median Perf. Avg, po bossu best %, median %, uboji, najhitrejši, seznam ubojev z rangom), stran runa → Bosses:
   klik na igralca odpre razčlenitev.
-- ⏳ Naprej: W5 `/rankings` (+ speed), W9 Discord, S2 addon 0.5, izdaja Companion v0.1.7 (shema 4 + rolli + omejitve).
+- ✅ **W5** `/rankings` (povezava v glavi): po dungeonu in bossu top 10 DPS/HPS (en vnos na junaka) + *Speed demons* (najhitrejši
+  cleari v sezoni). Pozor: Convex ne dovoli ne-ASCII ključev v objektih (cirilični slugi) → vračamo sezname, ne `Record<slug,…>`.
+- ⏳ Naprej: W9 Discord, S2 addon 0.5, izdaja Companion v0.1.7 (shema 4 + rolli + omejitve). Na prod enkrat:
+  `bunx convex run --prod seasons:checkPatch` in `bunx convex run --prod companion:backfillParses '{}'` (iz `web/`).
 
 ## 10. Odločitve za uporabnika
 

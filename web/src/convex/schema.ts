@@ -360,6 +360,7 @@ export default defineSchema({
 			'season'
 		])
 		.index('by_slug_and_season', ['slug', 'season'])
+		.index('by_season', ['season'])
 		.index('by_run', ['runId']),
 
 	// Sezone (particije lestvic): nova ob večjem patchu, ko jo potrdi admin. Brez vrstic = Season 1.

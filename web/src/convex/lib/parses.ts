@@ -203,3 +203,71 @@ export function patchFromNamespace(href: string): string | null {
 	const m = href.match(/static-(\d+\.\d+\.\d+)_\d+-/);
 	return m ? m[1] : null;
 }
+
+export type RankEntry = {
+	slug: string;
+	value: number;
+	runId: string;
+	at: number;
+	ilvl: number | null;
+	durationMs: number;
+};
+export type RankBoss = {
+	encounterId: number;
+	encounter: string;
+	difficultyId: number;
+	dps: RankEntry[];
+	heal: RankEntry[];
+};
+
+/** Lestvica sezone: po dungeonu in bossu najboljši (en na junaka) DPS in HPS, top `n`. Tanki gredo med DPS. */
+export function rankings(
+	rows: (ParseRow & { runId: string })[],
+	n = 10
+): { zone: string; bosses: RankBoss[] }[] {
+	const zones = new Map<string, Map<string, RankBoss>>();
+	const best = new Map<string, RankEntry>();
+	for (const r of rows) {
+		const board = r.role === 'heal' ? 'heal' : 'dps';
+		const value = board === 'heal' ? r.hps : r.dps;
+		if (value <= 0) continue;
+		const bossKey = `${r.encounterId}:${r.difficultyId}`;
+		const z = zones.get(r.zone) ?? new Map<string, RankBoss>();
+		zones.set(r.zone, z);
+		if (!z.has(bossKey))
+			z.set(bossKey, {
+				encounterId: r.encounterId,
+				encounter: r.encounter,
+				difficultyId: r.difficultyId,
+				dps: [],
+				heal: []
+			});
+		const k = `${r.zone}|${bossKey}|${board}|${r.slug}`;
+		const prev = best.get(k);
+		if (!prev || value > prev.value)
+			best.set(k, {
+				slug: r.slug,
+				value,
+				runId: r.runId,
+				at: r.at,
+				ilvl: r.ilvl,
+				durationMs: r.durationMs
+			});
+	}
+	for (const [k, e] of best) {
+		const [zone, bossKey, board] = k.split('|');
+		zones.get(zone)!.get(bossKey)![board as 'dps' | 'heal'].push(e);
+	}
+	return [...zones.entries()]
+		.sort((a, b) => a[0].localeCompare(b[0]))
+		.map(([zone, m]) => ({
+			zone,
+			bosses: [...m.values()]
+				.sort((a, b) => a.encounterId - b.encounterId)
+				.map((b) => ({
+					...b,
+					dps: b.dps.sort((x, y) => y.value - x.value).slice(0, n),
+					heal: b.heal.sort((x, y) => y.value - x.value).slice(0, n)
+				}))
+		}));
+}

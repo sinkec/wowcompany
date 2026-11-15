@@ -6,7 +6,8 @@ import {
 	patchLine,
 	poolKey,
 	roleOf,
-	standing
+	standing,
+	rankings
 } from '../src/convex/lib/parses.ts';
 import type { RunSummary } from '../src/convex/lib/companionSchema.ts';
 
@@ -149,5 +150,34 @@ describe('patches and seasons', () => {
 		expect(patchFromNamespace('static-forever-eu')).toBeNull();
 		expect(patchLine('1.60.1')).toBe('1.60');
 		expect(patchLine('1.61.12')).toBe('1.61');
+	});
+});
+
+describe('rankings', () => {
+	test('one entry per hero and board, best first; tanks on the dps board', () => {
+		const base = {
+			encounterId: 589,
+			encounter: 'Skum',
+			zone: 'Wailing Caverns',
+			difficultyId: 1,
+			taken: 0,
+			ilvl: null,
+			durationMs: 30_000,
+			at: 1
+		};
+		const rows = [
+			{ ...base, slug: 'a', role: 'dps' as const, dps: 30, hps: 0, runId: 'r1' },
+			{ ...base, slug: 'a', role: 'dps' as const, dps: 50, hps: 0, runId: 'r2' },
+			{ ...base, slug: 'b', role: 'tank' as const, dps: 40, hps: 0, runId: 'r1' },
+			{ ...base, slug: 'c', role: 'heal' as const, dps: 1, hps: 80, runId: 'r1' }
+		];
+		const out = rankings(rows);
+		expect(out).toHaveLength(1);
+		const boss = out[0].bosses[0];
+		expect(boss.dps.map((e) => [e.slug, e.value, e.runId])).toEqual([
+			['a', 50, 'r2'],
+			['b', 40, 'r1']
+		]);
+		expect(boss.heal.map((e) => [e.slug, e.value])).toEqual([['c', 80]]);
 	});
 });
