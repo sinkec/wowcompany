@@ -152,7 +152,10 @@ describe('loot (schema 2)', () => {
 	test('schema 2 run with loot is accepted, absurd loot is not', () => {
 		expect(checkRun(RUN({ schema: 2, loot: [L('fizzle-boom')] }), NOW)).toBeNull();
 		expect(
-			checkRun(RUN({ schema: 2, loot: Array.from({ length: MAX_LOOT + 1 }, () => L('fizzle-boom')) }), NOW)
+			checkRun(
+				RUN({ schema: 2, loot: Array.from({ length: MAX_LOOT + 1 }, () => L('fizzle-boom')) }),
+				NOW
+			)
 		).toContain('too much loot');
 		expect(checkRun(RUN({ schema: 2, loot: [L('fizzle-boom', '')] }), NOW)).toBe('bad loot entry');
 		expect(checkRun(RUN({ schema: 2, loot: [L('fizzle-boom', 'x', 0)] }), NOW)).toBe(
@@ -183,7 +186,10 @@ describe('records (schema 3)', () => {
 		...o
 	});
 	const run = (records: ReturnType<typeof R>[]) =>
-		RUN({ schema: 3, players: [P('grobos-stinkfoot', { recorder: true, records }), P('fizzle-boom')] });
+		RUN({
+			schema: 3,
+			players: [P('grobos-stinkfoot', { recorder: true, records }), P('fizzle-boom')]
+		});
 
 	test('sane records are accepted; old runs without records too', () => {
 		expect(checkRun(run([R('crit', 1204), R('hitTaken', 800, { unit: null })]), NOW)).toBeNull();
