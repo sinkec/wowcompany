@@ -15,6 +15,7 @@ export const MAX_AGE_MS = 30 * 86_400_000;
 export const MAX_LOOT = 2000;
 /** Največ rekordov na igralca (ena vrsta = en rekord). */
 export const MAX_RECORDS = 5;
+export const MAX_ROLLS = 500;
 
 const WORDS = [
 	'MURLOC',
@@ -83,6 +84,24 @@ export function checkRun(s: RunSummary, now: number): string | null {
 		)
 	)
 		return 'bad loot entry';
+	const rolls = s.rolls ?? [];
+	if (rolls.length > MAX_ROLLS) return `too many rolls (max ${MAX_ROLLS})`;
+	if (
+		rolls.some(
+			(r) =>
+				!r.item ||
+				r.item.length > 120 ||
+				r.entries.length > MAX_PLAYERS ||
+				(r.winner !== null && !slugs.has(r.winner)) ||
+				r.entries.some(
+					(e) =>
+						!slugs.has(e.slug) ||
+						e.name.length > 64 ||
+						(e.roll !== null && !(Number.isInteger(e.roll) && e.roll >= 1 && e.roll <= 100))
+				)
+		)
+	)
+		return 'bad roll entry';
 	for (const p of s.players) {
 		const recs = p.records ?? [];
 		if (recs.length > MAX_RECORDS || new Set(recs.map((r) => r.kind)).size !== recs.length)
@@ -113,10 +132,16 @@ export function checkPersonal(u: PersonalUpload, now: number): string | null {
 	if (u.characters.length < 1 || u.characters.length > MAX_PERSONAL_CHARACTERS)
 		return `characters must be 1–${MAX_PERSONAL_CHARACTERS}`;
 	const slugs = new Set(u.characters.map((c) => c.slug));
-	if (slugs.size !== u.characters.length || [...slugs].some((x) => !/^[\p{L}\p{N}'-]{2,64}$/u.test(x)))
+	if (
+		slugs.size !== u.characters.length ||
+		[...slugs].some((x) => !/^[\p{L}\p{N}'-]{2,64}$/u.test(x))
+	)
 		return 'bad slugs';
 	for (const c of u.characters) {
-		if (c.records.length > MAX_RECORDS || new Set(c.records.map((r) => r.kind)).size !== c.records.length)
+		if (
+			c.records.length > MAX_RECORDS ||
+			new Set(c.records.map((r) => r.kind)).size !== c.records.length
+		)
 			return 'bad records';
 		if (
 			c.records.some(

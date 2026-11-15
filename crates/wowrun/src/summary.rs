@@ -35,6 +35,41 @@ pub struct RunSummary {
     /// in from the WowCompany addon's export when there is one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub leader: Option<String>,
+    /// Need/greed rolls (from `/chatlog`), party members only. Empty when nobody rolled.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rolls: Vec<LootRoll>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RollChoice {
+    Need,
+    Greed,
+    Pass,
+}
+
+/// One item the party rolled for.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LootRoll {
+    pub item: String,
+    /// From the matching loot entry (chat log link or the addon), when known.
+    pub item_id: Option<u32>,
+    pub quality: Option<u8>,
+    pub at_ms: i64,
+    /// Slug of the party member who won; `None` = everyone passed (or a stranger won).
+    pub winner: Option<String>,
+    pub entries: Vec<RollEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RollEntry {
+    pub slug: String,
+    pub name: String,
+    pub choice: RollChoice,
+    /// 1–100, `None` for a pass (or when the roll line was missing).
+    pub roll: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -248,6 +283,27 @@ pub struct PlayerTimeline {
     pub taken: Vec<i64>,
 }
 
+impl RunSummary {
+    /// Copies item id and quality from the loot list to the rolls (the winner's loot line
+    /// carries them once the chat link or the addon told us).
+    pub fn link_rolls_to_loot(&mut self) {
+        for r in &mut self.rolls {
+            if r.item_id.is_some() && r.quality.is_some() {
+                continue;
+            }
+            let hit = self
+                .loot
+                .iter()
+                .filter(|l| l.item == r.item && (l.at_ms - r.at_ms).abs() <= 5 * 60_000)
+                .min_by_key(|l| (l.slug != r.winner, (l.at_ms - r.at_ms).abs()));
+            if let Some(l) = hit {
+                r.item_id = r.item_id.or(l.item_id);
+                r.quality = r.quality.or(l.quality);
+            }
+        }
+    }
+}
+
 /// Largest run JSON we send: Convex stores the analysis in one document (limit 1 MiB).
 pub const MAX_RUN_BYTES: usize = 800 * 1024;
 
@@ -339,6 +395,7 @@ mod size_tests {
                     })
                     .collect(),
             },
+            rolls: vec![],
             loot: (0..2000)
                 .map(|i| LootDrop {
                     slug: Some("hero-0".into()),

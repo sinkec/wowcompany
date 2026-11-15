@@ -1,4 +1,4 @@
-//! `WoWChatLog.txt` (`/chatlog`): only the loot lines are interesting.
+//! `WoWChatLog.txt` (`/chatlog`): loot lines and need/greed rolls are interesting.
 //!
 //! Verified on a real Forever chat log (13. 11. 2026): plain item names without brackets,
 //! stack count glued on (`Linen Clothx3`), trailing dot only for other players, timestamps
@@ -119,6 +119,126 @@ pub fn parse_loot_line(line: &str, default_year: i64) -> Option<Loot> {
     })
 }
 
+/// A need/greed choice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RollChoice {
+    Need,
+    Greed,
+    Pass,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RollEvent {
+    /// `Loot: Item` – a roll starts for an item.
+    Start,
+    /// `Loot: X has selected Need for: Item` / `Loot: You have selected Greed for: Item` /
+    /// `Loot: X passed on: Item`.
+    Choice(RollChoice),
+    /// `Loot: Greed Roll - 97 for Item by X`.
+    Rolled(RollChoice, u32),
+    /// `Loot: X won: Item` / `Loot: You won: Item`.
+    Won,
+}
+
+/// One roll message. Verified on a real Forever chat log (15. 11. 2026, Wailing Caverns, 338 lines).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Roll {
+    /// Naive local milliseconds (same clock as the combat log).
+    pub timestamp: i64,
+    /// `None` = the person who wrote the log ("You"), and for `Start`.
+    pub who: Option<String>,
+    pub item: String,
+    pub event: RollEvent,
+}
+
+fn who_of(s: &str) -> Option<Option<String>> {
+    let s = s.trim();
+    if s.is_empty() || s.len() > 64 {
+        return None;
+    }
+    Some((s != "You").then(|| s.to_string()))
+}
+
+fn choice_of(s: &str) -> Option<RollChoice> {
+    match s {
+        "Need" => Some(RollChoice::Need),
+        "Greed" => Some(RollChoice::Greed),
+        _ => None,
+    }
+}
+
+/// Item name from the end of a roll message: plain (Forever) or `[Item]` / a raw link.
+fn roll_item(s: &str) -> Option<String> {
+    let s = s.trim().trim_end_matches('.');
+    let name = match (s.find('['), s.rfind(']')) {
+        (Some(a), Some(b)) if b > a => &s[a + 1..b],
+        _ => s,
+    };
+    let name = name.trim();
+    (!name.is_empty() && name.len() <= 120).then(|| name.to_string())
+}
+
+/// Parses one chat log line; `Some` only for need/greed roll messages (they start with `Loot:`).
+pub fn parse_roll_line(line: &str, default_year: i64) -> Option<Roll> {
+    let line = line.trim_start_matches('\u{feff}').trim_end_matches(['\r', '\n']);
+    let (ts, text) = line.split_once("  ")?;
+    let timestamp = time::parse_with_year(ts, default_year)?;
+    let text = text.trim().strip_prefix("Loot:")?.trim();
+
+    // "Greed Roll - 97 for Item by Name" (item names may contain ": " or " by ", so cut from the end)
+    for (prefix, choice) in [("Need Roll - ", RollChoice::Need), ("Greed Roll - ", RollChoice::Greed)] {
+        if let Some(rest) = text.strip_prefix(prefix) {
+            let (value, rest) = rest.split_once(" for ")?;
+            let (item, who) = rest.rsplit_once(" by ")?;
+            return Some(Roll {
+                timestamp,
+                who: who_of(who)?,
+                item: roll_item(item)?,
+                event: RollEvent::Rolled(choice, value.trim().parse().ok()?),
+            });
+        }
+    }
+    // "X has selected Need for: Item" / "You have selected Greed for: Item"
+    for sep in [" has selected ", " have selected "] {
+        if let Some((who, rest)) = text.split_once(sep) {
+            let (choice, item) = rest.split_once(" for: ")?;
+            return Some(Roll {
+                timestamp,
+                who: who_of(who)?,
+                item: roll_item(item)?,
+                event: RollEvent::Choice(choice_of(choice.trim())?),
+            });
+        }
+    }
+    // "X passed on: Item" / "You automatically passed on: Item because you cannot loot that item."
+    for sep in [" automatically passed on: ", " passed on: "] {
+        if let Some((who, item)) = text.split_once(sep) {
+            let item = item.split(" because ").next().unwrap_or(item);
+            return Some(Roll {
+                timestamp,
+                who: who_of(who)?,
+                item: roll_item(item)?,
+                event: RollEvent::Choice(RollChoice::Pass),
+            });
+        }
+    }
+    if let Some((who, item)) = text.split_once(" won: ") {
+        return Some(Roll {
+            timestamp,
+            who: who_of(who)?,
+            item: roll_item(item)?,
+            event: RollEvent::Won,
+        });
+    }
+    // anything else after "Loot:" is the item a roll starts for
+    Some(Roll {
+        timestamp,
+        who: None,
+        item: roll_item(text)?,
+        event: RollEvent::Start,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,5 +327,63 @@ mod tests {
         ] {
             assert_eq!(parse_loot_line(l, 2026), None, "{l}");
         }
+    }
+
+    #[test]
+    fn forever_roll_messages() {
+        let p = |l: &str| parse_roll_line(l, 2026).unwrap();
+        // shapes from the real Forever chat log of 15. 11. 2026 (names replaced)
+        let start = p("11/15 14:31:05.317  Loot: Waylaid Crate: Apprentice Fabrics");
+        assert_eq!(
+            (start.who, start.item.as_str(), start.event),
+            (None, "Waylaid Crate: Apprentice Fabrics", RollEvent::Start)
+        );
+        let a = p("11/15 14:53:45.298  Loot: Grobos Stinkfoot has selected Greed for: Gleaming Claymore of the Wolf");
+        assert_eq!(a.who.as_deref(), Some("Grobos Stinkfoot"));
+        assert_eq!(a.event, RollEvent::Choice(RollChoice::Greed));
+        assert_eq!(a.item, "Gleaming Claymore of the Wolf");
+        let me = p("11/15 14:53:47.915  Loot: You have selected Need for: Slither Cord");
+        assert_eq!((me.who, me.event), (None, RollEvent::Choice(RollChoice::Need)));
+        let pass = p("11/15 14:53:51.217  Loot: Воля Незламна passed on: Gleaming Claymore of the Wolf");
+        assert_eq!(
+            (pass.who.as_deref(), pass.event),
+            (Some("Воля Незламна"), RollEvent::Choice(RollChoice::Pass))
+        );
+        let r = p("11/15 14:53:51.219  Loot: Greed Roll - 97 for Waylaid Crate: Apprentice Fabrics by Fizzle Boom");
+        assert_eq!(r.item, "Waylaid Crate: Apprentice Fabrics");
+        assert_eq!(
+            (r.who.as_deref(), r.event),
+            (Some("Fizzle Boom"), RollEvent::Rolled(RollChoice::Greed, 97))
+        );
+        let w = p("11/15 14:53:51.223  Loot: Fizzle Boom won: Gleaming Claymore of the Wolf");
+        assert_eq!((w.who.as_deref(), w.event), (Some("Fizzle Boom"), RollEvent::Won));
+        let mine = p("11/15 14:59:42.798  Loot: You won: Hook Dagger of Intellect");
+        assert_eq!((mine.who, mine.event), (None, RollEvent::Won));
+        let auto = p(
+            "11/15 14:59:43.000  Loot: You automatically passed on: Plans: Guard's Chain Shirt because you cannot loot that item.",
+        );
+        assert_eq!(
+            (auto.item.as_str(), auto.event),
+            ("Plans: Guard's Chain Shirt", RollEvent::Choice(RollChoice::Pass))
+        );
+        // other chat lines are not rolls; loot lines are not rolls either
+        assert_eq!(
+            parse_roll_line(
+                "11/15 14:53:51.291  Fizzle Boom receives loot: Gleaming Claymore of the Wolf.",
+                2026
+            ),
+            None
+        );
+        assert_eq!(
+            parse_roll_line(
+                "11/15 14:54:13.120  Deviate Crocolisk dies, you gain 18 experience.",
+                2026
+            ),
+            None
+        );
+        assert_eq!(
+            parse_roll_line("11/15 14:54:13.120  Loot: Need Roll - x for Sword by Fizzle", 2026),
+            None
+        );
     }
 }

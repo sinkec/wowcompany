@@ -139,6 +139,23 @@ export const lootDrop = v.object({
 	atMs: v.number()
 });
 
+/** Need/greed roll za en predmet (iz /chatlog; samo člani partyja). */
+export const rollEntry = v.object({
+	slug: v.string(),
+	name: v.string(),
+	choice: v.union(v.literal('need'), v.literal('greed'), v.literal('pass')),
+	roll: nullableNumber
+});
+export const lootRoll = v.object({
+	item: v.string(),
+	itemId: nullableNumber,
+	quality: nullableNumber,
+	atMs: v.number(),
+	/** slug zmagovalca; null = vsi so passali */
+	winner: nullableString,
+	entries: v.array(rollEntry)
+});
+
 /** Osebni rekord iz celega loga (tudi open world) – Rust `wowrun::personal`. `at` = UTC ms. */
 export const personalRecord = v.object({
 	kind: recordKind,
@@ -176,7 +193,9 @@ export const runSummary = v.object({
 	timeline,
 	loot: v.optional(v.array(lootDrop)),
 	/** vodja partyja – iz addona WowCompany (combat log ga ne pozna) */
-	leader: v.optional(v.string())
+	leader: v.optional(v.string()),
+	/** need/greed rolli (Companion v0.1.7+) */
+	rolls: v.optional(v.array(lootRoll))
 });
 
 export const award = v.object({
@@ -213,6 +232,7 @@ export type RunSummary = Infer<typeof runSummary>;
 export type PlayerSummary = Infer<typeof playerSummary>;
 export type Award = Infer<typeof award>;
 export type LootDrop = Infer<typeof lootDrop>;
+export type LootRoll = Infer<typeof lootRoll>;
 export type RunRecord = Infer<typeof runRecord>;
 export type RecordKind = Infer<typeof recordKind>;
 export type PersonalUpload = Infer<typeof personalUpload>;

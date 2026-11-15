@@ -231,6 +231,10 @@ pub fn apply(export: &AddonExport, run: &mut RunSummary) -> (bool, bool) {
         leader_added = true;
     }
     let loot = enrich_loot(export, run);
+    if loot {
+        // the rolled items get the id/quality the loot just learned
+        run.link_rolls_to_loot();
+    }
     (leader_added || loot, leader_added)
 }
 

@@ -73,6 +73,38 @@
 		return [...m.values()].sort((a, b) => b.items - a.items);
 	});
 
+	// need/greed rolli: po predmetih + kocke po igralcih (srečnež, preklete kocke)
+	const rolls = $derived(run?.rolls ?? []);
+	const dice = $derived.by(() => {
+		const m = new Map<
+			string,
+			{ slug: string; name: string; sum: number; n: number; wins: number; needs: number }
+		>();
+		for (const r of rolls) {
+			for (const e of r.entries) {
+				const d = m.get(e.slug) ?? {
+					slug: e.slug,
+					name: names[e.slug] ?? e.name,
+					sum: 0,
+					n: 0,
+					wins: 0,
+					needs: 0
+				};
+				if (e.roll !== null) {
+					d.sum += e.roll;
+					d.n += 1;
+				}
+				if (e.choice === 'need') d.needs += 1;
+				if (r.winner === e.slug) d.wins += 1;
+				m.set(e.slug, d);
+			}
+		}
+		return [...m.values()].filter((d) => d.n > 0).sort((a, b) => b.sum / b.n - a.sum / a.n);
+	});
+	const sortedEntries = (r: (typeof rolls)[number]) =>
+		[...r.entries].sort((a, b) => (b.roll ?? -1) - (a.roll ?? -1));
+	const CHOICE = { need: 'Need', greed: 'Greed', pass: 'Pass' } as const;
+
 	// Big Numbers: največji dogodek vsake vrste (zmagovalec runa) + tabela po igralcih
 	const records = $derived(
 		players.flatMap((p) => (p.records ?? []).map((r) => ({ ...r, slug: p.slug })))
@@ -82,7 +114,10 @@
 			kind,
 			best: records
 				.filter((r) => r.kind === kind)
-				.reduce<(typeof records)[number] | null>((b, r) => (!b || r.amount > b.amount ? r : b), null)
+				.reduce<(typeof records)[number] | null>(
+					(b, r) => (!b || r.amount > b.amount ? r : b),
+					null
+				)
 		})).filter((x) => x.best)
 	);
 	const recordOf = (slug: string, kind: string) =>
@@ -519,6 +554,87 @@
 								</div>
 							{/each}
 						</div>
+						{#if rolls.length}
+							<h3 class="pt-2 text-sm font-bold tracking-wide text-primary uppercase">
+								Need, greed &amp; broken friendships
+							</h3>
+							{#if dice.length > 1}
+								<div class="flex flex-wrap gap-2 text-sm">
+									{#each dice as d, i (d.slug)}
+										<div class="wow-frame rounded-lg px-3 py-2">
+											<span
+												class="font-semibold"
+												style="color: {classColor(classes[d.slug] ?? undefined)}">{d.name}</span
+											>
+											<span class="ml-1 text-muted-foreground tabular-nums"
+												>avg {Math.round(d.sum / d.n)} · {d.wins} won{#if d.needs}&nbsp;· {d.needs} need{d.needs ===
+													1
+														? ''
+														: 's'}{/if}</span
+											>
+											{#if i === 0}<span class="ml-1 text-xs text-primary"
+													>· blessed by RNGesus</span
+												>{/if}
+											{#if i === dice.length - 1}<span class="ml-1 text-xs text-destructive"
+													>· cursed dice</span
+												>{/if}
+										</div>
+									{/each}
+								</div>
+							{/if}
+							<div class="wow-frame overflow-hidden rounded-lg">
+								<table class="w-full text-sm">
+									<thead class="text-xs text-muted-foreground">
+										<tr class="border-b border-border/50">
+											<th class="w-20 px-3 py-2 text-left">When</th>
+											<th class="px-3 py-2 text-left">Item</th>
+											<th class="px-3 py-2 text-left">Rolls</th>
+										</tr>
+									</thead>
+									<tbody>
+										{#each rolls as r, i (i)}
+											<tr class="border-b border-border/30 align-top last:border-0">
+												<td class="px-3 py-1.5 text-muted-foreground tabular-nums"
+													>{fmtDuration(Math.max(0, r.atMs))}</td
+												>
+												<td class="px-3 py-1.5">
+													<span style="color: {lootColor(r.quality)}">[{r.item}]</span>
+													{#if !r.winner}<div class="text-xs text-muted-foreground">
+															Nobody wanted it. Not even the vendor.
+														</div>{/if}
+												</td>
+												<td class="px-3 py-1.5">
+													<div class="flex flex-wrap gap-x-3 gap-y-0.5">
+														{#each sortedEntries(r) as e (e.slug)}
+															<span
+																class={e.choice === 'pass' ? 'text-muted-foreground' : ''}
+																title={CHOICE[e.choice]}
+															>
+																<span
+																	class={r.winner === e.slug ? 'font-bold' : ''}
+																	style="color: {e.choice === 'pass'
+																		? 'inherit'
+																		: classColor(classes[e.slug] ?? undefined)}"
+																	>{names[e.slug] ?? e.name}</span
+																>
+																<span class="text-xs tabular-nums"
+																	>{e.choice === 'pass'
+																		? 'pass'
+																		: `${CHOICE[e.choice]} ${e.roll ?? '?'}`}{#if r.winner === e.slug}&nbsp;🎲{/if}</span
+																>
+															</span>
+														{/each}
+													</div>
+												</td>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+							</div>
+							<h3 class="pt-2 text-sm font-bold tracking-wide text-primary uppercase">
+								Everything looted
+							</h3>
+						{/if}
 						<div class="wow-frame overflow-hidden rounded-lg">
 							<table class="w-full text-sm">
 								<thead class="text-xs text-muted-foreground">
@@ -558,8 +674,8 @@
 							</table>
 						</div>
 						<p class="text-xs text-muted-foreground">
-							From the uploader's <code>/chatlog</code>. Need/greed rolls aren't tracked yet — only
-							who ended up with it.
+							From the uploader's <code>/chatlog</code>.{#if !rolls.length}
+								No need/greed rolls on file — recorded by an older Companion, or nobody rolled.{/if}
 						</p>
 					{/if}
 				</Tabs.Content>
@@ -568,8 +684,8 @@
 				<Tabs.Content value="numbers" class="mt-4 space-y-4">
 					{#if !records.length}
 						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
-							No big numbers on file. This run was recorded by an older Companion — update the app and
-							the next one will name and shame the biggest crit.
+							No big numbers on file. This run was recorded by an older Companion — update the app
+							and the next one will name and shame the biggest crit.
 						</div>
 					{:else}
 						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -583,11 +699,14 @@
 											{fmtNum(best.amount)}
 										</div>
 										<div class="mt-1 text-sm">
-											<span class="font-semibold" style="color: {classColor(classes[best.slug] ?? undefined)}"
+											<span
+												class="font-semibold"
+												style="color: {classColor(classes[best.slug] ?? undefined)}"
 												>{names[best.slug] ?? best.slug}</span
 											>
 											<span class="text-muted-foreground">·</span>
-											{best.spell}{#if best.pet}<span class="text-xs text-muted-foreground"> (pet)</span
+											{best.spell}{#if best.pet}<span class="text-xs text-muted-foreground">
+													(pet)</span
 												>{/if}
 											{#if best.unit}<span class="text-muted-foreground">
 													{RECORD_LABEL[kind].prep}</span
@@ -615,8 +734,9 @@
 								<tbody>
 									{#each players as p (p.slug)}
 										<tr class="border-t border-border">
-											<td class="py-1.5 pr-3 font-semibold" style="color: {classColor(p.classId ?? undefined)}"
-												>{p.name}</td
+											<td
+												class="py-1.5 pr-3 font-semibold"
+												style="color: {classColor(p.classId ?? undefined)}">{p.name}</td
 											>
 											{#each RECORD_KINDS as kind (kind)}
 												{@const r = recordOf(p.slug, kind)}

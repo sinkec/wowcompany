@@ -6,6 +6,7 @@ import {
 	endReason,
 	linkStatus,
 	lootDrop,
+	lootRoll,
 	partyMember,
 	playerSummary,
 	recordKind,
@@ -304,7 +305,8 @@ export default defineSchema({
 		segments: v.array(segment),
 		deaths: v.array(death),
 		timeline,
-		loot: v.optional(v.array(lootDrop))
+		loot: v.optional(v.array(lootDrop)),
+		rolls: v.optional(v.array(lootRoll))
 	}).index('by_run', ['runId']),
 
 	// Vseživljenjski rekordi spremljanih junakov (največji crit …): ena vrstica na junaka in vrsto.

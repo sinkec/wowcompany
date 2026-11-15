@@ -174,6 +174,43 @@ describe('loot (schema 2)', () => {
 	});
 });
 
+describe('need/greed rolls', () => {
+	const roll = (o: object = {}, entry: object = {}) => ({
+		item: 'Gleaming Claymore of the Wolf',
+		itemId: null,
+		quality: 2,
+		atMs: 60_000,
+		winner: 'fizzle-boom',
+		entries: [
+			{ slug: 'fizzle-boom', name: 'Fizzle Boom', choice: 'greed' as const, roll: 97 },
+			{
+				slug: 'grobos-stinkfoot',
+				name: 'Grobos Stinkfoot',
+				choice: 'pass' as const,
+				roll: null,
+				...entry
+			}
+		],
+		...o
+	});
+	test('party rolls are accepted, old runs without rolls too', () => {
+		expect(checkRun(RUN({ schema: 3, rolls: [roll()] }), NOW)).toBeNull();
+		expect(checkRun(RUN({ schema: 3, rolls: [roll({ winner: null })] }), NOW)).toBeNull();
+		expect(checkRun(RUN({ schema: 3 }), NOW)).toBeNull();
+	});
+	test('strangers and impossible dice are refused', () => {
+		expect(checkRun(RUN({ schema: 3, rolls: [roll({ winner: 'random-stranger' })] }), NOW)).toBe(
+			'bad roll entry'
+		);
+		expect(checkRun(RUN({ schema: 3, rolls: [roll({}, { slug: 'random-stranger' })] }), NOW)).toBe(
+			'bad roll entry'
+		);
+		expect(
+			checkRun(RUN({ schema: 3, rolls: [roll({}, { choice: 'need', roll: 101 })] }), NOW)
+		).toBe('bad roll entry');
+	});
+});
+
 describe('records (schema 3)', () => {
 	const R = (kind: 'crit' | 'hit' | 'heal' | 'critHeal' | 'hitTaken', amount: number, o = {}) => ({
 		kind,

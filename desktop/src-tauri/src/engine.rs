@@ -106,12 +106,14 @@ impl Pipeline {
         }
     }
 
-    /// A chat log line; only loot lines matter. `year` = current year (chat logs have none).
+    /// A chat log line; loot and need/greed rolls matter. `year` = current year (chat logs have none).
     pub fn feed_chat(&mut self, line: &str, year: i64) {
         self.chat_lines += 1;
         if let Some(loot) = wowlog::parse_loot_line(line, year) {
             self.loot_lines += 1;
             self.det.push_loot(&loot);
+        } else if let Some(roll) = wowlog::parse_roll_line(line, year) {
+            self.det.push_roll(&roll);
         }
     }
 
@@ -991,6 +993,19 @@ mod tests {
         p.feed_chat("11/20 20:00:18.5000  You receive loot: [Oggleflint's Ugly Hat].", 2026);
         p.feed_chat("11/20 20:00:18.6000  [Party] Fizzle: gz on the hat lol", 2026);
         assert_eq!((p.chat_lines, p.loot_lines), (2, 1));
+        // a need/greed roll: party members kept, a stranger never stored
+        for l in [
+            "11/20 20:00:10.000  Loot: Oggleflint's Ugly Hat",
+            "11/20 20:00:11.000  Loot: Fizzle Boom has selected Greed for: Oggleflint's Ugly Hat",
+            "11/20 20:00:11.500  Loot: You have selected Need for: Oggleflint's Ugly Hat",
+            "11/20 20:00:12.000  Loot: Random Stranger has selected Need for: Oggleflint's Ugly Hat",
+            "11/20 20:00:13.000  Loot: Need Roll - 77 for Oggleflint's Ugly Hat by Tankus Maximus",
+            "11/20 20:00:13.000  Loot: Need Roll - 99 for Oggleflint's Ugly Hat by Random Stranger",
+            "11/20 20:00:13.000  Loot: Greed Roll - 12 for Oggleflint's Ugly Hat by Fizzle Boom",
+            "11/20 20:00:13.100  Loot: You won: Oggleflint's Ugly Hat",
+        ] {
+            p.feed_chat(l, 2026);
+        }
         for l in &lines[cut..] {
             p.feed(l, &mut personal);
         }
@@ -998,6 +1013,22 @@ mod tests {
         assert_eq!(runs[0].loot.len(), 1);
         assert_eq!(runs[0].loot[0].item, "Oggleflint's Ugly Hat");
         assert_eq!(runs[0].loot[0].slug.as_deref(), Some("tankus-maximus"));
+        let rolls = &runs[0].rolls;
+        assert_eq!(rolls.len(), 1);
+        assert_eq!(rolls[0].winner.as_deref(), Some("tankus-maximus"));
+        let e: Vec<_> = rolls[0]
+            .entries
+            .iter()
+            .map(|e| (e.slug.as_str(), e.choice, e.roll))
+            .collect();
+        assert_eq!(
+            e,
+            vec![
+                ("fizzle-boom", wowrun::summary::RollChoice::Greed, Some(12)),
+                ("tankus-maximus", wowrun::summary::RollChoice::Need, Some(77)),
+            ]
+        );
+        assert!(!serde_json::to_string(&runs[0]).unwrap().contains("Stranger"));
     }
 
     #[test]

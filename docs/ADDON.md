@@ -55,7 +55,8 @@ Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez nje
 - **Rolli need/greed so v chat logu** kot navaden tekst (`Loot: X has selected Greed for: Item`, `Loot: X passed on: Item`,
   `Loot: Greed Roll - 97 for Item by X`, `Loot: X won: Item`, `You won:` / `You have selected …`) → bere jih lahko Companion iz
   `WoWChatLog.txt`, addon ni potreben (naslednji korak).
-- **Še odprto:** rolli v Companionu in na portalu, statistika lika na portalu, `/wowco probe` v dungeonu.
+- ✅ **Rolli (15. 11. 2026):** `wowlog::parse_roll_line` (vseh 338 `Loot:` vrstic pravega loga), `RunSummary.rolls` (samo člani partyja, tujci se ne shranijo), strežnik `runDetails.rolls` (+ `checkRun`), portal: zavihek Loot → *Need, greed & broken friendships* (kocke po igralcih, kdo je kaj vrgel, zmagovalec). `wowrun <log> --chat <WoWChatLog.txt>` za preizkus; `web/scripts/companion-upload.ts` naloži run na dev.
+- **Še odprto:** statistika lika na portalu, `/wowco probe` v dungeonu.
 - Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`;
   v izvozu je edino tuje ime vodja LASTNEGA partyja).
 

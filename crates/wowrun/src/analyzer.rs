@@ -181,7 +181,11 @@ pub struct RunAcc {
     killed: BTreeSet<u32>,
     wipes: u32,
     loot: Vec<LootDrop>,
+    rolls: Vec<LootRoll>,
 }
+
+/// Max rolls kept per run (a 1 h dungeon had 35).
+pub const MAX_ROLLS: usize = 500;
 
 /// Max loot entries kept per run (the server accepts the same; a full party in a 1 h dungeon
 /// loots ~250 items, so this covers very long runs). Size is guarded by `RunSummary::fit_size`.
@@ -211,16 +215,13 @@ impl RunAcc {
             killed: BTreeSet::new(),
             wipes: 0,
             loot: Vec::new(),
+            rolls: Vec::new(),
         }
     }
 
-    /// Adds a loot line from the chat log (only once the run has started).
-    pub fn push_loot(&mut self, l: &wowlog::Loot) {
-        let Some(start) = self.started_at else { return };
-        if l.timestamp < start - 60_000 || self.loot.len() >= MAX_LOOT {
-            return;
-        }
-        let player = match &l.looter {
+    /// The group player behind a chat name (`None` = the log writer, "You").
+    fn chat_player(&self, who: Option<&String>) -> Option<&PlayerAcc> {
+        match who {
             None => self.players.values().find(|p| p.mine),
             Some(raw) => {
                 let key = name_key(raw);
@@ -237,7 +238,90 @@ impl RunAcc {
                     }
                 })
             }
+        }
+    }
+
+    /// Adds a need/greed roll message from the chat log. Only party members are kept.
+    pub fn push_roll(&mut self, r: &wowlog::Roll) {
+        use wowlog::RollEvent;
+        let Some(start) = self.started_at else { return };
+        if r.timestamp < start - 60_000 {
+            return;
+        }
+        let at_ms = r.timestamp - start;
+        // the open roll for this item (the newest one not won yet, within 5 minutes)
+        let open = self
+            .rolls
+            .iter()
+            .rposition(|x| x.item == r.item && x.winner.is_none() && at_ms - x.at_ms <= 5 * 60_000);
+        let idx = match (&r.event, open) {
+            (RollEvent::Start, _) | (_, None) => {
+                if self.rolls.len() >= MAX_ROLLS {
+                    return;
+                }
+                self.rolls.push(LootRoll {
+                    item: r.item.clone(),
+                    item_id: None,
+                    quality: None,
+                    at_ms,
+                    winner: None,
+                    entries: Vec::new(),
+                });
+                if r.event == RollEvent::Start {
+                    return;
+                }
+                self.rolls.len() - 1
+            }
+            (_, Some(i)) => i,
         };
+        let Some((slug, name)) = self
+            .chat_player(r.who.as_ref())
+            .map(|p| (p.slug.clone(), p.name.clone()))
+        else {
+            return; // not a party member: never stored
+        };
+        let roll = &mut self.rolls[idx];
+        let entry = |roll: &mut LootRoll| -> usize {
+            match roll.entries.iter().position(|e| e.slug == slug) {
+                Some(i) => i,
+                None => {
+                    roll.entries.push(RollEntry {
+                        slug: slug.clone(),
+                        name: name.clone(),
+                        choice: RollChoice::Pass,
+                        roll: None,
+                    });
+                    roll.entries.len() - 1
+                }
+            }
+        };
+        let choice = |c: wowlog::RollChoice| match c {
+            wowlog::RollChoice::Need => RollChoice::Need,
+            wowlog::RollChoice::Greed => RollChoice::Greed,
+            wowlog::RollChoice::Pass => RollChoice::Pass,
+        };
+        match r.event {
+            RollEvent::Start => {}
+            RollEvent::Choice(c) => {
+                let i = entry(roll);
+                roll.entries[i].choice = choice(c);
+            }
+            RollEvent::Rolled(c, v) => {
+                let i = entry(roll);
+                roll.entries[i].choice = choice(c);
+                roll.entries[i].roll = Some(v);
+            }
+            RollEvent::Won => roll.winner = Some(slug),
+        }
+    }
+
+    /// Adds a loot line from the chat log (only once the run has started).
+    pub fn push_loot(&mut self, l: &wowlog::Loot) {
+        let Some(start) = self.started_at else { return };
+        if l.timestamp < start - 60_000 || self.loot.len() >= MAX_LOOT {
+            return;
+        }
+        let player = self.chat_player(l.looter.as_ref());
         self.loot.push(LootDrop {
             slug: player.map(|p| p.slug.clone()),
             looter: player
@@ -807,7 +891,7 @@ impl RunAcc {
         };
 
         let bosses_killed = self.killed.len() as u32;
-        RunSummary {
+        let mut summary = RunSummary {
             schema: SCHEMA_VERSION,
             run_key,
             zone: Zone {
@@ -833,8 +917,11 @@ impl RunAcc {
             timeline,
             // loot after the last kill (boss corpse) belongs to the run too
             loot: self.loot.clone(),
+            rolls: self.rolls.clone(),
             leader: None,
-        }
+        };
+        summary.link_rolls_to_loot();
+        summary
     }
 
     /// GUIDs of the group players (for the run key).

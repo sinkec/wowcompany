@@ -134,6 +134,16 @@ impl Detector {
         }
     }
 
+    /// A need/greed roll message from the chat log (inside the dungeon during a run).
+    pub fn push_roll(&mut self, roll: &wowlog::Roll) {
+        if !self.inside {
+            return;
+        }
+        if let Some(run) = self.run.as_mut() {
+            run.push_roll(roll);
+        }
+    }
+
     /// Time passes without new lines (the app calls this e.g. every few seconds with
     /// the current time converted to log-local milliseconds).
     pub fn tick(&mut self, now: i64) -> Vec<RunSummary> {

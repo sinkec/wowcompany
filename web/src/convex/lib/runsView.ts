@@ -3,7 +3,7 @@
 //   runDetails  → številke: meter, uroki, segmenti, časovnica, nagrade
 //   runDeaths   → smrti (števci in recapi)
 //   classId     → barve razredov (obstoječe polje)
-import type { Award, LootDrop, PlayerSummary } from './companionSchema.js';
+import type { Award, LootDrop, LootRoll, PlayerSummary } from './companionSchema.js';
 
 export type Allowed = (field: string) => boolean;
 
@@ -63,6 +63,7 @@ export type DetailsLike = {
 		players: { slug: string; damage: number[]; healing: number[]; taken: number[] }[];
 	};
 	loot?: LootDrop[];
+	rolls?: LootRoll[];
 };
 
 /** Ime iz partyja za slug (snemalec je vedno v partyju; rezerva = slug). */
@@ -128,7 +129,9 @@ export function runDetail(
 		segments: nums ? details!.segments : null,
 		timeline: nums ? details!.timeline : null,
 		deaths: deaths ? details!.deaths : null,
-		loot: allowed('runLoot') && details ? (details.loot ?? []) : null
+		loot: allowed('runLoot') && details ? (details.loot ?? []) : null,
+		/** need/greed rolli – isto polje vidnosti kot loot */
+		rolls: allowed('runLoot') && details ? (details.rolls ?? []) : null
 	};
 }
 

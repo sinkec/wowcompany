@@ -351,12 +351,14 @@ export const ingestRun = internalMutation({
 			.first();
 
 		const loot = s.loot ?? [];
+		const rolls = s.rolls ?? [];
 		const details = {
 			players: s.players,
 			segments: s.segments,
 			deaths: s.deaths,
 			timeline: s.timeline,
-			loot
+			loot,
+			...(rolls.length ? { rolls } : {})
 		};
 		const runFields = {
 			schema: s.schema,
@@ -403,17 +405,25 @@ export const ingestRun = internalMutation({
 			await writeParticipants(ctx, existing._id, party, s.startedAt);
 			await writeHeroRecords(ctx, existing._id, s, party);
 		} else {
-			// isti posnetek z več podatki o lootu (ID/kakovost iz addona pride pozno): zamenjaj samo loot
+			// isti posnetek z več podatki o lootu (ID/kakovost iz addona pride pozno) ali z rolli
+			// (novejša aplikacija): zamenjaj samo to
 			const known = (l: { quality: number | null; itemId: number | null }[]) =>
 				l.filter((x) => x.quality !== null || x.itemId !== null).length;
-			if (known(loot) > 0) {
+			if (known(loot) > 0 || rolls.length > 0) {
 				const old = await ctx.db
 					.query('runDetails')
 					.withIndex('by_run', (q) => q.eq('runId', existing._id))
 					.unique();
 				const oldLoot = old?.loot ?? [];
-				if (old && oldLoot.length === loot.length && known(loot) > known(oldLoot))
-					await ctx.db.patch('runDetails', old._id, { loot });
+				const oldRolls = old?.rolls ?? [];
+				const patch: { loot?: typeof loot; rolls?: typeof rolls } = {};
+				if (oldLoot.length === loot.length && known(loot) > known(oldLoot)) patch.loot = loot;
+				if (
+					rolls.length > oldRolls.length ||
+					(rolls.length === oldRolls.length && known(rolls) > known(oldRolls))
+				)
+					patch.rolls = rolls;
+				if (old && (patch.loot || patch.rolls)) await ctx.db.patch('runDetails', old._id, patch);
 			}
 		}
 		if (!better && (added || (s.leader && !existing.leader))) {
