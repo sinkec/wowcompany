@@ -99,7 +99,8 @@ pub struct PlayerSummary {
     /// Portal hero slug (`name-surname`).
     pub slug: String,
     pub recorder: bool,
-    /// Last value of the advanced-log `level` field (probably item level for players – unverified).
+    /// Last value of the advanced-log `level` field. For players this is the **equipped item level**
+    /// (same number as Blizzard's `equipped_item_level`), not the character level – verified 15. 11. 2026.
     pub level: Option<i64>,
     pub damage: i64,
     pub healing: i64,

@@ -461,7 +461,7 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 - [ ] A6 ✅ uid = 5. del (`Creature-0-6868-43-27750-…`); **napaka popravljena 15. 11.:** detektor je vzel uid NPC-ja z druge mape (Herald of Thrall, map 1, world buff na petu) → zdaj samo NPC-ji z mape = instanceID. Še odprto: drugačen po resetu. Uid kopije instance v GUID-u NPC-jev (5. del) – enak za vse člane in drugačen po resetu?
 - [ ] A7 `runKey` pri dveh snemalcih istega runa enak (obe datoteki skozi `wowrun`)
 - [ ] A8 Swing pravilo: `SWING_DAMAGE` vs `SWING_DAMAGE_LANDED` – vsota za igralca primerjana z in-game metrom (Details!, če obstaja)
-- [x] A9 ✅ to je **level lika** (13–15 v WC), ne ilvl. Polje `level` v naprednem bloku: level ali ilvl? (primerjaj s portalom)
+- [x] A9 ✅ to je **ilvl opreme** (enak Blizzardovemu `equipped_item_level`: Sinek 13 = 13, Im 15 = 15), ne level lika (vsi so bili level 20). Polje `level` v naprednem bloku: level ali ilvl? (primerjaj s portalom)
 - [x] A10 ✅ ob vsakem ENCOUNTER_START za vsakega člana (5×), 150 polj: GUID, frakcija, statistike, talenti `[(id,node,rank)…]`, **oprema `[(itemId, ilvl, (enchant), (bonus), (gemi))…]`** – ilvl po predmetu ✅, aure. `COMBATANT_INFO` (oprema/talenti ob pullu) – format
 - [x] A11 ✅ oba se parsata (4 dispeli druida v runu; interrupti samo tujca zunaj). `SPELL_INTERRUPT`, `SPELL_DISPEL` – postavitev polj (zdaj po retail). ✅ `SPELL_ABSORBED`, `SPELL_AURA_BROKEN_SPELL`, `DAMAGE_SHIELD`, `SPELL_CAST_FAILED` potrjeni na pravem logu
 - [ ] A12 DPS/HPS iz `wowrun` ≈ in-game meter (±5 %)

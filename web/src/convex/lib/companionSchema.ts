@@ -43,6 +43,7 @@ export const playerSummary = v.object({
 	name: v.string(),
 	slug: v.string(),
 	recorder: v.boolean(),
+	/** advanced-log `level` = equipped item level (not the character level) */
 	level: nullableNumber,
 	damage: v.number(),
 	healing: v.number(),
