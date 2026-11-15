@@ -676,3 +676,23 @@ fn stranger_hit_on_the_recorder_is_anonymous() {
         (RecordKind::HitTaken, 700, Some("Another player"))
     );
 }
+
+#[test]
+fn combat_log_categories_add_up() {
+    let (l, _) = full_run();
+    let (runs, _) = detect(&l, Config::default());
+    for p in &runs[0].players {
+        let c = p.combat.as_ref().expect("combat stats");
+        let m = &c.mine;
+        let dealt = m.melee.amount + m.ranged.amount + m.spells.amount + m.periodic.amount + m.damage_shields;
+        assert_eq!(dealt, p.damage, "{}: My actions add up to the damage", p.slug);
+        let me = &c.me;
+        let taken = me.melee.amount + me.ranged.amount + me.spells.amount + me.periodic.amount + me.environmental;
+        assert_eq!(
+            taken, p.damage_taken,
+            "{}: What happened to me adds up to damage taken",
+            p.slug
+        );
+        assert_eq!(me.deaths, p.deaths);
+    }
+}

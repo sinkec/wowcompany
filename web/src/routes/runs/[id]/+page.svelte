@@ -10,6 +10,7 @@
 	import { api } from '#convex/_generated/api.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import Locked from '#lib/components/wow/Locked.svelte';
+	import CombatLogPanel from '#lib/components/wow/CombatLogPanel.svelte';
 	import RunTimeline from '#lib/components/wow/RunTimeline.svelte';
 	import { classColor, iconFallback } from '#lib/wow.js';
 	import {
@@ -303,7 +304,7 @@
 							>{/if}</Tabs.Trigger
 					>
 					<Tabs.Trigger value="timeline" disabled={!run.access.details}>Timeline</Tabs.Trigger>
-					<Tabs.Trigger value="spells" disabled={!run.access.details}>Spells</Tabs.Trigger>
+					<Tabs.Trigger value="spells" disabled={!run.access.details}>Combat Log</Tabs.Trigger>
 				</Tabs.List>
 
 				<!-- METER -->
@@ -524,7 +525,13 @@
 													>{/if}
 												{#if p.deaths}<span class="text-destructive">died {p.deaths}×</span>{/if}
 											</div>
-											{#each [{ title: 'Damage', list: dp(p).spells ?? [], total: p.damage }, { title: 'Healing', list: dp(p).heals ?? [], total: p.healing }] as part (part.title)}
+											{#if dp(p).combat}
+												<div class="text-xs text-muted-foreground">
+													Grouped like the game's Combat Log Config.
+												</div>
+												<CombatLogPanel combat={dp(p).combat!} secs={segDur} />
+											{/if}
+											{#each [{ title: 'Spells & abilities: damage', list: dp(p).spells ?? [], total: p.damage }, { title: 'Spells & abilities: healing', list: dp(p).heals ?? [], total: p.healing }] as part (part.title)}
 												{#if part.list.length}
 													<table class="w-full">
 														<thead class="text-muted-foreground">
@@ -537,7 +544,7 @@
 																<th class="py-1 text-right">Crit</th>
 																<th class="hidden py-1 text-right sm:table-cell">Avg</th>
 																<th class="hidden py-1 text-right sm:table-cell">Min–Max</th>
-																{#if part.title === 'Healing'}<th
+																{#if part.title.endsWith('healing')}<th
 																		class="hidden py-1 text-right sm:table-cell">Overheal</th
 																	>{/if}
 															</tr>
@@ -567,7 +574,7 @@
 																	<td class="hidden py-1 text-right tabular-nums sm:table-cell"
 																		>{x.max ? `${fmtNum(x.min ?? 0)}–${fmtNum(x.max)}` : '—'}</td
 																	>
-																	{#if part.title === 'Healing'}<td
+																	{#if part.title.endsWith('healing')}<td
 																			class="hidden py-1 text-right tabular-nums sm:table-cell"
 																			>{x.overheal
 																				? `${Math.round(((x.overheal ?? 0) / Math.max(1, x.amount + (x.overheal ?? 0))) * 100)}%`
@@ -641,7 +648,7 @@
 											<div class="grid gap-3 sm:grid-cols-2">
 												{#if dp(p).targets?.length}
 													<div>
-														<div class="mb-1 font-semibold text-muted-foreground">Beat up</div>
+														<div class="mb-1 font-semibold text-muted-foreground">Targets</div>
 														{#each dp(p).targets as t (t.name)}
 															<div class="flex justify-between">
 																<span class="truncate">{t.name}</span><span class="tabular-nums"
@@ -651,7 +658,7 @@
 														{/each}
 													</div>
 												{/if}
-												{#each [{ title: 'Buffs (uptime)', list: dp(p).buffs ?? [] }, { title: 'Debuffs kept on enemies', list: dp(p).debuffs ?? [] }] as au (au.title)}
+												{#each [{ title: 'Auras: beneficial (uptime)', list: dp(p).buffs ?? [] }, { title: 'Auras: hostile, kept on enemies', list: dp(p).debuffs ?? [] }] as au (au.title)}
 													{#if au.list.length}
 														<div>
 															<div class="mb-1 font-semibold text-muted-foreground">{au.title}</div>
@@ -677,7 +684,7 @@
 												{#if dp(p).casts?.length}
 													<div>
 														<div class="mb-1 font-semibold text-muted-foreground">
-															Button presses
+															Spell Casting: successful casts
 														</div>
 														{#each dp(p).casts as c (c.id + ':' + c.pet)}
 															<div class="flex justify-between">
@@ -1076,6 +1083,14 @@
 							>
 						{/each}
 					</div>
+					{#if spellPlayer?.combat}
+						<section class="wow-frame space-y-2 rounded-lg p-4">
+							<h3 class="font-display font-semibold text-primary">
+								Whole run, grouped like the game's Combat Log Config
+							</h3>
+							<CombatLogPanel combat={spellPlayer.combat} secs={run.durationMs / 1000} />
+						</section>
+					{/if}
 					{#if spellPlayer}
 						<div class="grid gap-4 lg:grid-cols-2">
 							{#each [['Damage', spellPlayer.topDamage, spellPlayer.damage], ['Healing', spellPlayer.topHealing, spellPlayer.healing]] as const as [label, list, total] (label)}

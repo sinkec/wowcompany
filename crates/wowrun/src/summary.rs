@@ -199,6 +199,9 @@ pub struct PlayerSummary {
     /// Equipped items at the last boss pull (`COMBATANT_INFO`, schema 4).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub gear: Vec<GearItem>,
+    /// Everything grouped like the game's Combat Log Config ("My actions" / "What happened to me?").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat: Option<CombatLogStats>,
     /// Biggest single events of the run, at most one per kind (schema 3).
     #[serde(default)]
     pub records: Vec<RunRecord>,
@@ -345,6 +348,77 @@ pub struct SegmentPlayer {
     /// Boss fights only: the fight in `bucket_ms` steps (for a per-boss graph).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeline: Option<BossTimeline>,
+    /// Boss fights only: the fight grouped like the game's Combat Log Config.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat: Option<CombatLogStats>,
+}
+
+/// One kind of hit (Melee, Ranged, Spells, Periodic – the game's Combat Log Config categories).
+/// For "what happened to me" `misses` are attacks against the player that missed.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HitPart {
+    pub amount: i64,
+    pub hits: u32,
+    pub crits: u32,
+    pub misses: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NamedCount {
+    pub name: String,
+    pub count: u32,
+}
+
+/// "My actions" – what the player did.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MyActions {
+    pub melee: HitPart,
+    pub ranged: HitPart,
+    pub spells: HitPart,
+    pub periodic: HitPart,
+    pub heals: i64,
+    pub periodic_heals: i64,
+    pub power_gains: i64,
+    pub drains: u32,
+    pub interrupts: u32,
+    pub extra_attacks: u32,
+    pub summons: u32,
+    pub resurrections: u32,
+    pub dispels: u32,
+    pub casts_started: u32,
+    pub casts: u32,
+    pub casts_failed: u32,
+    /// Why casts failed ("Not enough mana", "Out of range" …), most common first.
+    pub fail_reasons: Vec<NamedCount>,
+    pub kills: u32,
+    pub damage_shields: i64,
+    /// The player's misses by type (MISS, DODGE, PARRY, RESIST …).
+    pub misses: Vec<NamedCount>,
+}
+
+/// "What happened to me?" – what was done to the player.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DoneToMe {
+    pub melee: HitPart,
+    pub ranged: HitPart,
+    pub spells: HitPart,
+    pub periodic: HitPart,
+    pub environmental: i64,
+    pub heals_received: i64,
+    pub deaths: u32,
+    /// Attacks the player avoided, by type (DODGE, PARRY, MISS, BLOCK, RESIST …).
+    pub avoided: Vec<NamedCount>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CombatLogStats {
+    pub mine: MyActions,
+    pub me: DoneToMe,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -466,6 +540,7 @@ impl RunSummary {
                 sp.buffs.truncate(5);
                 sp.debuffs.truncate(5);
                 sp.timeline = None;
+                sp.combat = None;
             }
         }
         if self.json_len() > max_bytes {

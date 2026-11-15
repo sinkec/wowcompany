@@ -112,6 +112,76 @@ type SpellMap = HashMap<(u32, bool), SpellAcc>;
 /// Casts keyed by (spell id, done by the pet) → (name, count).
 type CastMap = HashMap<(u32, bool), (String, u32)>;
 
+/// "My actions" / "What happened to me?" while counting (named counts in maps).
+#[derive(Debug, Clone, Default)]
+struct CombatAcc {
+    mine: MyActions,
+    me: DoneToMe,
+    fail_reasons: HashMap<String, u32>,
+    misses: HashMap<String, u32>,
+    avoided: HashMap<String, u32>,
+}
+
+impl CombatAcc {
+    fn stats(&self) -> CombatLogStats {
+        let top = |m: &HashMap<String, u32>| {
+            let mut v: Vec<NamedCount> = m
+                .iter()
+                .map(|(name, &count)| NamedCount {
+                    name: name.clone(),
+                    count,
+                })
+                .collect();
+            v.sort_by(|a, b| b.count.cmp(&a.count).then(a.name.cmp(&b.name)));
+            v.truncate(8);
+            v
+        };
+        let mut s = CombatLogStats {
+            mine: self.mine.clone(),
+            me: self.me.clone(),
+        };
+        s.mine.fail_reasons = top(&self.fail_reasons);
+        s.mine.misses = top(&self.misses);
+        s.me.avoided = top(&self.avoided);
+        s
+    }
+}
+
+/// Which Combat Log Config category a damage event belongs to.
+fn hit_part<'a>(
+    kind: DamageSource,
+    parts: (&'a mut HitPart, &'a mut HitPart, &'a mut HitPart, &'a mut HitPart),
+) -> Option<&'a mut HitPart> {
+    let (melee, ranged, spells, periodic) = parts;
+    match kind {
+        DamageSource::Swing | DamageSource::SwingLanded => Some(melee),
+        DamageSource::Range => Some(ranged),
+        DamageSource::Periodic => Some(periodic),
+        DamageSource::Environmental => None,
+        // spells, siege, damage shields and splits (a damage shield on the player's own side is
+        // counted separately as `damage_shields` before this is asked)
+        _ => Some(spells),
+    }
+}
+
+impl MyActions {
+    fn part(&mut self, kind: DamageSource) -> Option<&mut HitPart> {
+        hit_part(
+            kind,
+            (&mut self.melee, &mut self.ranged, &mut self.spells, &mut self.periodic),
+        )
+    }
+}
+
+impl DoneToMe {
+    fn part(&mut self, kind: DamageSource) -> Option<&mut HitPart> {
+        hit_part(
+            kind,
+            (&mut self.melee, &mut self.ranged, &mut self.spells, &mut self.periodic),
+        )
+    }
+}
+
 /// One group player in one segment.
 #[derive(Debug, Clone, Default)]
 struct SegPlayerAcc {
@@ -131,6 +201,7 @@ struct SegPlayerAcc {
     uptime: HashMap<(u32, bool), (String, i64)>,
     /// damage / healing / taken per `BOSS_BUCKET_MS` from the segment start
     tl: [Vec<i64>; 3],
+    combat: CombatAcc,
 }
 
 /// Resolution of a boss fight's timeline (the run timeline has 10 s buckets – too coarse for a 30 s boss).
@@ -178,6 +249,7 @@ struct PlayerAcc {
     heal_spells: SpellMap,
     casts: CastMap,
     gear: Vec<GearItem>,
+    combat: CombatAcc,
     tl_damage: Vec<i64>,
     tl_healing: Vec<i64>,
     tl_taken: Vec<i64>,
@@ -529,6 +601,19 @@ impl RunAcc {
         }
     }
 
+    /// Counts something for the player in the whole run and in the current segment.
+    fn combat(&mut self, guid: &str, f: impl Fn(&mut CombatAcc)) {
+        if let Some(p) = self.players.get_mut(guid) {
+            f(&mut p.combat);
+        }
+        if self.started_at.is_some()
+            && self.players.contains_key(guid)
+            && let Some(sp) = self.seg_player(guid)
+        {
+            f(&mut sp.combat);
+        }
+    }
+
     /// The group player's numbers in the current segment.
     fn seg_player(&mut self, guid: &str) -> Option<&mut SegPlayerAcc> {
         self.current_seg
@@ -764,6 +849,17 @@ impl RunAcc {
                     p.damage += damage.amount;
                     p.hits += 1;
                     p.crits += damage.critical as u32;
+                    let (amount, crit, kind) = (damage.amount, damage.critical, *source_kind);
+                    self.combat(&guid, |c| {
+                        if kind == DamageSource::Shield {
+                            c.mine.damage_shields += amount;
+                        } else if let Some(part) = c.mine.part(kind) {
+                            part.amount += amount;
+                            part.hits += 1;
+                            part.crits += crit as u32;
+                        }
+                    });
+                    let p = self.players.get_mut(&guid).expect("actor exists");
                     p.dmg_spells
                         .entry((id, pet))
                         .or_insert_with(|| SpellAcc::named(&name))
@@ -803,6 +899,17 @@ impl RunAcc {
                     if *source_kind == DamageSource::Environmental {
                         p.env_taken += damage.amount;
                     }
+                    let (amount, crit, kind) = (damage.amount, damage.critical, *source_kind);
+                    self.combat(&guid, |c| {
+                        if kind == DamageSource::Environmental {
+                            c.me.environmental += amount;
+                        } else if let Some(part) = c.me.part(kind) {
+                            part.amount += amount;
+                            part.hits += 1;
+                            part.crits += crit as u32;
+                        }
+                    });
+                    let p = self.players.get_mut(&guid).expect("checked");
                     add_at(&mut p.tl_taken, b, damage.amount);
                     push_recap(
                         &mut p.recap,
@@ -820,15 +927,52 @@ impl RunAcc {
                     self.seg_add(&guid, ts, 0, 0, damage.amount);
                 }
             }
-            Kind::Missed { .. } => {
-                if let Some((guid, _)) = self.actor(&rec.source) {
+            Kind::Missed { source_kind, miss, .. } => {
+                let kind = *source_kind;
+                let miss_type = miss.miss_type.clone();
+                if let Some((guid, _)) = self.actor(&rec.source)
+                    && !self.is_group_side(&rec.dest)
+                {
+                    self.combat(&guid, |c| {
+                        if let Some(part) = c.mine.part(kind) {
+                            part.misses += 1;
+                        }
+                        *c.misses.entry(miss_type.clone()).or_default() += 1;
+                    });
                     self.touch(&guid, ts, cfg);
+                }
+                if rec.dest.is_player() && self.players.contains_key(&rec.dest.guid) && !self.is_group_side(&rec.source)
+                {
+                    let guid = rec.dest.guid.clone();
+                    self.combat(&guid, |c| {
+                        if let Some(part) = c.me.part(kind) {
+                            part.misses += 1;
+                        }
+                        *c.avoided.entry(miss_type.clone()).or_default() += 1;
+                    });
                 }
             }
             Kind::Heal {
-                spell, advanced, heal, ..
+                spell,
+                advanced,
+                heal,
+                periodic,
             } => {
                 let effective = heal.amount - heal.overheal;
+                let periodic = *periodic;
+                if let Some((guid, _)) = self.actor(&rec.source) {
+                    self.combat(&guid, |c| {
+                        if periodic {
+                            c.mine.periodic_heals += effective;
+                        } else {
+                            c.mine.heals += effective;
+                        }
+                    });
+                }
+                if rec.dest.is_player() && self.players.contains_key(&rec.dest.guid) {
+                    let guid = rec.dest.guid.clone();
+                    self.combat(&guid, |c| c.me.heals_received += effective);
+                }
                 let b = self.bucket(ts, cfg);
                 if let Some((guid, pet)) = self.actor(&rec.source) {
                     let target = self.public_name(&rec.dest);
@@ -894,6 +1038,7 @@ impl RunAcc {
             Kind::Interrupt { .. } => {
                 if let Some((guid, _)) = self.actor(&rec.source) {
                     self.players.get_mut(&guid).expect("actor exists").interrupts += 1;
+                    self.combat(&guid, |c| c.mine.interrupts += 1);
                     if let Some(sp) = self.seg_player(&guid) {
                         sp.interrupts += 1;
                     }
@@ -903,6 +1048,7 @@ impl RunAcc {
             Kind::Dispel { .. } => {
                 if let Some((guid, _)) = self.actor(&rec.source) {
                     self.players.get_mut(&guid).expect("actor exists").dispels += 1;
+                    self.combat(&guid, |c| c.mine.dispels += 1);
                     if let Some(sp) = self.seg_player(&guid) {
                         sp.dispels += 1;
                     }
@@ -926,9 +1072,68 @@ impl RunAcc {
                             .or_insert_with(|| (spell.name.clone(), 0))
                             .1 += 1;
                     }
+                    self.combat(&guid, |c| c.mine.casts += 1);
                     if !pet {
                         self.touch(&guid, ts, cfg);
                     }
+                }
+            }
+            Kind::Cast {
+                phase: wowlog::CastPhase::Start,
+                ..
+            } => {
+                if let Some((guid, _)) = self.actor(&rec.source) {
+                    self.combat(&guid, |c| c.mine.casts_started += 1);
+                }
+            }
+            Kind::Cast {
+                phase: wowlog::CastPhase::Failed,
+                failed_reason,
+                ..
+            } => {
+                if let Some((guid, _)) = self.actor(&rec.source) {
+                    let reason = failed_reason.clone().unwrap_or_else(|| "Unknown".into());
+                    self.combat(&guid, |c| {
+                        c.mine.casts_failed += 1;
+                        *c.fail_reasons.entry(reason.clone()).or_default() += 1;
+                    });
+                }
+            }
+            Kind::Energize { amount, .. } => {
+                if let Some((guid, _)) = self.actor(&rec.source) {
+                    let gained = amount.max(0.0).round() as i64;
+                    self.combat(&guid, |c| c.mine.power_gains += gained);
+                }
+            }
+            Kind::ExtraAttacks { amount, .. } => {
+                if let Some((guid, _)) = self.actor(&rec.source) {
+                    let n = (*amount).max(0) as u32;
+                    self.combat(&guid, |c| c.mine.extra_attacks += n);
+                }
+            }
+            Kind::Summon { .. } => {
+                if let Some((guid, _)) = self.actor(&rec.source) {
+                    self.combat(&guid, |c| c.mine.summons += 1);
+                }
+            }
+            Kind::Resurrect { .. } => {
+                if let Some((guid, _)) = self.actor(&rec.source) {
+                    self.combat(&guid, |c| c.mine.resurrections += 1);
+                }
+            }
+            Kind::PartyKill => {
+                if let Some((guid, _)) = self.actor(&rec.source) {
+                    self.combat(&guid, |c| c.mine.kills += 1);
+                }
+            }
+            Kind::Other { .. }
+                if matches!(
+                    rec.event.as_str(),
+                    "SPELL_DRAIN" | "SPELL_LEECH" | "SPELL_PERIODIC_DRAIN" | "SPELL_PERIODIC_LEECH"
+                ) =>
+            {
+                if let Some((guid, _)) = self.actor(&rec.source) {
+                    self.combat(&guid, |c| c.mine.drains += 1);
                 }
             }
             Kind::Aura {
@@ -967,6 +1172,10 @@ impl RunAcc {
                     && let Some(sp) = self.seg_player(&rec.dest.guid)
                 {
                     sp.deaths += 1;
+                }
+                if self.players.contains_key(&rec.dest.guid) {
+                    let guid = rec.dest.guid.clone();
+                    self.combat(&guid, |c| c.me.deaths += 1);
                 }
                 if let Some(p) = self.players.get_mut(&rec.dest.guid) {
                     p.deaths += 1;
@@ -1088,6 +1297,7 @@ impl RunAcc {
                             targets: if boss { top_targets(&sp.targets, 8) } else { vec![] },
                             buffs: if boss { top_auras(&sp.uptime, false, 12) } else { vec![] },
                             debuffs: if boss { top_auras(&sp.uptime, true, 12) } else { vec![] },
+                            combat: boss.then(|| sp.combat.stats()),
                             timeline: boss.then(|| {
                                 // every series as long as the fight
                                 let n = (((s.end - s.start).max(1) + BOSS_BUCKET_MS - 1) / BOSS_BUCKET_MS) as usize;
@@ -1142,6 +1352,7 @@ impl RunAcc {
                 top_healing: top(&p.heal_spells, &p.casts),
                 casts: top_casts(&p.casts, 30),
                 gear: p.gear.clone(),
+                combat: Some(p.combat.stats()),
                 records: p
                     .records
                     .values()

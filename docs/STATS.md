@@ -364,6 +364,11 @@ Izdaje: S0 brez izdaje · S2+S3 → **Companion v0.2.0** (z addonom 0.5) · S4+S
 - ✅ **C8** graf boja po bossu (2 s), **C7/W8** primerjava z najboljšim v Logs, **C11** *Keep logs for N days*.
 - ✅ Predmeti iz retail/classic namespacea (`companion.enrichItems`), združevanje istega runa z drugim ključem (`cb4fe24`).
 - ✅ Izdaje: Companion 0.1.7, **0.1.8** (nameščena pri uporabniku); 0.1.9 commitana, oznako pushne uporabnik.
+- ✅ **Kategorije kot Combat Log Config (16. 11. 2026):** *My actions* (Melee, Ranged, Spells, Periodic, Auras, Spell Casting
+  z razlogi neuspehov, Miscellaneous) in *What happened to me?* (prejeto po kategorijah, izognjeni napadi po vrsti, prejeti heali,
+  okolje, smrti) – po bossu (Bosses → ▸) in za cel run (zavihek **Combat Log**, prej Spells). Filtri v igrinem *Combat Log Config*
+  vplivajo samo na prikaz v chatu, **ne** na datoteko (preverjeno na logu po spremembi filtrov). Kategorije se seštejejo v
+  škodo/prejeto škodo (test). Neuspeli casti so v logu samo za snemalca.
 - ⏳ Ostane: **C9 replay**, **C5 poročilo v Companionu**, preverjanje razčlenitve v igri (`/wowco probe`).
 
 ## 10. Odločitve za uporabnika

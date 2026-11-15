@@ -305,8 +305,11 @@ const DETAIL_KEYS = [
 	'targets',
 	'buffs',
 	'debuffs',
-	'timeline'
+	'timeline',
+	'combat'
 ] as const;
+/** neseznamski deli razčlenitve (objekti) */
+const OBJECT_KEYS = new Set<string>(['timeline', 'combat']);
 
 /**
  * Razčlenitev boss bojev iz segmentov v ločene dokumente: segmenti ostanejo s seštevki in oznako
@@ -318,7 +321,7 @@ export function splitBossDetails(segments: RunSummary['segments']) {
 		const players: BossDetailPlayer[] = [];
 		const slimPlayers = seg.players.map((p) => {
 			const has = DETAIL_KEYS.some((k) =>
-				k === 'timeline' ? !!p.timeline : ((p[k] as unknown[] | undefined)?.length ?? 0) > 0
+				OBJECT_KEYS.has(k) ? !!p[k] : ((p[k] as unknown[] | undefined)?.length ?? 0) > 0
 			);
 			const rest = { ...p };
 			for (const k of DETAIL_KEYS) delete rest[k];
@@ -326,7 +329,7 @@ export function splitBossDetails(segments: RunSummary['segments']) {
 			const d: BossDetailPlayer = { slug: p.slug };
 			for (const k of DETAIL_KEYS) {
 				const val = p[k];
-				if (k === 'timeline' ? !!val : ((val as unknown[] | undefined)?.length ?? 0) > 0)
+				if (OBJECT_KEYS.has(k) ? !!val : ((val as unknown[] | undefined)?.length ?? 0) > 0)
 					(d as Record<string, unknown>)[k] = val;
 			}
 			players.push(d);

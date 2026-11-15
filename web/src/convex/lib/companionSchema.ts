@@ -34,6 +34,50 @@ export const castStat = v.object({
 export const targetStat = v.object({ name: v.string(), amount: v.number() });
 export const gearItem = v.object({ itemId: v.number(), ilvl: v.number() });
 export const auraStat = v.object({ id: v.number(), name: v.string(), uptimeMs: v.number() });
+const hitPart = v.object({
+	amount: v.number(),
+	hits: v.number(),
+	crits: v.number(),
+	misses: v.number()
+});
+const namedCount = v.object({ name: v.string(), count: v.number() });
+/** Kot Combat Log Config v igri: "My actions" in "What happened to me?" (Companion v0.1.11+). */
+export const combatLogStats = v.object({
+	mine: v.object({
+		melee: hitPart,
+		ranged: hitPart,
+		spells: hitPart,
+		periodic: hitPart,
+		heals: v.number(),
+		periodicHeals: v.number(),
+		powerGains: v.number(),
+		drains: v.number(),
+		interrupts: v.number(),
+		extraAttacks: v.number(),
+		summons: v.number(),
+		resurrections: v.number(),
+		dispels: v.number(),
+		castsStarted: v.number(),
+		casts: v.number(),
+		castsFailed: v.number(),
+		failReasons: v.array(namedCount),
+		kills: v.number(),
+		damageShields: v.number(),
+		misses: v.array(namedCount)
+	}),
+	me: v.object({
+		melee: hitPart,
+		ranged: hitPart,
+		spells: hitPart,
+		periodic: hitPart,
+		environmental: v.number(),
+		healsReceived: v.number(),
+		deaths: v.number(),
+		avoided: v.array(namedCount)
+	})
+});
+export type CombatLogStats = Infer<typeof combatLogStats>;
+
 export const bossTimeline = v.object({
 	bucketMs: v.number(),
 	damage: v.array(v.number()),
@@ -85,7 +129,8 @@ export const playerSummary = v.object({
 	records: v.optional(v.array(runRecord)),
 	/** shema 4: casti (tudi uroki brez škode) in oprema ob zadnjem bossu (COMBATANT_INFO) */
 	casts: v.optional(v.array(castStat)),
-	gear: v.optional(v.array(gearItem))
+	gear: v.optional(v.array(gearItem)),
+	combat: v.optional(combatLogStats)
 });
 
 export const segment = v.object({
@@ -114,6 +159,7 @@ export const segment = v.object({
 			buffs: v.optional(v.array(auraStat)),
 			debuffs: v.optional(v.array(auraStat)),
 			timeline: v.optional(bossTimeline),
+			combat: v.optional(combatLogStats),
 			/** razčlenitev je v runBossDetails (strežnik jo prestavi tja ob uploadu) */
 			hasDetail: v.optional(v.boolean())
 		})
@@ -129,7 +175,8 @@ export const bossDetailPlayer = v.object({
 	targets: v.optional(v.array(targetStat)),
 	buffs: v.optional(v.array(auraStat)),
 	debuffs: v.optional(v.array(auraStat)),
-	timeline: v.optional(bossTimeline)
+	timeline: v.optional(bossTimeline),
+	combat: v.optional(combatLogStats)
 });
 export type BossDetailPlayer = Infer<typeof bossDetailPlayer>;
 
