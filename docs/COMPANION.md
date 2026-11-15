@@ -381,19 +381,9 @@ Obstoječi portal porabi ~100 k klicev in ~150–200 MB DB I/O na mesec → **sk
 
 ## 12. Struktura repozitorija (monorepo)
 
-```
-WowCompany/
-├─ src/                       # portal (obstoječe)
-│  └─ convex/                 # + companion.ts, runs.ts, http.ts (nove poti)
-├─ desktop/                   # NOVO: Tauri aplikacija
-│  ├─ src/                    # Svelte UI
-│  ├─ src-tauri/              # Rust (Tauri app)
-│  │  └─ src/{main,auth,locate,tail,run_detector,analyzer,uploader,ipc}.rs
-│  └─ package.json
-├─ crates/wowlog/             # NOVO: parser combat loga (+ testi na vzorcih)
-├─ wowlog/                    # vzorci logov (gitignore!)
-└─ COMPANION.md               # ta dokument
-```
+Od 15. 11. 2026 (STATS.md §8): `web/` portal (SvelteKit + Convex – poti `src/…` v teh dokumentih so pod `web/`),
+`desktop/` Tauri aplikacija, `crates/` Rust knjižnici `wowlog` + `wowrun`, `addon/WowCompany/` addon (+ `addon/tests/`),
+`docs/` dokumenti, `wowlog/` vzorci logov (gitignore). Kazalo: [README.md](README.md).
 
 ---
 

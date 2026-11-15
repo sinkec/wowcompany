@@ -33,21 +33,25 @@ Vse mora delovati znotraj **brezplačnih paketov**.
 2. Po ~1 tednu: Convex dashboard → Usage (primerjaj z razdelkom 8) in izmeri zakasnitev Blizzarda po odjavi.
 3. Opcijsko: Blizzard ključi nastavljivi prek Portal Room (kot Discord); Discord bot avatar = `static/icon-512.png`; bot viden med člani (`bot` scope brez pravic).
 
-**Upravljanje (ukazi):**
+**Upravljanje (ukazi):** od 15. 11. 2026 je portal v `web/` – ukaze za portal poganjaj iz `web/` (ali iz korena prek bližnjic `bun run dev|check|test|convex`), Rust in addon iz korena.
 ```bash
+cd web                              # portal (SvelteKit + Convex)
 bunx convex dev                     # dev funkcije (pusti teči); za CLI: export CONVEX_TMPDIR=$PWD/node_modules/.convex-tmp
 bun run dev                         # http://localhost:5173
 bun run check                       # tipi (svelte-check)
 bun run test                        # 53 enotskih testov (Discord objave + slash ukazi po vidnosti)
 bun run check:visibility            # ~1500 preverjanj javno/zasebno na dev deploymentu
 bun run check:companion             # Companion E2E na dev (povezava naprave, upload, združevanje; za sabo pobriše)
-cargo test && cargo run --bin wowrun -- <log>   # Companion: parser + detektor runov (crates/)
-cd desktop && bun install && bunx tauri dev       # Companion namizna aplikacija (WOWCOMPANY_API=<dev convex.site> za dev strežnik)
 bun run env:push [-- --prod]        # .env -> Convex env (vrednosti *_PROD za produkcijo)
 bun run discord:register            # registracija slash ukazov iz .env (ali gumb v Portal Room)
 bunx convex run [--prod] admin:refetchAll && bunx convex run [--prod] poll:run '{"force":true}'   # ponovni prenos vseh likov
 bunx convex run [--prod] players:addByName '{"name":"Ime Priimek"}'                              # ročno dodajanje
-git push origin main                # Vercel samodejno: convex deploy (prod) + build
+git push origin main                # Vercel samodejno: convex deploy (prod) + build (vercel.json v korenu)
+# --- iz korena repozitorija ---
+cargo test && cargo run --bin wowrun -- <log>   # Companion: parser + detektor runov (crates/)
+bun run check:addon                             # addon: luac + smoke test + luacheck
+bun run check:all                               # vse zgoraj + svelte-check desktopa
+cd desktop && bun install && bunx tauri dev     # Companion (WOWCOMPANY_API=<dev convex.site> za dev strežnik)
 ```
 
 **Pomembne odločitve:** UI v angleščini, odgovori v slovenščini · ilvl samo od Blizzarda (brez lastnih izračunov) · Bun · Convex inicializiran v `src/hooks.ts` (SvelteKit 3 način) namesto `setupConvex()` · slash ukazi angleški · interakcije: SvelteKit pot posreduje Convex HTTP akciji (podpis + interne poizvedbe) · poizvedbe ne berejo ure (`since` pošlje brskalnik).

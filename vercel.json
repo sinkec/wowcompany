@@ -1,5 +1,5 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"installCommand": "bun install",
-	"buildCommand": "bunx convex deploy --cmd-url-env-var-name PUBLIC_CONVEX_URL --cmd 'bun run build'"
+	"installCommand": "command -v bun >/dev/null || npm install -g bun; cd web && bun install",
+	"buildCommand": "cd web && bunx convex deploy --cmd-url-env-var-name PUBLIC_CONVEX_URL --cmd 'bun run build' && cd .. && rm -rf .vercel/output && mkdir -p .vercel && mv web/.vercel/output .vercel/output"
 }

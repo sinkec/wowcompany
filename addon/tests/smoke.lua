@@ -1,4 +1,4 @@
--- Smoke test for the addon outside the game: lua5.1 addon/smoke.lua (from the repo root).
+-- Smoke test for the addon outside the game: lua5.1 addon/tests/smoke.lua (from the repo root).
 -- A fake, minimal WoW API loads every file, fires the events and draws every tab, so nil calls,
 -- typos and broken logic show up here and not as a Lua error in the middle of a dungeon.
 -- It cannot prove that the real client behaves like the fake one – only that our code is sound.
