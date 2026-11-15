@@ -344,3 +344,27 @@ describe('boss details are stored apart (DB I/O)', () => {
 		]);
 	});
 });
+
+describe('recorder progress (XP, money, reputation)', () => {
+	const G = (o: object = {}) => ({
+		xp: 8348,
+		xpBonus: 2467,
+		copper: 1605,
+		reputation: [{ faction: 'Thunder Bluff', amount: 25 }],
+		skills: [{ skill: 'Wands', from: 90, to: 97 }],
+		levels: [21],
+		...o
+	});
+	test('sane gains are accepted', () =>
+		expect(checkRun(RUN({ schema: 4, progress: G() }), NOW)).toBeNull());
+	test('impossible gains are refused', () => {
+		expect(checkRun(RUN({ schema: 4, progress: G({ xpBonus: 9999 }) }), NOW)).toBe('bad progress');
+		expect(
+			checkRun(
+				RUN({ schema: 4, progress: G({ skills: [{ skill: 'Wands', from: 97, to: 90 }] }) }),
+				NOW
+			)
+		).toBe('bad progress');
+		expect(checkRun(RUN({ schema: 4, progress: G({ levels: [0] }) }), NOW)).toBe('bad progress');
+	});
+});

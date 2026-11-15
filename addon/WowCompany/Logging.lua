@@ -57,8 +57,10 @@ end
 -- (happened 15. 11. 2026). So the addon keeps a chat tab of its own that shows exactly what the
 -- Companion reads; the player's own chat stays as it is.
 local TAB = "WowCompany"
+-- loot + rolls, leader (system + party), and what YOU gained in the run: XP, money, reputation,
+-- skill-ups (the Companion adds them to the run). Never trade/general channels, whispers or guild.
 local GROUPS = { "LOOT", "SYSTEM", "PARTY", "PARTY_LEADER", "RAID", "RAID_LEADER", "RAID_WARNING",
-    "INSTANCE_CHAT", "INSTANCE_CHAT_LEADER" }
+    "INSTANCE_CHAT", "INSTANCE_CHAT_LEADER", "COMBAT_XP_GAIN", "MONEY", "COMBAT_FACTION_CHANGE", "SKILL" }
 
 local function chatTab()
     if type(GetChatWindowInfo) ~= "function" then return nil, nil end

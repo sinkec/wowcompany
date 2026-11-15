@@ -103,6 +103,21 @@ export function checkRun(s: RunSummary, now: number): string | null {
 		)
 	)
 		return 'bad roll entry';
+	const g = s.progress;
+	if (g) {
+		const okText = (t: string) => t.length > 0 && t.length <= 80;
+		if (
+			!(g.xp >= 0 && g.xp <= 10_000_000 && g.xpBonus >= 0 && g.xpBonus <= g.xp) ||
+			!(g.copper >= 0 && g.copper <= 1_000_000_000) ||
+			g.reputation.length > 50 ||
+			g.skills.length > 50 ||
+			g.levels.length > 20 ||
+			g.reputation.some((r) => !okText(r.faction) || Math.abs(r.amount) > 1_000_000) ||
+			g.skills.some((k) => !okText(k.skill) || k.from < 0 || k.to < k.from || k.to > 1000) ||
+			g.levels.some((l) => l < 1 || l > 100)
+		)
+			return 'bad progress';
+	}
 	for (const p of s.players) {
 		const recs = p.records ?? [];
 		if (recs.length > MAX_RECORDS || new Set(recs.map((r) => r.kind)).size !== recs.length)

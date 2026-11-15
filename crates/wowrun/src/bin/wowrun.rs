@@ -48,6 +48,7 @@ fn main() -> ExitCode {
         Loot(wowlog::Loot),
         Roll(wowlog::Roll),
         Group(wowlog::GroupLine),
+        Progress(wowlog::ProgressLine),
     }
     let mut chat_lines: Vec<(i64, Chat)> = Vec::new();
     if let Some(c) = &chat {
@@ -61,6 +62,8 @@ fn main() -> ExitCode {
                         chat_lines.push((r.timestamp, Chat::Roll(r)));
                     } else if let Some(g) = wowlog::parse_group_line(line, year) {
                         chat_lines.push((g.timestamp, Chat::Group(g)));
+                    } else if let Some(p) = wowlog::parse_progress_line(line, year) {
+                        chat_lines.push((p.timestamp, Chat::Progress(p)));
                     }
                 }
             }
@@ -83,6 +86,7 @@ fn main() -> ExitCode {
                         Chat::Loot(l) => det.push_loot(&l),
                         Chat::Roll(r) => det.push_roll(&r),
                         Chat::Group(g) => det.push_group(&g),
+                        Chat::Progress(p) => det.push_progress(&p),
                     }
                 }
                 runs.extend(det.push(&rec));

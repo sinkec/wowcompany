@@ -160,6 +160,16 @@ impl Detector {
         }
     }
 
+    /// The recorder's gains from the chat log (inside the dungeon during a run).
+    pub fn push_progress(&mut self, p: &wowlog::ProgressLine) {
+        if !self.inside {
+            return;
+        }
+        if let Some(run) = self.run.as_mut() {
+            run.push_progress(p);
+        }
+    }
+
     /// A need/greed roll message from the chat log (inside the dungeon during a run).
     pub fn push_roll(&mut self, roll: &wowlog::Roll) {
         if !self.inside {

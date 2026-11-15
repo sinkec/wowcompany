@@ -125,3 +125,15 @@ export const ROLE_LABEL: Record<'dps' | 'heal' | 'tank', string> = {
 	heal: 'Healer',
 	tank: 'Tank'
 };
+
+/** Bakreniki → "1g 2s 3c" (brez ničel). */
+export function fmtMoney(copper: number): string {
+	const c = Math.round(copper);
+	const g = Math.floor(c / 10_000);
+	const s = Math.floor((c % 10_000) / 100);
+	const r = c % 100;
+	const parts = [g ? `${g}g` : '', s ? `${s}s` : '', r || (!g && !s) ? `${r}c` : ''].filter(
+		Boolean
+	);
+	return parts.join(' ');
+}

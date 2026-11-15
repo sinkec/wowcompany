@@ -18,7 +18,7 @@
   `/wowco details on|off`, `/wowco ask on|off`). Uporabnik je potrdil, da deluje (15. 11.).
 - Predmeti: imena/kakovost iz Blizzard **retail/classic** namespacea (Forever `item/{id}` = 404) – loot ima kakovost brez addona.
 
-**Izdaje:** Companion **0.1.10** (addon 0.5.2 z zavihkom chata "WowCompany"). 0.1.9 (addon 0.5.1) je bila izdana pred zavihkom.
+**Izdaje:** Companion **0.1.11** (addon 0.5.3: zavihek chata "WowCompany" + XP/denar/reputacija/veščine na portalu). 0.1.9 (addon 0.5.1) je bila izdana pred zavihkom.
 - V igri preveriti: po `/reload` in vklopu logiranja se pojavi zavihek chata **WowCompany** (če ne: `/wowco chat on` in poročati,
   kaj izpiše).
 - Da lahko izdaje in `convex run --prod` poganja Claude brez potrditve: dovoljenja v `.claude/settings.json`.

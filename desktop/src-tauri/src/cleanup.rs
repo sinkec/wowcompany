@@ -220,7 +220,12 @@ mod tests {
         assert_eq!(r.kept[0].1, "younger than the keep-logs setting");
         // a week later it goes
         let later = SystemTime::now() + Duration::from_secs(8 * 86_400);
-        assert_eq!(cleanup_logs(d, &[], Duration::from_secs(7 * 86_400), later).deleted.len(), 1);
+        assert_eq!(
+            cleanup_logs(d, &[], Duration::from_secs(7 * 86_400), later)
+                .deleted
+                .len(),
+            1
+        );
     }
 
     #[test]

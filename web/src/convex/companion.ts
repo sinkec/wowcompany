@@ -362,6 +362,26 @@ async function writeParses(
 	);
 }
 
+/** Pridobitve snemalca: ena vrstica na run in snemalca (drugi snemalec istega runa doda svojo). */
+async function writeProgress(ctx: MutationCtx, runId: Id<'runs'>, s: RunSummary) {
+	if (!s.progress || !s.recorder) return;
+	const row = {
+		runId,
+		slug: s.recorder,
+		zone: s.zone.name,
+		startedAt: s.startedAt,
+		durationMs: s.durationMs,
+		season: await seasonAt(ctx, s.endedAt),
+		...s.progress
+	};
+	const old = await ctx.db
+		.query('runProgress')
+		.withIndex('by_run_and_slug', (q) => q.eq('runId', runId).eq('slug', row.slug))
+		.unique();
+	if (old) await ctx.db.replace('runProgress', old._id, row);
+	else await ctx.db.insert('runProgress', row);
+}
+
 async function writeBossDetails(
 	ctx: MutationCtx,
 	runId: Id<'runs'>,
@@ -474,6 +494,7 @@ export const ingestRun = internalMutation({
 			await writeParticipants(ctx, runId, party, s.startedAt);
 			await writeHeroRecords(ctx, runId, s, party);
 			await writeParses(ctx, runId, s, party);
+			await writeProgress(ctx, runId, s);
 			// Discord: enkrat, čez 5 min (drugi snemalec, dopolnitev iz addona); postRun preveri vidnost
 			await ctx.scheduler.runAfter(5 * 60_000, internal.discord.postRun, { runId });
 			await ctx.scheduler.runAfter(0, internal.companion.enrichItems, { runId });
@@ -528,6 +549,8 @@ export const ingestRun = internalMutation({
 				...(s.leader && !existing.leader ? { leader: s.leader } : {})
 			});
 		}
+		// pridobitve snemalca vedno (vsak snemalec ima svoje), tudi ko posnetek ni boljši
+		await writeProgress(ctx, existing._id, s);
 		return { runId: existing._id, created: false, recorderAdded: added, replaced: better };
 	}
 });
@@ -646,6 +669,11 @@ export const deleteRun = internalMutation({
 		}
 		for await (const c of ctx.db.query('clears').withIndex('by_run', (q) => q.eq('runId', runId))) {
 			await ctx.db.delete('clears', c._id);
+		}
+		for await (const g of ctx.db
+			.query('runProgress')
+			.withIndex('by_run_and_slug', (q) => q.eq('runId', runId))) {
+			await ctx.db.delete('runProgress', g._id);
 		}
 		if (await ctx.db.get('runs', runId)) await ctx.db.delete('runs', runId);
 		return null;

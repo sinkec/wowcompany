@@ -289,6 +289,122 @@ pub fn parse_group_line(line: &str, default_year: i64) -> Option<GroupLine> {
     Some(GroupLine { timestamp, event })
 }
 
+/// What the log writer gained (Experience, Money Loot, Reputation, Skill-ups and level-up chat
+/// groups). Only about "you" – never other players. Shapes from real Forever chat logs (15. 11. 2026).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Progress {
+    /// `Mob dies, you gain 46 experience. (+14 group bonus)` / `You gain 25 experience.` /
+    /// `Discovered Sun Rock Retreat: 220 experience gained`. `bonus` is part of `amount`.
+    Xp { amount: u32, bonus: u32, kill: bool },
+    /// `You loot 5 Silver, 3 Copper` / `Your share of the loot is 1 Gold, 20 Copper.` (in copper).
+    Money { copper: u64, share: bool },
+    /// `Reputation with Gadgetzan increased by 75.` (negative for "decreased").
+    Reputation { faction: String, amount: i32 },
+    /// `Your skill in Wands has increased to 45.`
+    Skill { skill: String, value: u32 },
+    /// `Congratulations, you have reached level 21!`
+    Level(u32),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProgressLine {
+    /// Naive local milliseconds (same clock as the combat log).
+    pub timestamp: i64,
+    pub progress: Progress,
+}
+
+/// `1 Gold, 2 Silver, 3 Copper` → copper.
+fn coins(s: &str) -> Option<u64> {
+    let mut total = 0u64;
+    let mut any = false;
+    for part in s.trim().trim_end_matches('.').split(',') {
+        let mut it = part.split_whitespace();
+        let n: u64 = it.next()?.parse().ok()?;
+        let unit = match it.next()? {
+            "Gold" => 10_000,
+            "Silver" => 100,
+            "Copper" => 1,
+            _ => return None,
+        };
+        total += n * unit;
+        any = true;
+    }
+    any.then_some(total)
+}
+
+fn leading_number(s: &str) -> Option<u32> {
+    s.split(|c: char| !c.is_ascii_digit())
+        .find(|x| !x.is_empty())?
+        .parse()
+        .ok()
+}
+
+/// Parses one chat log line; `Some` only for the log writer's XP, money, reputation, skill-ups
+/// and level-ups. Player chat (`[Party] X: … experience …`) is never taken for a gain.
+pub fn parse_progress_line(line: &str, default_year: i64) -> Option<ProgressLine> {
+    let line = line.trim_start_matches('\u{feff}').trim_end_matches(['\r', '\n']);
+    let (ts, text) = line.split_once("  ")?;
+    let timestamp = time::parse_with_year(ts, default_year)?;
+    let text = text.trim();
+    if text.starts_with('[') || text.starts_with('|') {
+        return None; // a chat channel line, not a system message
+    }
+    let progress = if let Some((_, rest)) = text.split_once(" dies, you gain ") {
+        let amount = leading_number(rest)?;
+        let bonus = rest.split_once("(+").and_then(|(_, b)| leading_number(b)).unwrap_or(0);
+        Progress::Xp {
+            amount,
+            bonus,
+            kill: true,
+        }
+    } else if let Some(rest) = text.strip_prefix("You gain ").filter(|r| r.contains(" experience")) {
+        let amount = leading_number(rest)?;
+        let bonus = rest.split_once("(+").and_then(|(_, b)| leading_number(b)).unwrap_or(0);
+        Progress::Xp {
+            amount,
+            bonus,
+            kill: false,
+        }
+    } else if text.starts_with("Discovered ") && text.ends_with(" experience gained") {
+        let (_, rest) = text.rsplit_once(": ")?;
+        Progress::Xp {
+            amount: leading_number(rest)?,
+            bonus: 0,
+            kill: false,
+        }
+    } else if let Some(rest) = text.strip_prefix("Your share of the loot is ") {
+        Progress::Money {
+            copper: coins(rest)?,
+            share: true,
+        }
+    } else if let Some(rest) = text.strip_prefix("You loot ") {
+        Progress::Money {
+            copper: coins(rest)?,
+            share: false,
+        }
+    } else if let Some(rest) = text.strip_prefix("Reputation with ") {
+        let (faction, change) = rest
+            .rsplit_once(" increased by ")
+            .map(|(f, _)| (f, 1))
+            .or_else(|| rest.rsplit_once(" decreased by ").map(|(f, _)| (f, -1)))?;
+        let n = leading_number(rest.rsplit_once(" by ")?.1)? as i32;
+        Progress::Reputation {
+            faction: faction.to_string(),
+            amount: change * n,
+        }
+    } else if let Some(rest) = text.strip_prefix("Your skill in ") {
+        let (skill, value) = rest.split_once(" has increased to ")?;
+        Progress::Skill {
+            skill: skill.to_string(),
+            value: leading_number(value)?,
+        }
+    } else {
+        let rest = text.strip_prefix("Congratulations, you have reached level ")?;
+        Progress::Level(leading_number(rest)?)
+    };
+    Some(ProgressLine { timestamp, progress })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,5 +583,91 @@ mod tests {
             None
         );
         assert_eq!(p("11/15 14:40:03.000  Fizzle Boom receives loot: Linen Cloth."), None);
+    }
+
+    #[test]
+    fn progress_lines() {
+        let p = |l: &str| parse_progress_line(l, 2026).map(|x| x.progress);
+        assert_eq!(
+            p("11/15 14:54:13.120  Deviate Crocolisk dies, you gain 18 experience. (+6 group bonus)"),
+            Some(Progress::Xp {
+                amount: 18,
+                bonus: 6,
+                kill: true
+            })
+        );
+        assert_eq!(
+            p("11/15 14:54:14.000  Theramore Marine dies, you gain 120 experience."),
+            Some(Progress::Xp {
+                amount: 120,
+                bonus: 0,
+                kill: true
+            })
+        );
+        assert_eq!(
+            p("11/15 14:54:15.000  You gain 25 experience."),
+            Some(Progress::Xp {
+                amount: 25,
+                bonus: 0,
+                kill: false
+            })
+        );
+        assert_eq!(
+            p("11/15 14:54:16.000  Discovered Sun Rock Retreat: 220 experience gained"),
+            Some(Progress::Xp {
+                amount: 220,
+                bonus: 0,
+                kill: false
+            })
+        );
+        assert_eq!(
+            p("11/15 14:54:17.000  You loot 5 Copper"),
+            Some(Progress::Money {
+                copper: 5,
+                share: false
+            })
+        );
+        assert_eq!(
+            p("11/15 14:54:18.000  Your share of the loot is 1 Gold, 2 Silver, 3 Copper."),
+            Some(Progress::Money {
+                copper: 10_203,
+                share: true
+            })
+        );
+        assert_eq!(
+            p("11/15 14:54:19.000  Reputation with Steamwheedle Cartel increased by 75."),
+            Some(Progress::Reputation {
+                faction: "Steamwheedle Cartel".into(),
+                amount: 75
+            })
+        );
+        assert_eq!(
+            p("11/15 14:54:20.000  Reputation with Venture Co. decreased by 5."),
+            Some(Progress::Reputation {
+                faction: "Venture Co.".into(),
+                amount: -5
+            })
+        );
+        assert_eq!(
+            p("11/15 14:54:21.000  Your skill in Wands has increased to 45."),
+            Some(Progress::Skill {
+                skill: "Wands".into(),
+                value: 45
+            })
+        );
+        assert_eq!(
+            p("11/15 14:54:22.000  Congratulations, you have reached level 21!"),
+            Some(Progress::Level(21))
+        );
+        // somebody talking about experience is not a gain
+        assert_eq!(
+            p("11/15 14:54:23.000  [2. Trade] Julius Xd: an experienced core, you gain 5 experience"),
+            None
+        );
+        assert_eq!(
+            p("11/15 14:54:24.000  |Hchannel:PARTY|h[Party]|h Fizzle Boom: You loot 5 Gold"),
+            None
+        );
+        assert_eq!(p("11/15 14:54:25.000  Fizzle Boom receives loot: Linen Cloth."), None);
     }
 }

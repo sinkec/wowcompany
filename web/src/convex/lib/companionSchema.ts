@@ -214,6 +214,18 @@ export const lootRoll = v.object({
 	entries: v.array(rollEntry)
 });
 
+/** Kar je snemalec pridobil v runu (iz /chatlog): XP, denar, reputacija, veščine, leveli. Samo snemalec. */
+export const runProgress = v.object({
+	xp: v.number(),
+	xpBonus: v.number(),
+	/** v bakrenikih */
+	copper: v.number(),
+	reputation: v.array(v.object({ faction: v.string(), amount: v.number() })),
+	skills: v.array(v.object({ skill: v.string(), from: v.number(), to: v.number() })),
+	levels: v.array(v.number())
+});
+export type RunProgress = Infer<typeof runProgress>;
+
 /** Osebni rekord iz celega loga (tudi open world) – Rust `wowrun::personal`. `at` = UTC ms. */
 export const personalRecord = v.object({
 	kind: recordKind,
@@ -253,7 +265,9 @@ export const runSummary = v.object({
 	/** vodja partyja – iz addona WowCompany (combat log ga ne pozna) */
 	leader: v.optional(v.string()),
 	/** need/greed rolli (Companion v0.1.7+) */
-	rolls: v.optional(v.array(lootRoll))
+	rolls: v.optional(v.array(lootRoll)),
+	/** pridobitve snemalca (Companion v0.1.11+) */
+	progress: v.optional(runProgress)
 });
 
 export const award = v.object({

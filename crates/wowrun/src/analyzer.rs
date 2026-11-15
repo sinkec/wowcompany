@@ -243,6 +243,8 @@ pub struct RunAcc {
     wipes: u32,
     loot: Vec<LootDrop>,
     rolls: Vec<LootRoll>,
+    /// The recorder's gains from the chat log (XP, money, reputation, skills, levels).
+    progress: Option<RunProgress>,
     /// Open aura intervals: (credited player guid, spell id, debuff on enemies).
     auras: HashMap<(String, u32, bool), AuraTrack>,
     /// Leader from the chat log (see `Detector::push_group`): `Some(None)` = the log writer.
@@ -282,6 +284,7 @@ impl RunAcc {
             loot: Vec::new(),
             rolls: Vec::new(),
             auras: HashMap::new(),
+            progress: None,
             chat_leader: None,
         }
     }
@@ -379,6 +382,39 @@ impl RunAcc {
                 roll.entries[i].roll = Some(v);
             }
             RollEvent::Won => roll.winner = Some(slug),
+        }
+    }
+
+    /// The recorder's XP / money / reputation / skill-up / level line from the chat log.
+    pub fn push_progress(&mut self, p: &wowlog::ProgressLine) {
+        use wowlog::Progress;
+        let Some(start) = self.started_at else { return };
+        if p.timestamp < start - 60_000 {
+            return;
+        }
+        let g = self.progress.get_or_insert_with(RunProgress::default);
+        match &p.progress {
+            Progress::Xp { amount, bonus, .. } => {
+                g.xp += u64::from(*amount);
+                g.xp_bonus += u64::from(*bonus);
+            }
+            Progress::Money { copper, .. } => g.copper += copper,
+            Progress::Reputation { faction, amount } => match g.reputation.iter_mut().find(|r| &r.faction == faction) {
+                Some(r) => r.amount += i64::from(*amount),
+                None => g.reputation.push(RepGain {
+                    faction: faction.clone(),
+                    amount: i64::from(*amount),
+                }),
+            },
+            Progress::Skill { skill, value } => match g.skills.iter_mut().find(|s| &s.skill == skill) {
+                Some(s) => s.to = s.to.max(*value),
+                None => g.skills.push(SkillUp {
+                    skill: skill.clone(),
+                    from: value.saturating_sub(1),
+                    to: *value,
+                }),
+            },
+            Progress::Level(l) => g.levels.push(*l),
         }
     }
 
@@ -1173,6 +1209,11 @@ impl RunAcc {
             // loot after the last kill (boss corpse) belongs to the run too
             loot: self.loot.clone(),
             rolls: self.rolls.clone(),
+            progress: self.progress.clone().map(|mut p| {
+                p.reputation
+                    .sort_by(|a, b| b.amount.cmp(&a.amount).then(a.faction.cmp(&b.faction)));
+                p
+            }),
             // only a party member of this run, by their display name (like the addon sends it)
             leader: self
                 .chat_leader

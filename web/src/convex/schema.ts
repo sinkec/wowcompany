@@ -413,6 +413,24 @@ export default defineSchema({
 		])
 		.index('by_season', ['season']),
 
+	// Pridobitve snemalca v runu (XP, denar, reputacija, veščine) – ena vrstica na run in snemalca.
+	runProgress: defineTable({
+		runId: v.id('runs'),
+		slug: v.string(),
+		zone: v.string(),
+		startedAt: v.number(),
+		durationMs: v.number(),
+		season: v.number(),
+		xp: v.number(),
+		xpBonus: v.number(),
+		copper: v.number(),
+		reputation: v.array(v.object({ faction: v.string(), amount: v.number() })),
+		skills: v.array(v.object({ skill: v.string(), from: v.number(), to: v.number() })),
+		levels: v.array(v.number())
+	})
+		.index('by_run_and_slug', ['runId', 'slug'])
+		.index('by_season', ['season']),
+
 	// Celotni cleari (za "Speed demons"): majhna vrstica na run, da Rankings ne bere celih runov.
 	clears: defineTable({
 		runId: v.id('runs'),

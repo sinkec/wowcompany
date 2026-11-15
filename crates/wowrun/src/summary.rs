@@ -40,6 +40,40 @@ pub struct RunSummary {
     /// Need/greed rolls (from `/chatlog`), party members only. Empty when nobody rolled.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rolls: Vec<LootRoll>,
+    /// What the recorder gained during the run (from `/chatlog`: XP, money, reputation, skill-ups,
+    /// levels). Only the recorder – the chat log says nothing about the others' gains.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress: Option<RunProgress>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunProgress {
+    /// All experience (kills, quests, discoveries); `xp_bonus` of it was the group bonus.
+    pub xp: u64,
+    pub xp_bonus: u64,
+    /// Looted coins plus the share of party money, in copper.
+    pub copper: u64,
+    pub reputation: Vec<RepGain>,
+    pub skills: Vec<SkillUp>,
+    /// Levels reached during the run.
+    pub levels: Vec<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepGain {
+    pub faction: String,
+    pub amount: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillUp {
+    pub skill: String,
+    /// Value before the run's first increase.
+    pub from: u32,
+    pub to: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -495,6 +529,7 @@ mod size_tests {
                     .collect(),
             },
             rolls: vec![],
+            progress: None,
             loot: (0..2000)
                 .map(|i| LootDrop {
                     slug: Some("hero-0".into()),

@@ -78,9 +78,21 @@ export const get = query({
 						.unique()
 				: null;
 		const classOf = await classesFor(ctx, [run]);
+		// pridobitve snemalcev (XP, denar, reputacija) – majhne vrstice, številke -> runDetails
+		const progress = allowed('runDetails')
+			? (
+					await ctx.db
+						.query('runProgress')
+						.withIndex('by_run_and_slug', (q) => q.eq('runId', run._id))
+						.take(10)
+				).map(({ _id: _i, _creationTime: _c, runId: _r, ...g }) => g)
+			: [];
 		return {
 			locked: false as const,
-			run: runDetail(run as RunDocLike, details as DetailsLike | null, classOf, allowed)
+			run: {
+				...runDetail(run as RunDocLike, details as DetailsLike | null, classOf, allowed),
+				progress
+			}
 		};
 	}
 });
@@ -257,12 +269,38 @@ export const rankings = query({
 				: null;
 			people.push({ slug, name, classId: sum?.classId ?? null });
 		}
+		// najbolj donosni dungeoni: povprečni XP/uro in zlato/uro iz pridobitev snemalcev
+		const gains = await ctx.db
+			.query('runProgress')
+			.withIndex('by_season', (q) => q.eq('season', chosen))
+			.take(1000);
+		const byZoneValue = new Map<
+			string,
+			{ runs: number; xp: number; copper: number; hours: number }
+		>();
+		for (const g of gains) {
+			const e = byZoneValue.get(g.zone) ?? { runs: 0, xp: 0, copper: 0, hours: 0 };
+			e.runs += 1;
+			e.xp += g.xp;
+			e.copper += g.copper;
+			e.hours += Math.max(g.durationMs, 60_000) / 3_600_000;
+			byZoneValue.set(g.zone, e);
+		}
+		const value = [...byZoneValue.entries()]
+			.map(([zone, e]) => ({
+				zone,
+				runs: e.runs,
+				xpPerHour: Math.round(e.xp / e.hours),
+				copperPerHour: Math.round(e.copper / e.hours)
+			}))
+			.sort((a, b) => b.xpPerHour - a.xpPerHour);
 		return {
 			locked: false as const,
 			seasons,
 			season: chosen,
 			boards,
 			stars,
+			value,
 			speed: [...byZone.entries()]
 				.map(([zone, list]) => ({
 					zone,

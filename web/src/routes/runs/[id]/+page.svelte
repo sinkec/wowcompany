@@ -18,6 +18,7 @@
 		deathQuip,
 		durationQuip,
 		fmtDuration,
+		fmtMoney,
 		fmtNum,
 		fmtRate,
 		fmtWhen,
@@ -768,6 +769,59 @@
 
 				<!-- LOOT -->
 				<Tabs.Content value="loot" class="mt-4 space-y-4">
+					{#if run.progress?.length}
+						{@const hours = Math.max(run.durationMs, 60_000) / 3_600_000}
+						<div class="grid gap-3 md:grid-cols-2">
+							{#each run.progress as g (g.slug)}
+								<div class="wow-frame space-y-2 rounded-lg p-4 text-sm">
+									<div class="flex items-baseline justify-between gap-2">
+										<span
+											class="font-semibold"
+											style="color: {classColor(classes[g.slug] ?? undefined)}"
+											>{names[g.slug] ?? g.slug}</span
+										>
+										<span class="text-xs text-muted-foreground">coin &amp; glory</span>
+									</div>
+									<div class="grid grid-cols-2 gap-2">
+										<div>
+											<div class="text-xs text-muted-foreground uppercase">Experience</div>
+											<div class="text-lg font-bold text-primary tabular-nums">{fmtNum(g.xp)}</div>
+											<div class="text-xs text-muted-foreground tabular-nums">
+												{fmtNum(Math.round(g.xp / hours))}/h{#if g.xpBonus}
+													· {fmtNum(g.xpBonus)} group bonus{/if}
+											</div>
+										</div>
+										<div>
+											<div class="text-xs text-muted-foreground uppercase">Money</div>
+											<div class="text-lg font-bold text-primary tabular-nums">
+												{fmtMoney(g.copper)}
+											</div>
+											<div class="text-xs text-muted-foreground tabular-nums">
+												{fmtMoney(g.copper / hours)}/h
+											</div>
+										</div>
+									</div>
+									{#if g.levels.length}
+										<div class="text-xs">
+											🎉 Reached level {g.levels.join(', ')} in here. Ding!
+										</div>
+									{/if}
+									{#if g.reputation.length}
+										<div class="text-xs text-muted-foreground">
+											Reputation: {g.reputation
+												.map((r) => `${r.faction} ${r.amount > 0 ? '+' : ''}${r.amount}`)
+												.join(' · ')}
+										</div>
+									{/if}
+									{#if g.skills.length}
+										<div class="text-xs text-muted-foreground">
+											Skill-ups: {g.skills.map((k) => `${k.skill} ${k.from}→${k.to}`).join(' · ')}
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{/if}
 					{#if !loot.length}
 						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
 							No loot recorded. Either nobody had <code class="text-primary">/chatlog</code> on, or this

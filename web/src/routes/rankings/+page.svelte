@@ -4,7 +4,7 @@
 	import Trophy from '@lucide/svelte/icons/trophy';
 	import { api } from '#convex/_generated/api.js';
 	import Locked from '#lib/components/wow/Locked.svelte';
-	import { fmtDuration, fmtRate, fmtWhen } from '#lib/runs.js';
+	import { fmtDuration, fmtMoney, fmtNum, fmtRate, fmtWhen } from '#lib/runs.js';
 	import { classColor } from '#lib/wow.js';
 
 	let season = $state<number | undefined>(undefined);
@@ -87,6 +87,36 @@
 						</div>
 					{/each}
 				</div>
+			</section>
+		{/if}
+
+		{#if d.value.length}
+			<section class="wow-frame rounded-lg p-4">
+				<h2 class="font-display text-lg font-semibold text-primary">Best value</h2>
+				<p class="text-xs text-muted-foreground italic">
+					average experience and coin per hour inside, from whoever had the Companion running. time
+					is money, and you are broke.
+				</p>
+				<table class="mt-3 w-full text-sm">
+					<thead class="text-xs text-muted-foreground">
+						<tr class="border-b border-border/50">
+							<th class="py-1 text-left">Dungeon</th>
+							<th class="py-1 text-right">XP / hour</th>
+							<th class="py-1 text-right">Coin / hour</th>
+							<th class="py-1 text-right">Runs</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each d.value as z (z.zone)}
+							<tr class="border-b border-border/30 last:border-0">
+								<td class="py-1">{z.zone}</td>
+								<td class="py-1 text-right tabular-nums">{fmtNum(z.xpPerHour)}</td>
+								<td class="py-1 text-right tabular-nums">{fmtMoney(z.copperPerHour)}</td>
+								<td class="py-1 text-right tabular-nums">{z.runs}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			</section>
 		{/if}
 

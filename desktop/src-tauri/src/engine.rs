@@ -117,6 +117,9 @@ impl Pipeline {
         } else if let Some(g) = wowlog::parse_group_line(line, year) {
             // the party leader without the addon (and without /reload)
             self.det.push_group(&g);
+        } else if let Some(p) = wowlog::parse_progress_line(line, year) {
+            // what the recorder gained: XP, money, reputation, skill-ups
+            self.det.push_progress(&p);
         }
     }
 

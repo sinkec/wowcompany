@@ -78,6 +78,11 @@ Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez nje
   (`FCF_OpenNewWindow`) s skupinami LOOT, SYSTEM, PARTY(_LEADER), RAID(_LEADER/WARNING), INSTANCE_CHAT(_LEADER); glavni zavihek
   ostane izbran. `/wowco chat on|off`. Filtri *Combat Log Config* vplivajo samo na prikaz, ne na datoteko combat loga.
   **Še ne preverjeno v igri**, ali Forever (Midnight) pozna `FCF_OpenNewWindow` – če ne, addon to pove in svetuje ročno nastavitev.
+- ✅ **Pridobitve snemalca (addon 0.5.3, Companion 0.1.11, 16. 11. 2026):** zavihek chata prikazuje še COMBAT_XP_GAIN, MONEY,
+  COMBAT_FACTION_CHANGE, SKILL. `wowlog::parse_progress_line` (XP z bonusom za skupino, `You loot`/`Your share of the loot`,
+  reputacija, veščine, level) → `RunSummary.progress` (samo snemalec) → tabela `runProgress` (run × snemalec) → run stran
+  (zavihek Loot: *coin & glory*) in `/rankings` → *Best value* (XP/uro, zlato/uro po dungeonu). Pravi WC: 8 348 XP (2 467 bonus),
+  16s 5c, Wands 90→97. Brez Tradeskills, kanalov, šepetanj, guilda.
 - Ruins of Lordaeron (2999) ima 6 bossov – dodan The Butcher (3355), preverjeno na pravem logu.
 - **Še odprto:** preizkus 0.5.x v igri (posebej razčlenitev med bojem/po boju), `/wowco probe` v dungeonu.
 - Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`;
