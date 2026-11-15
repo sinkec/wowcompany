@@ -14,13 +14,14 @@
   buffi/debuffi, oprema), Company Parses (lik → **Logs**, primerjava z najboljšim), **/rankings** (top 10, All-Stars,
   Speed demons), sezone (Office → Settings), Discord objave runov + `/parses` (Office → Visibility → Discord → *Dungeon runs*).
 - Companion **v0.1.8** izdan in nameščen pri uporabniku (`~/Applications/WowCompany-Companion.AppImage`, stara 0.1.6 kot `.bak`).
-- Addon **0.5.1** v mapi igre (meter *More*, klik na vrstico = uroki, povzetek runa + vprašanje *Send now / Later*, `/wowco report`,
+- Addon **0.5.2** v mapi igre (meter *More*, klik na vrstico = uroki, povzetek runa + vprašanje *Send now / Later*, `/wowco report`,
   `/wowco details on|off`, `/wowco ask on|off`). Uporabnik je potrdil, da deluje (15. 11.).
 - Predmeti: imena/kakovost iz Blizzard **retail/classic** namespacea (Forever `item/{id}` = 404) – loot ima kakovost brez addona.
 
 **Čaka na uporabnika (zaščita mi ne dovoli):**
-- `git tag companion-v0.1.9 && git push origin companion-v0.1.9` – izdaja z addonom 0.5.1 (popravek: ob prijavi ni več
-  povzetka/vprašanja za star run). Commit `531c8ed` je že na `main`.
+- `git tag companion-v0.1.9 && git push origin companion-v0.1.9` – izdaja z addonom **0.5.2** (ob prijavi ni več povzetka
+  za star run; lasten zavihek chata, da loot/rolli/vodja vedno pridejo v chat log). Commit `78ebbb3` je na `main`.
+- V igri preveriti: po `/reload` se pojavi zavihek chata **WowCompany** (če ne: `/wowco chat on` in poročati, kaj izpiše).
 - Da lahko izdaje in `convex run --prod` poganja Claude: dovoljenja v `.claude/settings.json` (glej pogovor 15. 11.).
 
 **Naslednji koraki (predlog):**
