@@ -327,6 +327,20 @@ Izdaje: S0 brez izdaje · S2+S3 → **Companion v0.2.0** (z addonom 0.5) · S4+S
 
 ---
 
+### 9.1 Stanje izvedbe (15. 11. 2026)
+
+- ✅ **S0** preureditev repozitorija.
+- ✅ **S1 (delno)** pravi WC run s partyjem: potrjeni ENCOUNTER_*, zastavice, COMBATANT_INFO (oprema + ilvl), `level` = ilvl,
+  vodja iz addona, loot povezave. Odprto: `/wowco probe` (oblika `combatSpells`, skrite vrednosti med bojem, `C_DeathRecap`).
+- ✅ **Rolli** (need/greed iz chat loga) – Companion + portal (zavihek Loot).
+- ✅ **S3 (C1, C3, C4)** shema 4: po bossu in igralcu uroki (casts, hits, crit, min/max, overheal), heali, casti, tarče,
+  ilvl, aktivnost, interrupti/dispeli/smrti; casti in oprema igralca. WC run: 117 KB.
+- ✅ **S4/S5 (W1, W2, W3, W4)** tabela `parses` (vpis ob uploadu, samo spremljani junaki), `seasons` + dnevni cron verzije
+  (`seasons.checkPatch`, `settings.gamePatch`), Office → *Parse seasons*, stran lika → zavihek **Logs**
+  (Best/Median Perf. Avg, po bossu best %, median %, uboji, najhitrejši, seznam ubojev z rangom), stran runa → Bosses:
+  klik na igralca odpre razčlenitev.
+- ⏳ Naprej: W5 `/rankings` (+ speed), W9 Discord, S2 addon 0.5, izdaja Companion v0.1.7 (shema 4 + rolli + omejitve).
+
 ## 10. Odločitve za uporabnika
 
 1. ~~Struktura repozitorija~~ → izvedeno (S0, §8.3), Vercel ostane na korenu prek `vercel.json`.

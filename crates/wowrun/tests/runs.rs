@@ -510,14 +510,16 @@ fn loot_from_chat_log_is_attached_to_the_run() {
     assert_eq!(runs[0].loot[1].quality, Some(3));
     assert_eq!(runs[0].loot[1].item_id, Some(2084));
     let json = serde_json::to_string(&runs[0]).unwrap();
-    assert!(json.contains("\"schema\":3") && json.contains("\"itemId\":2084"));
+    assert!(
+        json.contains(&format!("\"schema\":{}", wowrun::summary::SCHEMA_VERSION)) && json.contains("\"itemId\":2084")
+    );
 }
 
 #[test]
 fn biggest_hits_become_records() {
     let (l, _) = full_run();
     let (runs, _) = detect(&l, Config::default());
-    assert_eq!(runs[0].schema, 3);
+    assert_eq!(runs[0].schema, wowrun::summary::SCHEMA_VERSION);
     let rec = |slug: &str, kind: RecordKind| {
         player(&runs[0], slug)
             .records

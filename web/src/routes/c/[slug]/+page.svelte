@@ -9,6 +9,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import GossipFeed from '#lib/components/wow/GossipFeed.svelte';
+	import HeroLogs from '#lib/components/wow/HeroLogs.svelte';
 	import ItemSlot from '#lib/components/wow/ItemSlot.svelte';
 	import LineChart from '#lib/components/wow/LineChart.svelte';
 	import TalentTree from '#lib/components/wow/TalentTree.svelte';
@@ -173,7 +174,13 @@
 					<Tabs.Trigger value="prof">Professions</Tabs.Trigger>
 					<Tabs.Trigger value="all">Every Stat Ever</Tabs.Trigger>
 					<Tabs.Trigger value="runs">Dungeon Runs</Tabs.Trigger>
+					<Tabs.Trigger value="logs">Logs</Tabs.Trigger>
 				</Tabs.List>
+
+				<!-- LOGS: Company Parses po bossih -->
+				<Tabs.Content value="logs" class="mt-4 space-y-3">
+					<HeroLogs {slug} />
+				</Tabs.Content>
 
 				<!-- DUNGEON RUNS -->
 				<Tabs.Content value="runs" class="mt-4 space-y-3">

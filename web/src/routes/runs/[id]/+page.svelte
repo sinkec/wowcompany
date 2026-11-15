@@ -73,6 +73,9 @@
 		return [...m.values()].sort((a, b) => b.items - a.items);
 	});
 
+	// Bosses: odprta razčlenitev igralca (`${boss}:${slug}`)
+	let openBoss = $state<string | null>(null);
+
 	// need/greed rolli: po predmetih + kocke po igralcih (srečnež, preklete kocke)
 	const rolls = $derived(run?.rolls ?? []);
 	const dice = $derived.by(() => {
@@ -439,11 +442,18 @@
 							</div>
 							<div class="mt-3 space-y-1.5">
 								{#each sp as p (p.slug)}
-									<div class="grid grid-cols-[9rem_1fr_6rem_5rem] items-center gap-3 text-sm">
+									{@const k = `${i}:${p.slug}`}
+									{@const detail = !!(p.spells?.length || p.heals?.length || p.casts?.length)}
+									<button
+										class="grid w-full grid-cols-[9rem_1fr_6rem_5rem] items-center gap-3 text-left text-sm {detail
+											? 'cursor-pointer rounded hover:bg-muted/30'
+											: 'cursor-default'}"
+										onclick={() => detail && (openBoss = openBoss === k ? null : k)}
+									>
 										<span
 											class="truncate font-semibold"
 											style="color: {classColor(classes[p.slug] ?? undefined)}"
-											>{names[p.slug] ?? p.slug}</span
+											>{detail ? (openBoss === k ? '▾ ' : '▸ ') : ''}{names[p.slug] ?? p.slug}</span
 										>
 										<div class="h-2 overflow-hidden rounded bg-muted">
 											<div
@@ -455,7 +465,114 @@
 										<span class="text-right text-xs text-muted-foreground tabular-nums"
 											>{p.healing ? `${fmtRate(p.healing / segDur)} HPS` : ''}</span
 										>
-									</div>
+									</button>
+									{#if openBoss === k}
+										<div
+											class="space-y-3 rounded-md border border-border/50 bg-muted/10 p-3 text-xs"
+										>
+											<div class="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+												{#if p.ilvl}<span>ilvl <b class="text-foreground">{p.ilvl}</b></span>{/if}
+												{#if p.activeMs !== undefined}<span
+														>active <b class="text-foreground"
+															>{Math.round(((p.activeMs ?? 0) / 1000 / segDur) * 100)}%</b
+														></span
+													>{/if}
+												<span>taken <b class="text-foreground">{fmtNum(p.damageTaken)}</b></span>
+												{#if p.interrupts}<span
+														>interrupts <b class="text-foreground">{p.interrupts}</b></span
+													>{/if}
+												{#if p.dispels}<span
+														>dispels <b class="text-foreground">{p.dispels}</b></span
+													>{/if}
+												{#if p.deaths}<span class="text-destructive">died {p.deaths}×</span>{/if}
+											</div>
+											{#each [{ title: 'Damage', list: p.spells ?? [], total: p.damage }, { title: 'Healing', list: p.heals ?? [], total: p.healing }] as part (part.title)}
+												{#if part.list.length}
+													<table class="w-full">
+														<thead class="text-muted-foreground">
+															<tr class="border-b border-border/40">
+																<th class="py-1 text-left">{part.title}</th>
+																<th class="py-1 text-right">Amount</th>
+																<th class="py-1 text-right">%</th>
+																<th class="py-1 text-right">Casts</th>
+																<th class="py-1 text-right">Hits</th>
+																<th class="py-1 text-right">Crit</th>
+																<th class="hidden py-1 text-right sm:table-cell">Avg</th>
+																<th class="hidden py-1 text-right sm:table-cell">Min–Max</th>
+																{#if part.title === 'Healing'}<th
+																		class="hidden py-1 text-right sm:table-cell">Overheal</th
+																	>{/if}
+															</tr>
+														</thead>
+														<tbody>
+															{#each part.list as x (x.id + ':' + x.pet)}
+																<tr class="border-b border-border/20 last:border-0">
+																	<td class="py-1"
+																		>{x.name}{#if x.pet}<span class="text-muted-foreground">
+																				(pet)</span
+																			>{/if}</td
+																	>
+																	<td class="py-1 text-right tabular-nums">{fmtNum(x.amount)}</td>
+																	<td class="py-1 text-right tabular-nums"
+																		>{part.total
+																			? Math.round((x.amount / part.total) * 100)
+																			: 0}%</td
+																	>
+																	<td class="py-1 text-right tabular-nums">{x.casts || '—'}</td>
+																	<td class="py-1 text-right tabular-nums">{x.hits}</td>
+																	<td class="py-1 text-right tabular-nums"
+																		>{x.hits ? Math.round((x.crits / x.hits) * 100) : 0}%</td
+																	>
+																	<td class="hidden py-1 text-right tabular-nums sm:table-cell"
+																		>{x.hits ? fmtNum(Math.round(x.amount / x.hits)) : '—'}</td
+																	>
+																	<td class="hidden py-1 text-right tabular-nums sm:table-cell"
+																		>{x.max ? `${fmtNum(x.min ?? 0)}–${fmtNum(x.max)}` : '—'}</td
+																	>
+																	{#if part.title === 'Healing'}<td
+																			class="hidden py-1 text-right tabular-nums sm:table-cell"
+																			>{x.overheal
+																				? `${Math.round(((x.overheal ?? 0) / Math.max(1, x.amount + (x.overheal ?? 0))) * 100)}%`
+																				: '—'}</td
+																		>{/if}
+																</tr>
+															{/each}
+														</tbody>
+													</table>
+												{/if}
+											{/each}
+											<div class="grid gap-3 sm:grid-cols-2">
+												{#if p.targets?.length}
+													<div>
+														<div class="mb-1 font-semibold text-muted-foreground">Beat up</div>
+														{#each p.targets as t (t.name)}
+															<div class="flex justify-between">
+																<span class="truncate">{t.name}</span><span class="tabular-nums"
+																	>{fmtNum(t.amount)}</span
+																>
+															</div>
+														{/each}
+													</div>
+												{/if}
+												{#if p.casts?.length}
+													<div>
+														<div class="mb-1 font-semibold text-muted-foreground">
+															Button presses
+														</div>
+														{#each p.casts as c (c.id + ':' + c.pet)}
+															<div class="flex justify-between">
+																<span class="truncate"
+																	>{c.name}{#if c.pet}<span class="text-muted-foreground">
+																			(pet)</span
+																		>{/if}</span
+																><span class="tabular-nums">{c.count}</span>
+															</div>
+														{/each}
+													</div>
+												{/if}
+											</div>
+										</div>
+									{/if}
 								{/each}
 							</div>
 						</section>

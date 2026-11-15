@@ -70,6 +70,7 @@ export async function getSettings(ctx: QueryCtx) {
 	// Discord je zaseben kanal prijateljev -> privzeto vse
 	return {
 		...base,
+		gamePatch: doc?.gamePatch,
 		discordFields: doc?.discordFields ?? ALL_FIELDS.filter((f) => !RUN_FIELDS.includes(f))
 	};
 }

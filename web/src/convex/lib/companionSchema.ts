@@ -3,9 +3,10 @@
 // dvigni SCHEMA_VERSION na obeh straneh.
 import { v, type Infer } from 'convex/values';
 
-/** Najnovejša shema (Rust `SCHEMA_VERSION`). 1 = brez loota (aplikacija v0.1.0), 2 = + loot, 3 = + rekordi igralcev. */
-export const SCHEMA_VERSION = 3;
-export const SUPPORTED_SCHEMAS = [1, 2, 3];
+/** Najnovejša shema (Rust `SCHEMA_VERSION`). 1 = brez loota (aplikacija v0.1.0), 2 = + loot, 3 = + rekordi igralcev,
+ * 4 = + razčlenitev po bossih (uroki s casti/min/max, tarče, ilvl), casti in oprema igralcev (vse neobvezno). */
+export const SCHEMA_VERSION = 4;
+export const SUPPORTED_SCHEMAS = [1, 2, 3, 4];
 
 const nullableNumber = v.union(v.number(), v.null());
 const nullableString = v.union(v.string(), v.null());
@@ -16,8 +17,22 @@ export const spellStat = v.object({
 	amount: v.number(),
 	hits: v.number(),
 	crits: v.number(),
+	pet: v.boolean(),
+	/** shema 4 */
+	casts: v.optional(v.number()),
+	min: v.optional(v.number()),
+	max: v.optional(v.number()),
+	overheal: v.optional(v.number())
+});
+
+export const castStat = v.object({
+	id: v.number(),
+	name: v.string(),
+	count: v.number(),
 	pet: v.boolean()
 });
+export const targetStat = v.object({ name: v.string(), amount: v.number() });
+export const gearItem = v.object({ itemId: v.number(), ilvl: v.number() });
 
 export const recordKind = v.union(
 	v.literal('crit'),
@@ -60,7 +75,10 @@ export const playerSummary = v.object({
 	critPct: v.number(),
 	topDamage: v.array(spellStat),
 	topHealing: v.array(spellStat),
-	records: v.optional(v.array(runRecord))
+	records: v.optional(v.array(runRecord)),
+	/** shema 4: casti (tudi uroki brez škode) in oprema ob zadnjem bossu (COMBATANT_INFO) */
+	casts: v.optional(v.array(castStat)),
+	gear: v.optional(v.array(gearItem))
 });
 
 export const segment = v.object({
@@ -71,7 +89,22 @@ export const segment = v.object({
 	endMs: v.number(),
 	result: v.union(v.literal('kill'), v.literal('wipe'), v.literal('none')),
 	players: v.array(
-		v.object({ slug: v.string(), damage: v.number(), healing: v.number(), damageTaken: v.number() })
+		v.object({
+			slug: v.string(),
+			damage: v.number(),
+			healing: v.number(),
+			damageTaken: v.number(),
+			/** shema 4 (podrobnosti samo pri bossih) */
+			ilvl: v.optional(v.number()),
+			activeMs: v.optional(v.number()),
+			interrupts: v.optional(v.number()),
+			dispels: v.optional(v.number()),
+			deaths: v.optional(v.number()),
+			spells: v.optional(v.array(spellStat)),
+			heals: v.optional(v.array(spellStat)),
+			casts: v.optional(v.array(castStat)),
+			targets: v.optional(v.array(targetStat))
+		})
 	)
 });
 
@@ -178,7 +211,7 @@ export const personalUpload = v.object({
 
 /** Kar pošlje aplikacija (POST /companion/runs). */
 export const runSummary = v.object({
-	schema: v.union(v.literal(1), v.literal(2), v.literal(3)),
+	schema: v.union(v.literal(1), v.literal(2), v.literal(3), v.literal(4)),
 	runKey: v.string(),
 	zone,
 	startedAt: v.number(),
@@ -233,6 +266,7 @@ export type PlayerSummary = Infer<typeof playerSummary>;
 export type Award = Infer<typeof award>;
 export type LootDrop = Infer<typeof lootDrop>;
 export type LootRoll = Infer<typeof lootRoll>;
+export type Segment = Infer<typeof segment>;
 export type RunRecord = Infer<typeof runRecord>;
 export type RecordKind = Infer<typeof recordKind>;
 export type PersonalUpload = Infer<typeof personalUpload>;

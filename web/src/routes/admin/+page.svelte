@@ -102,6 +102,8 @@
 
 	// --- portal room
 	const integ = useQuery(api.integrations.status, () => (isAdmin ? {} : 'skip'));
+	const seasonState = useQuery(api.seasons.state, () => (isAdmin ? {} : 'skip'));
+	let seasonName = $state('');
 	let webhookInput = $state('');
 	let tokenInput = $state('');
 	let guildInput = $state('');
@@ -502,6 +504,60 @@
 							</Button>
 						</div>
 					</section>
+
+					{#if seasonState.data}
+						{@const ss = seasonState.data}
+						<section class="wow-frame space-y-3 rounded-lg p-4 lg:col-span-2">
+							<h2 class="text-sm font-semibold text-primary">Parse seasons</h2>
+							<p class="text-xs text-muted-foreground">
+								Company Parses are ranked per season. Big patch, new gear, everyone suddenly hits
+								harder → start a fresh season so old numbers stop haunting the ladder. Old seasons
+								stay viewable.
+							</p>
+							<div class="text-sm">
+								Now: <span class="font-semibold text-primary">{ss.current.name}</span>
+								{#if ss.current.startedAt}<span class="text-muted-foreground">
+										· since {ago(ss.current.startedAt)}</span
+									>{/if}
+								· game version
+								<span class="tabular-nums">{ss.gamePatch ?? 'unknown (checked daily)'}</span>
+							</div>
+							{#if ss.suggest}
+								<div class="rounded-md border border-primary/60 bg-primary/10 p-3 text-sm">
+									Patch {ss.gamePatch} is here (season started on {ss.current.patch}). Start a new
+									season?
+								</div>
+							{/if}
+							<form
+								class="flex flex-wrap items-center gap-2"
+								onsubmit={(e) => {
+									e.preventDefault();
+									if (!confirm('Start a new parse season now? The ladder starts from zero.'))
+										return;
+									run(
+										client.mutation(
+											api.seasons.start,
+											seasonName.trim() ? { name: seasonName } : {}
+										),
+										'New season. Everyone is a nobody again.'
+									).then(() => (seasonName = ''));
+								}}
+							>
+								<input
+									bind:value={seasonName}
+									placeholder="Name (optional, e.g. Season 2 – Ragefire Reckoning)"
+									maxlength="40"
+									class="h-9 min-w-64 flex-1 rounded-md border border-border bg-background/60 px-3 text-sm"
+								/>
+								<Button size="sm" type="submit">Start new season</Button>
+							</form>
+							{#if ss.seasons.length > 1}
+								<p class="text-xs text-muted-foreground">
+									History: {ss.seasons.map((x) => x.name).join(' · ')}
+								</p>
+							{/if}
+						</section>
+					{/if}
 
 					<section class="wow-frame space-y-3 rounded-lg p-4">
 						<h2 class="text-sm font-semibold text-primary">

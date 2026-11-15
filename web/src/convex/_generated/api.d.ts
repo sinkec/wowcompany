@@ -28,6 +28,7 @@ import type * as lib_discordConfig from "../lib/discordConfig.js";
 import type * as lib_discordEmbed from "../lib/discordEmbed.js";
 import type * as lib_humor from "../lib/humor.js";
 import type * as lib_normalize from "../lib/normalize.js";
+import type * as lib_parses from "../lib/parses.js";
 import type * as lib_players from "../lib/players.js";
 import type * as lib_profile from "../lib/profile.js";
 import type * as lib_runsView from "../lib/runsView.js";
@@ -38,6 +39,7 @@ import type * as poll from "../poll.js";
 import type * as profile from "../profile.js";
 import type * as roster from "../roster.js";
 import type * as runs from "../runs.js";
+import type * as seasons from "../seasons.js";
 
 import type {
   ApiFromModules,
@@ -66,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   "lib/discordEmbed": typeof lib_discordEmbed;
   "lib/humor": typeof lib_humor;
   "lib/normalize": typeof lib_normalize;
+  "lib/parses": typeof lib_parses;
   "lib/players": typeof lib_players;
   "lib/profile": typeof lib_profile;
   "lib/runsView": typeof lib_runsView;
@@ -76,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   profile: typeof profile;
   roster: typeof roster;
   runs: typeof runs;
+  seasons: typeof seasons;
 }>;
 
 /**

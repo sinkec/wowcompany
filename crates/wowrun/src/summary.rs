@@ -6,8 +6,10 @@
 
 use serde::{Deserialize, Serialize};
 
-/// 1 = C2–C5, 2 = + `loot` (chat log), 3 = + `records` per player (biggest crit, hit, heal …).
-pub const SCHEMA_VERSION: u32 = 3;
+/// 1 = C2–C5, 2 = + `loot` (chat log), 3 = + `records` per player (biggest crit, hit, heal …),
+/// 4 = + per-boss breakdown (spells with casts/min/max, targets, ilvl), casts and gear per player.
+/// Everything new is optional, so older servers/readers keep working.
+pub const SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -157,6 +159,12 @@ pub struct PlayerSummary {
     pub crit_pct: f64,
     pub top_damage: Vec<SpellStat>,
     pub top_healing: Vec<SpellStat>,
+    /// Successful casts per spell (schema 4) – also spells that do no damage (buffs, CC, cooldowns).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub casts: Vec<CastStat>,
+    /// Equipped items at the last boss pull (`COMBATANT_INFO`, schema 4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gear: Vec<GearItem>,
     /// Biggest single events of the run, at most one per kind (schema 3).
     #[serde(default)]
     pub records: Vec<RunRecord>,
@@ -203,6 +211,41 @@ pub struct SpellStat {
     pub crits: u32,
     /// True when the spell came from the player's pet/guardian.
     pub pet: bool,
+    /// Successful casts of this spell (schema 4; 0 for melee, procs and DoT ticks).
+    #[serde(default)]
+    pub casts: u32,
+    /// Smallest / biggest single hit or heal (schema 4).
+    #[serde(default)]
+    pub min: i64,
+    #[serde(default)]
+    pub max: i64,
+    /// Overhealing of a heal (schema 4; 0 for damage).
+    #[serde(default)]
+    pub overheal: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CastStat {
+    pub id: u32,
+    pub name: String,
+    pub count: u32,
+    pub pet: bool,
+}
+
+/// Damage done to one enemy (by name; group members never appear as targets).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetStat {
+    pub name: String,
+    pub amount: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GearItem {
+    pub item_id: u32,
+    pub ilvl: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -240,6 +283,26 @@ pub struct SegmentPlayer {
     pub damage: i64,
     pub healing: i64,
     pub damage_taken: i64,
+    /// Equipped item level during the fight (advanced-log `level`, schema 4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ilvl: Option<i64>,
+    #[serde(default)]
+    pub active_ms: i64,
+    #[serde(default)]
+    pub interrupts: u32,
+    #[serde(default)]
+    pub dispels: u32,
+    #[serde(default)]
+    pub deaths: u32,
+    /// Boss fights only (schema 4): damage spells, heals, casts, targets.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spells: Vec<SpellStat>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub heals: Vec<SpellStat>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub casts: Vec<CastStat>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targets: Vec<TargetStat>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -333,6 +396,13 @@ impl RunSummary {
             for p in &mut self.players {
                 p.top_damage.truncate(10);
                 p.top_healing.truncate(10);
+                p.casts.truncate(10);
+            }
+            for sp in self.segments.iter_mut().flat_map(|s| s.players.iter_mut()) {
+                sp.spells.truncate(10);
+                sp.heals.truncate(10);
+                sp.casts.truncate(10);
+                sp.targets.truncate(5);
             }
         }
         if self.json_len() > max_bytes {

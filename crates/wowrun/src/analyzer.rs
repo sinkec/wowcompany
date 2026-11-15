@@ -84,6 +84,49 @@ struct SpellAcc {
     amount: i64,
     hits: u32,
     crits: u32,
+    min: i64,
+    max: i64,
+    overheal: i64,
+}
+
+impl SpellAcc {
+    fn named(name: &str) -> Self {
+        SpellAcc {
+            name: name.to_string(),
+            ..Default::default()
+        }
+    }
+    fn add(&mut self, amount: i64, crit: bool) {
+        self.amount += amount;
+        self.hits += 1;
+        self.crits += crit as u32;
+        if self.hits == 1 || amount < self.min {
+            self.min = amount;
+        }
+        self.max = self.max.max(amount);
+    }
+}
+
+/// Spells keyed by (spell id, done by the pet).
+type SpellMap = HashMap<(u32, bool), SpellAcc>;
+/// Casts keyed by (spell id, done by the pet) → (name, count).
+type CastMap = HashMap<(u32, bool), (String, u32)>;
+
+/// One group player in one segment.
+#[derive(Debug, Clone, Default)]
+struct SegPlayerAcc {
+    damage: i64,
+    healing: i64,
+    taken: i64,
+    level: Option<i64>,
+    active_ms: i64,
+    interrupts: u32,
+    dispels: u32,
+    deaths: u32,
+    dmg_spells: SpellMap,
+    heal_spells: SpellMap,
+    casts: CastMap,
+    targets: HashMap<String, i64>,
 }
 
 #[derive(Debug, Clone)]
@@ -116,8 +159,10 @@ struct PlayerAcc {
     last_action: Option<i64>,
     hits: u32,
     crits: u32,
-    dmg_spells: HashMap<(u32, bool), SpellAcc>,
-    heal_spells: HashMap<(u32, bool), SpellAcc>,
+    dmg_spells: SpellMap,
+    heal_spells: SpellMap,
+    casts: CastMap,
+    gear: Vec<GearItem>,
     tl_damage: Vec<i64>,
     tl_healing: Vec<i64>,
     tl_taken: Vec<i64>,
@@ -143,8 +188,7 @@ struct SegAcc {
     start: i64,
     end: i64,
     result: SegmentResult,
-    /// guid → (damage, healing, taken)
-    per: BTreeMap<String, (i64, i64, i64)>,
+    per: BTreeMap<String, SegPlayerAcc>,
 }
 
 impl SegAcc {
@@ -160,7 +204,9 @@ impl SegAcc {
         }
     }
     fn is_empty(&self) -> bool {
-        self.per.values().all(|&(d, h, t)| d == 0 && h == 0 && t == 0)
+        self.per
+            .values()
+            .all(|p| p.damage == 0 && p.healing == 0 && p.taken == 0)
     }
 }
 
@@ -411,22 +457,33 @@ impl RunAcc {
 
     fn touch(&mut self, guid: &str, ts: i64, cfg: &Config) {
         if let Some(p) = self.players.get_mut(guid) {
+            let mut active = 0;
             if let Some(last) = p.last_action {
                 let gap = ts - last;
                 if (0..=cfg.active_gap_ms).contains(&gap) {
                     p.active_ms += gap;
+                    active = gap;
                 }
             }
             p.last_action = Some(ts);
+            if let Some(sp) = self.seg_player(guid) {
+                sp.active_ms += active;
+            }
         }
     }
 
+    /// The group player's numbers in the current segment.
+    fn seg_player(&mut self, guid: &str) -> Option<&mut SegPlayerAcc> {
+        self.current_seg
+            .as_mut()
+            .map(|seg| seg.per.entry(guid.to_string()).or_default())
+    }
+
     fn seg_add(&mut self, guid: &str, dmg: i64, heal: i64, taken: i64) {
-        if let Some(seg) = self.current_seg.as_mut() {
-            let e = seg.per.entry(guid.to_string()).or_default();
-            e.0 += dmg;
-            e.1 += heal;
-            e.2 += taken;
+        if let Some(e) = self.seg_player(guid) {
+            e.damage += dmg;
+            e.healing += heal;
+            e.taken += taken;
         }
     }
 
@@ -476,6 +533,21 @@ impl RunAcc {
                 }
                 if let Some(p) = self.players.get_mut(&a.info_guid) {
                     p.level = Some(a.level);
+                    let guid = a.info_guid.clone();
+                    let level = a.level;
+                    if self.started_at.is_some()
+                        && let Some(sp) = self.seg_player(&guid)
+                    {
+                        sp.level = Some(level);
+                    }
+                }
+            }
+            Kind::CombatantInfo { guid, fields } => {
+                if let Some(p) = self.players.get_mut(guid) {
+                    let gear = combatant_gear(fields);
+                    if !gear.is_empty() {
+                        p.gear = gear;
+                    }
                 }
             }
             _ => {}
@@ -561,22 +633,28 @@ impl RunAcc {
                         amount: damage.amount,
                         spell: name.clone(),
                         spell_id: id,
-                        unit: target,
+                        unit: target.clone(),
                         at_ms: ts,
                         pet,
                     });
                     p.damage += damage.amount;
                     p.hits += 1;
                     p.crits += damage.critical as u32;
-                    let s = p.dmg_spells.entry((id, pet)).or_insert_with(|| SpellAcc {
-                        name,
-                        ..Default::default()
-                    });
-                    s.amount += damage.amount;
-                    s.hits += 1;
-                    s.crits += damage.critical as u32;
+                    p.dmg_spells
+                        .entry((id, pet))
+                        .or_insert_with(|| SpellAcc::named(&name))
+                        .add(damage.amount, damage.critical);
                     add_at(&mut p.tl_damage, b, damage.amount);
                     self.seg_add(&guid, damage.amount, 0, 0);
+                    if let Some(sp) = self.seg_player(&guid) {
+                        sp.dmg_spells
+                            .entry((id, pet))
+                            .or_insert_with(|| SpellAcc::named(&name))
+                            .add(damage.amount, damage.critical);
+                        if let Some(t) = &target {
+                            *sp.targets.entry(t.clone()).or_default() += damage.amount;
+                        }
+                    }
                     self.touch(&guid, ts, cfg);
                 }
                 if rec.dest.is_player() && self.players.contains_key(&rec.dest.guid) {
@@ -647,15 +725,22 @@ impl RunAcc {
                     });
                     p.healing += effective;
                     p.overheal += heal.overheal;
-                    let s = p.heal_spells.entry((spell.id, pet)).or_insert_with(|| SpellAcc {
-                        name: spell.name.clone(),
-                        ..Default::default()
-                    });
-                    s.amount += effective;
-                    s.hits += 1;
-                    s.crits += heal.critical as u32;
+                    let s = p
+                        .heal_spells
+                        .entry((spell.id, pet))
+                        .or_insert_with(|| SpellAcc::named(&spell.name));
+                    s.add(effective, heal.critical);
+                    s.overheal += heal.overheal;
                     add_at(&mut p.tl_healing, b, effective);
                     self.seg_add(&guid, 0, effective, 0);
+                    if let Some(sp) = self.seg_player(&guid) {
+                        let s = sp
+                            .heal_spells
+                            .entry((spell.id, pet))
+                            .or_insert_with(|| SpellAcc::named(&spell.name));
+                        s.add(effective, heal.critical);
+                        s.overheal += heal.overheal;
+                    }
                     self.touch(&guid, ts, cfg);
                 }
                 if rec.dest.is_player() && self.players.contains_key(&rec.dest.guid) && effective > 0 {
@@ -685,25 +770,50 @@ impl RunAcc {
             Kind::Interrupt { .. } => {
                 if let Some((guid, _)) = self.actor(&rec.source) {
                     self.players.get_mut(&guid).expect("actor exists").interrupts += 1;
+                    if let Some(sp) = self.seg_player(&guid) {
+                        sp.interrupts += 1;
+                    }
                     self.touch(&guid, ts, cfg);
                 }
             }
             Kind::Dispel { .. } => {
                 if let Some((guid, _)) = self.actor(&rec.source) {
                     self.players.get_mut(&guid).expect("actor exists").dispels += 1;
+                    if let Some(sp) = self.seg_player(&guid) {
+                        sp.dispels += 1;
+                    }
                     self.touch(&guid, ts, cfg);
                 }
             }
             Kind::Cast {
                 phase: wowlog::CastPhase::Success,
+                spell,
                 ..
             } => {
-                if let Some((guid, false)) = self.actor(&rec.source) {
-                    self.touch(&guid, ts, cfg);
+                if let Some((guid, pet)) = self.actor(&rec.source) {
+                    let p = self.players.get_mut(&guid).expect("actor exists");
+                    p.casts
+                        .entry((spell.id, pet))
+                        .or_insert_with(|| (spell.name.clone(), 0))
+                        .1 += 1;
+                    if let Some(sp) = self.seg_player(&guid) {
+                        sp.casts
+                            .entry((spell.id, pet))
+                            .or_insert_with(|| (spell.name.clone(), 0))
+                            .1 += 1;
+                    }
+                    if !pet {
+                        self.touch(&guid, ts, cfg);
+                    }
                 }
             }
             Kind::Died { unconscious: false, .. } if rec.dest.is_player() => {
                 let start = self.started_at.unwrap_or(ts);
+                if self.players.contains_key(&rec.dest.guid)
+                    && let Some(sp) = self.seg_player(&rec.dest.guid)
+                {
+                    sp.deaths += 1;
+                }
                 if let Some(p) = self.players.get_mut(&rec.dest.guid) {
                     p.deaths += 1;
                     let recap: Vec<RecapRaw> = p.recap.drain(..).collect();
@@ -793,35 +903,42 @@ impl RunAcc {
                 players: s
                     .per
                     .iter()
-                    .filter_map(|(g, &(damage, healing, damage_taken))| {
+                    .filter_map(|(g, sp)| {
+                        let boss = s.kind == SegmentKind::Boss;
                         self.players.get(g).map(|p| SegmentPlayer {
                             slug: p.slug.clone(),
-                            damage,
-                            healing,
-                            damage_taken,
+                            damage: sp.damage,
+                            healing: sp.healing,
+                            damage_taken: sp.taken,
+                            ilvl: sp.level,
+                            active_ms: sp.active_ms,
+                            interrupts: sp.interrupts,
+                            dispels: sp.dispels,
+                            deaths: sp.deaths,
+                            // the full breakdown only for boss fights (document size)
+                            spells: if boss {
+                                top_spells(&sp.dmg_spells, &sp.casts, cfg.top_spells)
+                            } else {
+                                vec![]
+                            },
+                            heals: if boss {
+                                top_spells(&sp.heal_spells, &sp.casts, cfg.top_spells)
+                            } else {
+                                vec![]
+                            },
+                            casts: if boss {
+                                top_casts(&sp.casts, cfg.top_spells)
+                            } else {
+                                vec![]
+                            },
+                            targets: if boss { top_targets(&sp.targets, 8) } else { vec![] },
                         })
                     })
                     .collect(),
             });
         }
 
-        let top = |m: &HashMap<(u32, bool), SpellAcc>| -> Vec<SpellStat> {
-            let mut v: Vec<SpellStat> = m
-                .iter()
-                .filter(|(_, s)| s.amount > 0)
-                .map(|(&(id, pet), s)| SpellStat {
-                    id,
-                    name: s.name.clone(),
-                    amount: s.amount,
-                    hits: s.hits,
-                    crits: s.crits,
-                    pet,
-                })
-                .collect();
-            v.sort_by(|a, b| b.amount.cmp(&a.amount).then(a.id.cmp(&b.id)));
-            v.truncate(cfg.top_spells);
-            v
-        };
+        let top = |m: &SpellMap, casts: &CastMap| top_spells(m, casts, cfg.top_spells);
 
         let mut players: Vec<PlayerSummary> = self
             .players
@@ -849,8 +966,10 @@ impl RunAcc {
                 } else {
                     0.0
                 },
-                top_damage: top(&p.dmg_spells),
-                top_healing: top(&p.heal_spells),
+                top_damage: top(&p.dmg_spells, &p.casts),
+                top_healing: top(&p.heal_spells, &p.casts),
+                casts: top_casts(&p.casts, 30),
+                gear: p.gear.clone(),
                 records: p
                     .records
                     .values()
@@ -930,6 +1049,111 @@ impl RunAcc {
     }
 }
 
+/// The biggest spells, with their cast counts.
+fn top_spells(m: &SpellMap, casts: &CastMap, n: usize) -> Vec<SpellStat> {
+    let mut v: Vec<SpellStat> = m
+        .iter()
+        .filter(|(_, s)| s.amount > 0)
+        .map(|(&(id, pet), s)| SpellStat {
+            id,
+            name: s.name.clone(),
+            amount: s.amount,
+            hits: s.hits,
+            crits: s.crits,
+            pet,
+            casts: casts.get(&(id, pet)).map_or(0, |c| c.1),
+            min: s.min,
+            max: s.max,
+            overheal: s.overheal,
+        })
+        .collect();
+    v.sort_by(|a, b| b.amount.cmp(&a.amount).then(a.id.cmp(&b.id)));
+    v.truncate(n);
+    v
+}
+
+fn top_casts(m: &CastMap, n: usize) -> Vec<CastStat> {
+    let mut v: Vec<CastStat> = m
+        .iter()
+        .map(|(&(id, pet), (name, count))| CastStat {
+            id,
+            name: name.clone(),
+            count: *count,
+            pet,
+        })
+        .collect();
+    v.sort_by(|a, b| b.count.cmp(&a.count).then(a.id.cmp(&b.id)));
+    v.truncate(n);
+    v
+}
+
+fn top_targets(m: &HashMap<String, i64>, n: usize) -> Vec<TargetStat> {
+    let mut v: Vec<TargetStat> = m
+        .iter()
+        .filter(|&(_, &a)| a > 0)
+        .map(|(name, &amount)| TargetStat {
+            name: name.clone(),
+            amount,
+        })
+        .collect();
+    v.sort_by(|a, b| b.amount.cmp(&a.amount).then(a.name.cmp(&b.name)));
+    v.truncate(n);
+    v
+}
+
+/// Equipped items from `COMBATANT_INFO`: the second top-level `[...]` list holds one
+/// `(itemId,ilvl,(enchants),(bonus ids),(gems))` per slot (verified on a real Forever log,
+/// 15. 11. 2026). Empty slots (`0`) are skipped.
+pub fn combatant_gear(fields: &[String]) -> Vec<GearItem> {
+    let text = fields.join(",");
+    let mut lists = Vec::new();
+    let (mut depth, mut start) = (0i32, 0usize);
+    for (i, c) in text.char_indices() {
+        match c {
+            '[' | '(' => {
+                if c == '[' && depth == 0 {
+                    start = i;
+                }
+                depth += 1;
+            }
+            ']' | ')' => {
+                depth -= 1;
+                if c == ']' && depth == 0 {
+                    lists.push(&text[start + 1..i]);
+                }
+            }
+            _ => {}
+        }
+    }
+    let Some(gear) = lists.get(1) else { return Vec::new() };
+    // split into the depth-1 tuples
+    let mut items = Vec::new();
+    let (mut depth, mut start) = (0i32, 0usize);
+    for (i, c) in gear.char_indices() {
+        match c {
+            '(' => {
+                if depth == 0 {
+                    start = i + 1;
+                }
+                depth += 1;
+            }
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    let mut nums = gear[start..i].split(',').map(|x| x.trim().parse::<u32>().ok());
+                    if let (Some(Some(item_id)), Some(Some(ilvl))) = (nums.next(), nums.next())
+                        && item_id != 0
+                    {
+                        items.push(GearItem { item_id, ilvl });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    items
+}
+
 fn add_at(v: &mut Vec<i64>, i: usize, amount: i64) {
     if v.len() <= i {
         v.resize(i + 1, 0);
@@ -973,5 +1197,30 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(creature_uid(&herald, 43), None);
+    }
+
+    #[test]
+    fn gear_from_combatant_info() {
+        // shape of a real Forever COMBATANT_INFO (after the GUID), shortened
+        let line = "0,35,81,62,39,40,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,720,1485,[(104976,129637,5),(104975,129636,2)],(0,0,0,0),[(279391,23,(),(),()),(0,0,(),(),()),(15018,20,(),(12736),()),(4568,21,(),(12742),())],[Creature-0-6866-1-19410-10719-000079B309,16609,1],1,0,0,0";
+        let fields: Vec<String> = line.split(',').map(str::to_string).collect();
+        assert_eq!(
+            combatant_gear(&fields),
+            vec![
+                GearItem {
+                    item_id: 279391,
+                    ilvl: 23
+                },
+                GearItem {
+                    item_id: 15018,
+                    ilvl: 20
+                },
+                GearItem {
+                    item_id: 4568,
+                    ilvl: 21
+                },
+            ]
+        );
+        assert!(combatant_gear(&[]).is_empty());
     }
 }

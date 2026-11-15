@@ -184,7 +184,9 @@ export default defineSchema({
 		publicFields: v.array(v.string()),
 		/** kaj gre v Discord (objave + slash ukazi); manjka = vse */
 		discordFields: v.optional(v.array(v.string())),
-		paused: v.boolean()
+		paused: v.boolean(),
+		/** zadnja verzija igre iz Blizzard static namespacea (dnevni cron; za predlog nove sezone) */
+		gamePatch: v.optional(v.string())
 	}).index('by_key', ['key']),
 
 	// Skrivnosti, nastavljene prek admin vmesnika (Portal Room). Berejo jih SAMO interne funkcije;
@@ -330,6 +332,46 @@ export default defineSchema({
 		.index('by_slug_and_kind', ['slug', 'kind'])
 		.index('by_kind_and_amount', ['kind', 'amount'])
 		.index('by_run', ['runId']),
+
+	// Company Parses (docs/STATS.md §6): en boss kill × spremljan junak. Majhne vrstice (~250 B);
+	// percentil se izračuna ob branju proti drugim iz iste skupine (boss + težavnost + vloga + sezona).
+	parses: defineTable({
+		runId: v.id('runs'),
+		slug: v.string(),
+		playerId: v.id('players'),
+		encounterId: v.number(),
+		encounter: v.string(),
+		zone: v.string(),
+		difficultyId: v.number(),
+		role: v.union(v.literal('dps'), v.literal('heal'), v.literal('tank')),
+		dps: v.number(),
+		hps: v.number(),
+		taken: v.number(),
+		durationMs: v.number(),
+		ilvl: v.union(v.number(), v.null()),
+		/** UTC ms konca boja */
+		at: v.number(),
+		season: v.number()
+	})
+		.index('by_encounterId_and_difficultyId_and_role_and_season', [
+			'encounterId',
+			'difficultyId',
+			'role',
+			'season'
+		])
+		.index('by_slug_and_season', ['slug', 'season'])
+		.index('by_run', ['runId']),
+
+	// Sezone (particije lestvic): nova ob večjem patchu, ko jo potrdi admin. Brez vrstic = Season 1.
+	seasons: defineTable({
+		number: v.number(),
+		name: v.string(),
+		startedAt: v.number(),
+		/** verzija igre ob začetku (npr. "1.61.0"), če je znana */
+		patch: v.union(v.string(), v.null())
+	})
+		.index('by_number', ['number'])
+		.index('by_startedAt', ['startedAt']),
 
 	// Kdo je bil v runu (za zavihek Runs na strani junaka).
 	runParticipants: defineTable({

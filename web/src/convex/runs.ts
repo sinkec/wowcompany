@@ -6,7 +6,9 @@ import { query, type QueryCtx } from './_generated/server.js';
 import { canSeePrivate } from './lib/access.js';
 import { recordKind } from './lib/companionSchema.js';
 import { runDetail, runListItem, type DetailsLike, type RunDocLike } from './lib/runsView.js';
+import { heroLogs as buildHeroLogs, poolKey } from './lib/parses.js';
 import { getSettings } from './lib/settings.js';
+import { listSeasons } from './seasons.js';
 
 async function visibility(ctx: QueryCtx) {
 	const [privateOk, settings] = await Promise.all([canSeePrivate(ctx), getSettings(ctx)]);
@@ -111,6 +113,50 @@ export const forHero = query({
 			runs: runs.map((r) => runListItem(r as RunDocLike, classOf, allowed)),
 			records
 		};
+	}
+});
+
+/**
+ * Zavihek Logs na strani junaka (Company Parses, docs/STATS.md §6): po bossu najboljši/median
+ * percentil, najhitrejši uboj in vsi uboji v izbrani sezoni. Številke -> polje runDetails.
+ * Bere parse junaka (≤ 500) in za vsako skupino (boss + težavnost + vloga) ≤ 1000 vrstic po ~250 B.
+ */
+export const heroLogs = query({
+	args: { slug: v.string(), season: v.optional(v.number()) },
+	handler: async (ctx, { slug, season }) => {
+		const { allowed } = await visibility(ctx);
+		if (!allowed('runs') || !allowed('runDetails')) return { locked: true as const };
+		const seasons = await listSeasons(ctx);
+		const chosen = season ?? seasons[0].number;
+		const mine = await ctx.db
+			.query('parses')
+			.withIndex('by_slug_and_season', (q) => q.eq('slug', slug).eq('season', chosen))
+			.take(500);
+		const pools = new Map<string, { slug: string; value: number }[]>();
+		for (const r of mine) {
+			const k = poolKey(r);
+			if (pools.has(k)) continue;
+			const rows = await ctx.db
+				.query('parses')
+				.withIndex('by_encounterId_and_difficultyId_and_role_and_season', (q) =>
+					q
+						.eq('encounterId', r.encounterId)
+						.eq('difficultyId', r.difficultyId)
+						.eq('role', r.role)
+						.eq('season', chosen)
+				)
+				.take(1000);
+			pools.set(
+				k,
+				rows.map((x) => ({ slug: x.slug, value: x.role === 'heal' ? x.hps : x.dps }))
+			);
+		}
+		const logs = buildHeroLogs(
+			slug,
+			mine.map((r) => ({ ...r, runId: r.runId as string })),
+			pools
+		);
+		return { locked: false as const, seasons, season: chosen, ...logs };
 	}
 });
 

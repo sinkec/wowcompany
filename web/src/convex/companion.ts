@@ -23,6 +23,8 @@ import {
 	runScore
 } from './lib/companion.js';
 import { personalUpload, runSummary, type RunSummary } from './lib/companionSchema.js';
+import { parseRows } from './lib/parses.js';
+import { seasonAt } from './seasons.js';
 
 const limiter = new RateLimiter(components.rateLimiter, {
 	// Cela platforma: največ 30 novih povezav na uro (prijateljska skupina).
@@ -294,6 +296,27 @@ async function writeHeroRecords(
 	}
 }
 
+/** Company Parses tega runa: najprej pobriše stare (boljši posnetek istega runa jih zamenja). */
+async function writeParses(
+	ctx: MutationCtx,
+	runId: Id<'runs'>,
+	s: RunSummary,
+	party: { slug: string; playerId?: Id<'players'> }[]
+) {
+	for await (const old of ctx.db.query('parses').withIndex('by_run', (q) => q.eq('runId', runId))) {
+		await ctx.db.delete('parses', old._id);
+	}
+	const ids = new Map(party.filter((p) => p.playerId).map((p) => [p.slug, p.playerId!]));
+	for (const row of parseRows(s, new Set(ids.keys()))) {
+		await ctx.db.insert('parses', {
+			...row,
+			runId,
+			playerId: ids.get(row.slug)!,
+			season: await seasonAt(ctx, row.at)
+		});
+	}
+}
+
 async function writeParticipants(
 	ctx: MutationCtx,
 	runId: Id<'runs'>,
@@ -388,6 +411,7 @@ export const ingestRun = internalMutation({
 			await ctx.db.insert('runDetails', { runId, ...details });
 			await writeParticipants(ctx, runId, party, s.startedAt);
 			await writeHeroRecords(ctx, runId, s, party);
+			await writeParses(ctx, runId, s, party);
 			return { runId, created: true, recorderAdded: true, replaced: false };
 		}
 
@@ -404,6 +428,7 @@ export const ingestRun = internalMutation({
 			else await ctx.db.insert('runDetails', { runId: existing._id, ...details });
 			await writeParticipants(ctx, existing._id, party, s.startedAt);
 			await writeHeroRecords(ctx, existing._id, s, party);
+			await writeParses(ctx, existing._id, s, party);
 		} else {
 			// isti posnetek z več podatki o lootu (ID/kakovost iz addona pride pozno) ali z rolli
 			// (novejša aplikacija): zamenjaj samo to
@@ -538,6 +563,9 @@ export const deleteRun = internalMutation({
 			.query('heroRecords')
 			.withIndex('by_run', (q) => q.eq('runId', runId))) {
 			await ctx.db.delete('heroRecords', r._id);
+		}
+		for await (const p of ctx.db.query('parses').withIndex('by_run', (q) => q.eq('runId', runId))) {
+			await ctx.db.delete('parses', p._id);
 		}
 		if (await ctx.db.get('runs', runId)) await ctx.db.delete('runs', runId);
 		return null;

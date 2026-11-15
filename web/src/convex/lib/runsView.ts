@@ -3,7 +3,7 @@
 //   runDetails  → številke: meter, uroki, segmenti, časovnica, nagrade
 //   runDeaths   → smrti (števci in recapi)
 //   classId     → barve razredov (obstoječe polje)
-import type { Award, LootDrop, LootRoll, PlayerSummary } from './companionSchema.js';
+import type { Award, LootDrop, LootRoll, PlayerSummary, Segment } from './companionSchema.js';
 
 export type Allowed = (field: string) => boolean;
 
@@ -34,15 +34,7 @@ export type RunDocLike = {
 
 export type DetailsLike = {
 	players: PlayerSummary[];
-	segments: {
-		kind: 'boss' | 'trash';
-		name: string;
-		encounterId: number | null;
-		startMs: number;
-		endMs: number;
-		result: 'kill' | 'wipe' | 'none';
-		players: { slug: string; damage: number; healing: number; damageTaken: number }[];
-	}[];
+	segments: Segment[];
 	deaths: {
 		slug: string;
 		atMs: number;

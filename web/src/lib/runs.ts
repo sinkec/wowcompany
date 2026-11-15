@@ -96,3 +96,32 @@ export const RECORD_LABEL: Record<RecordKindName, { title: string; quip: string;
 	heal: { title: 'Biggest Heal', quip: 'A band-aid the size of a tent.', prep: 'on' },
 	hitTaken: { title: 'Hardest Hit Taken', quip: 'Caught it with their face.', prep: 'from' }
 };
+
+/** Company Parse barva (kot ustaljena lestvica parsov: siva … zlata). */
+export function parseColor(pct: number | null | undefined): string {
+	if (pct == null) return 'var(--muted-foreground)';
+	if (pct >= 100) return '#e5cc80';
+	if (pct >= 99) return '#e268a8';
+	if (pct >= 95) return '#ff8000';
+	if (pct >= 75) return '#a335ee';
+	if (pct >= 50) return '#0070ff';
+	if (pct >= 25) return '#1eff00';
+	return '#9d9d9d';
+}
+
+/** Kratka pripomba k parsu (WoW ton, grobo). */
+export function parseQuip(pct: number | null | undefined): string {
+	if (pct == null) return 'Not enough victims to compare with yet.';
+	if (pct >= 100) return 'Top of the company. Insufferable now.';
+	if (pct >= 95) return 'Orange. Will mention it in every conversation.';
+	if (pct >= 75) return 'Purple. Respectable, annoyingly so.';
+	if (pct >= 50) return 'Blue. Pulling their weight, barely.';
+	if (pct >= 25) return 'Green. Present, technically.';
+	return 'Grey. Was the keyboard plugged in?';
+}
+
+export const ROLE_LABEL: Record<'dps' | 'heal' | 'tank', string> = {
+	dps: 'DPS',
+	heal: 'Healer',
+	tank: 'Tank'
+};
