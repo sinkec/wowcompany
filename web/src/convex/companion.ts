@@ -306,6 +306,28 @@ async function writeHeroRecords(
 	}
 }
 
+/**
+ * Isti run z drugim ključem: druga verzija aplikacije (popravek uid kopije instance, 15. 11. 2026) ali
+ * drug snemalec brez creature GUID-ov. Isti dungeon, začetek v ±10 min, vsaj dva skupna igralca
+ * (oziroma vsi, če jih je manj). Bere ≤ 20 runov iz okna.
+ */
+async function sameRunWithOtherKey(ctx: MutationCtx, s: RunSummary) {
+	const near = await ctx.db
+		.query('runs')
+		.withIndex('by_started_at', (q) =>
+			q.gte('startedAt', s.startedAt - 10 * 60_000).lte('startedAt', s.startedAt + 10 * 60_000)
+		)
+		.take(20);
+	const mine = new Set(s.players.map((p) => p.slug));
+	return (
+		near.find((r) => {
+			if (r.zone.instanceId !== s.zone.instanceId) return false;
+			const shared = r.party.filter((p) => mine.has(p.slug)).length;
+			return shared >= Math.min(2, mine.size, r.party.length);
+		}) ?? null
+	);
+}
+
 /** Company Parses tega runa: najprej pobriše stare (boljši posnetek istega runa jih zamenja). */
 async function writeParses(
 	ctx: MutationCtx,
@@ -404,10 +426,11 @@ export const ingestRun = internalMutation({
 
 		const rec = { userId: device.userId, deviceId: device._id, slug: s.recorder, at: now };
 		const score = runScore(s);
-		const existing = await ctx.db
-			.query('runs')
-			.withIndex('by_run_key', (q) => q.eq('runKey', s.runKey))
-			.first();
+		const existing =
+			(await ctx.db
+				.query('runs')
+				.withIndex('by_run_key', (q) => q.eq('runKey', s.runKey))
+				.first()) ?? (await sameRunWithOtherKey(ctx, s));
 
 		const loot = s.loot ?? [];
 		const rolls = s.rolls ?? [];
@@ -458,7 +481,9 @@ export const ingestRun = internalMutation({
 		}
 
 		const { list: recordedBy, added } = addRecorder(existing.recordedBy, rec);
-		const better = score > existing.score;
+		// boljši posnetek; pri enaki oceni tudi novejša shema (posodobljena aplikacija prinese več podrobnosti)
+		const better =
+			score > existing.score || (score === existing.score && s.schema > existing.schema);
 		if (better) {
 			const party = await partyFor(ctx, s);
 			await ctx.db.patch('runs', existing._id, { ...runFields, party, recordedBy, updatedAt: now });
