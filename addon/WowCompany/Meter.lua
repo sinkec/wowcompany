@@ -19,6 +19,33 @@ Meter.KINDS = {
     { key = "taken", label = "Taken", enum = "DamageTaken" },
     { key = "interrupts", label = "Kicks", enum = "Interrupts" },
 }
+-- behind the 4th button ("More"): the rest of what the game's meter counts
+Meter.MORE = {
+    { key = "interrupts", label = "Kicks", enum = "Interrupts" },
+    { key = "dispels", label = "Dispels", enum = "Dispels" },
+    { key = "absorbs", label = "Shields", enum = "Absorbs" },
+    { key = "avoidable", label = "Fire", enum = "AvoidableDamageTaken",
+      tip = "Avoidable damage taken: standing in things you should not stand in." },
+    { key = "enemies", label = "Beat up", enum = "EnemyDamageTaken",
+      tip = "Damage done to each enemy (mobs, never players)." },
+    { key = "deaths", label = "Deaths", enum = "Deaths" },
+}
+
+function Meter.IsMore(kindKey)
+    for i = 1, #Meter.MORE do
+        if Meter.MORE[i].key == kindKey then return Meter.MORE[i] end
+    end
+    return nil
+end
+
+-- the next "More" kind after `kindKey` (wraps around)
+function Meter.NextMore(kindKey)
+    for i = 1, #Meter.MORE do
+        if Meter.MORE[i].key == kindKey then return Meter.MORE[i % #Meter.MORE + 1] end
+    end
+    return Meter.MORE[1]
+end
+
 Meter.SCOPES = {
     { key = "current", label = "This fight", enum = "Current" },
     { key = "overall", label = "Overall", enum = "Overall" },
@@ -40,7 +67,16 @@ local function kindEnum(kindKey)
     for i = 1, #Meter.KINDS do
         if Meter.KINDS[i].key == kindKey then return enumValue("DamageMeterType", Meter.KINDS[i].enum) end
     end
+    local more = Meter.IsMore(kindKey)
+    if more then return enumValue("DamageMeterType", more.enum) end
     return enumValue("DamageMeterType", "DamageDone")
+end
+
+local function scopeEnum(scopeKey)
+    for i = 1, #Meter.SCOPES do
+        if Meter.SCOPES[i].key == scopeKey then return enumValue("DamageMeterSessionType", Meter.SCOPES[i].enum) end
+    end
+    return nil
 end
 
 -- One session: by scope ("current" / "overall") or by the id of a past fight.
@@ -53,12 +89,7 @@ function Meter.Read(scopeKey, kindKey, sessionId)
         if type(C_DamageMeter.GetCombatSessionFromID) ~= "function" then return nil end
         ok, session = pcall(C_DamageMeter.GetCombatSessionFromID, sessionId, kind)
     else
-        local scope
-        for i = 1, #Meter.SCOPES do
-            if Meter.SCOPES[i].key == scopeKey then
-                scope = enumValue("DamageMeterSessionType", Meter.SCOPES[i].enum)
-            end
-        end
+        local scope = scopeEnum(scopeKey)
         if scope == nil or type(C_DamageMeter.GetCombatSessionFromType) ~= "function" then return nil end
         ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, scope, kind)
     end
@@ -90,7 +121,8 @@ local function isMine(src, myGuid)
 end
 
 -- Rows of a session that may be shown (see the privacy rule), in the game's order.
-function Meter.Visible(session)
+-- The "enemies" board lists mobs (damage done to them): those rows are kept, players never.
+function Meter.Visible(session, kindKey)
     local out = {}
     local sources = session and session.combatSources
     if type(sources) ~= "table" then return out end
@@ -101,9 +133,53 @@ function Meter.Visible(session)
         local src = sources[i]
         if type(src) == "table" then
             local guid = ns.plain(src.sourceGUID)
-            if isMine(src, myGuid) or privateInstance or (grouped and guid ~= nil and guidInGroup(guid)) then
+            if kindKey == "enemies" then
+                local isPlayer = type(guid) == "string" and string.sub(guid, 1, 7) == "Player-"
+                if (type(guid) == "string" and not isPlayer) or (guid == nil and privateInstance) then
+                    table.insert(out, src)
+                end
+            elseif isMine(src, myGuid) or privateInstance or (grouped and guid ~= nil and guidInGroup(guid)) then
                 table.insert(out, src)
             end
+        end
+    end
+    return out
+end
+
+-- One player's spells in a session (Details! reads the same API on this client):
+-- { { name, amount, perSecond, pet }, … } in the game's order, or nil when the game does not say.
+-- Only for a row that is already visible (the caller passes its plain GUID).
+function Meter.Spells(scopeKey, kindKey, sessionId, guid)
+    if type(C_DamageMeter) ~= "table" or type(guid) ~= "string" then return nil end
+    local kind = kindEnum(kindKey)
+    local ok, src
+    if sessionId then
+        if type(C_DamageMeter.GetCombatSessionSourceFromID) ~= "function" then return nil end
+        ok, src = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionId, kind, guid)
+    else
+        local scope = scopeEnum(scopeKey)
+        if scope == nil or type(C_DamageMeter.GetCombatSessionSourceFromType) ~= "function" then return nil end
+        ok, src = pcall(C_DamageMeter.GetCombatSessionSourceFromType, scope, kind, guid)
+    end
+    if not ok or type(src) ~= "table" or type(src.combatSpells) ~= "table" then return nil end
+    local out = {}
+    for i = 1, #src.combatSpells do
+        local sp = src.combatSpells[i]
+        if type(sp) == "table" then
+            local id = ns.plain(sp.spellID)
+            local name
+            if type(id) == "number" and type(C_Spell) == "table" and type(C_Spell.GetSpellInfo) == "function" then
+                local okInfo, info = pcall(C_Spell.GetSpellInfo, id)
+                name = okInfo and type(info) == "table" and ns.plain(info.name) or nil
+            end
+            if id == 0 then name = "Melee" end
+            local pet = ns.plain(sp.creatureName)
+            table.insert(out, {
+                name = name or "Some spell",
+                pet = (type(pet) == "string" and pet ~= "") and pet or nil,
+                amount = sp.totalAmount,
+                perSecond = sp.amountPerSecond,
+            })
         end
     end
     return out

@@ -15,6 +15,8 @@ read_globals = {
     "BackdropTemplateMixin",
     "BreakUpLargeNumbers",
     "C_AddOns",
+    "C_Spell",
+    "SendChatMessage",
     "C_CVar",
     "C_DamageMeter",
     "C_Item",

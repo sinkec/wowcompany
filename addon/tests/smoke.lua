@@ -125,7 +125,13 @@ local function runTimers()
     timers = {}
     for i = 1, #list do list[i]() end
 end
-C_AddOns = { GetAddOnMetadata = function() return "0.4.1" end }
+C_AddOns = {
+    GetAddOnMetadata = function() return "0.5.0" end,
+    IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
+}
+C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
+local sent = {}
+function SendChatMessage(msg, channel) table.insert(sent, { msg = msg, channel = channel }) end
 C_CVar = {
     GetCVar = function() return game.advanced end,
     SetCVar = function(_, v) game.advanced = v end,
@@ -135,11 +141,18 @@ C_PartyInfo = {
     IsGUIDInGroup = function(guid) return game.partyGuids[guid] == true end,
 }
 Enum = {
-    DamageMeterType = { DamageDone = 0, Dps = 1, HealingDone = 2, Hps = 3, Interrupts = 5, DamageTaken = 7 },
+    DamageMeterType = { DamageDone = 0, Dps = 1, HealingDone = 2, Hps = 3, Absorbs = 4, Interrupts = 5, Dispels = 6,
+        DamageTaken = 7, AvoidableDamageTaken = 8, Deaths = 9, EnemyDamageTaken = 10 },
     DamageMeterSessionType = { Overall = 0, Current = 1, Expired = 2 },
 }
-local function session()
+local function session(kind)
     local n = function(v) return game.secrets and SECRET or v end
+    if kind == 10 then -- EnemyDamageTaken: rows are mobs (and never a player)
+        return { durationSeconds = 46, totalAmount = n(5000), maxAmount = n(4000), combatSources = {
+            { name = "Deviate Creeper", totalAmount = n(4000), amountPerSecond = n(87), sourceGUID = "Creature-0-1-43-1-3632-1" },
+            { name = "Fizzle Boom", totalAmount = n(1000), amountPerSecond = n(20), sourceGUID = "Player-1-0000000B" },
+        } }
+    end
     local s = {
         durationSeconds = 46, totalAmount = n(5000), maxAmount = n(3000),
         combatSources = {
@@ -159,10 +172,16 @@ local function session()
 end
 C_DamageMeter = {
     IsDamageMeterAvailable = function() return true, "" end,
-    GetCombatSessionFromType = function() return session() end,
-    GetCombatSessionFromID = function() return session() end,
-    GetCombatSessionSourceFromType = function() return { spells = {} } end,
-    GetCombatSessionSourceFromID = function() return { spells = {} } end,
+    GetCombatSessionFromType = function(_, kind) return session(kind) end,
+    GetCombatSessionFromID = function(_, kind) return session(kind) end,
+    GetCombatSessionSourceFromType = function()
+        local n = function(v) return game.secrets and SECRET or v end
+        return { totalAmount = n(3000), maxAmount = n(1800), combatSpells = {
+            { spellID = 133, totalAmount = n(1800), amountPerSecond = n(39.1), creatureName = "" },
+            { spellID = 116, totalAmount = n(1200), amountPerSecond = n(26.1), creatureName = "" },
+        } }
+    end,
+    GetCombatSessionSourceFromID = function() return { combatSpells = {} } end,
     GetSessionDurationSeconds = function() return 46 end,
     GetAvailableCombatSessions = function()
         return {
@@ -371,7 +390,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.4%.1|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.5%.0|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -556,6 +575,79 @@ slash("wat")
 check(said("/wowco log on"), "unknown command lists the commands")
 ns.on("PLAYER_DEAD", function() error("boom") end)
 check(pcall(fire, "PLAYER_DEAD") and #WowCompanyDB.errors == 1, "a failing handler is recorded, not raised")
+
+-- ------------------------------------------------------------------ 0.5: more kinds, breakdown, summary, Details!
+ns.UI.Show("meter")
+local st = WowCompanyDB.settings
+st.meterKind = "damage"
+local moreButton = WowCompanyFrame and nil
+for i = 1, #frames do
+    if rawget(frames[i], "label") and frames[i].label.text == "Kicks" then moreButton = frames[i] end
+end
+ns.UI.Refresh()
+for i = 1, #frames do
+    local l = rawget(frames[i], "label")
+    if l and (l.text == "Kicks" or l.text == "Dispels" or l.text == "Shields") and frames[i].scripts.OnClick then
+        moreButton = frames[i]
+    end
+end
+check(moreButton ~= nil, "meter: the 4th button is there")
+moreButton.scripts.OnClick(moreButton)
+check(st.meterKind == "interrupts", "more: first click opens kicks")
+moreButton.scripts.OnClick(moreButton)
+moreButton.scripts.OnClick(moreButton)
+check(st.meterKind == "absorbs" and moreButton.label.text == "Shields", "more: next clicks cycle (dispels, shields)")
+for _, k in ipairs(ns.Meter.MORE) do
+    st.meterKind = k.key
+    check(pcall(ns.UI.Refresh), "meter kind " .. k.key)
+end
+st.meterKind = "enemies"
+ns.UI.Refresh()
+check(widgetWith("Deviate Creeper") ~= nil and widgetWith("Fizzle Boom") == nil, "beat up: lists mobs, never a player")
+-- click a player for the spells, click again to go back
+st.meterKind = "damage"
+ns.UI.Refresh()
+local mine
+for i = 1, #frames do
+    if rawget(frames[i], "guid") == "Player-1-0000000A" then mine = frames[i] end
+end
+check(mine ~= nil, "breakdown: your row is clickable")
+mine.scripts.OnMouseUp(mine)
+check(widgetWith("Fireball") ~= nil and widgetWith("Frostbolt") ~= nil and widgetWith("click to go back") ~= nil,
+    "breakdown: your spells by name")
+check(textOf("60%") ~= nil, "breakdown: share of each spell")
+mine.scripts.OnMouseUp(mine)
+check(widgetWith("Fireball") == nil or not widgetWith("click to go back"), "breakdown: click again goes back")
+game.secrets = true
+check(pcall(ns.UI.Refresh), "breakdown: survives secrets")
+game.secrets = false
+-- Details! defer
+game.details = true
+slash("details on")
+ns.UI.Refresh()
+check(widgetWith("Details! is doing the counting") ~= nil, "details on: our meter steps aside")
+slash("details off")
+ns.UI.Refresh()
+check(widgetWith("Grobos Stinkfoot") ~= nil, "details off: our meter is back")
+game.details = false
+-- run summary after leaving the dungeon
+local now = GetServerTime()
+WowCompanyDB.state.run = { zone = "Wailing Caverns", startedAt = now - 3552, leftAt = now, afterFight = 0 }
+fire("ZONE_CHANGED_NEW_AREA")
+runTimers()
+check(said("Wailing Caverns done in 59:12") and said("1 boss, 3 fights"), "summary: time, bosses and fights in chat")
+check(said("MVP: Grobos Stinkfoot") and not said("Fizzle Boom %("), "summary: MVP, only you and your party")
+local before = #printed
+fire("ZONE_CHANGED_NEW_AREA")
+runTimers()
+check(#printed == before, "summary: said once per run")
+slash("report")
+check(said("not in a party") and #sent == 0, "report: nobody to tell outside a party")
+game.grouped = true
+slash("report")
+check(#sent >= 2 and sent[1].channel == "PARTY" and string.find(sent[1].msg, "Wailing Caverns", 1, true),
+    "report: the summary goes to /party only")
+game.grouped = false
 
 realPrint(failures == 0 and "all addon checks passed" or (failures .. " addon check(s) FAILED"))
 os.exit(failures == 0 and 0 or 1)

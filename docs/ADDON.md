@@ -56,7 +56,13 @@ Companion ostaja edini, ki nalaga na strežnik. Addon je **neobvezen**: brez nje
   `Loot: Greed Roll - 97 for Item by X`, `Loot: X won: Item`, `You won:` / `You have selected …`) → bere jih lahko Companion iz
   `WoWChatLog.txt`, addon ni potreben (naslednji korak).
 - ✅ **Rolli (15. 11. 2026):** `wowlog::parse_roll_line` (vseh 338 `Loot:` vrstic pravega loga), `RunSummary.rolls` (samo člani partyja, tujci se ne shranijo), strežnik `runDetails.rolls` (+ `checkRun`), portal: zavihek Loot → *Need, greed & broken friendships* (kocke po igralcih, kdo je kaj vrgel, zmagovalec). `wowrun <log> --chat <WoWChatLog.txt>` za preizkus; `web/scripts/companion-upload.ts` naloži run na dev.
-- **Še odprto:** statistika lika na portalu, `/wowco probe` v dungeonu.
+- ✅ **Addon 0.5.0 (15. 11. 2026, samo smoke test, v igri še ne):** gumb **More** v metru kroži med Kicks, Dispels,
+  Shields (absorbs), Fire (izogibna škoda), Beat up (škoda po nasprotnikih – samo mobi, nikoli igralci), Deaths;
+  **klik na vrstico** = uroki igralca (`GetCombatSessionSourceFrom*` → `combatSpells`, imena iz `C_Spell.GetSpellInfo`;
+  oblika povzeta po Details! kodi, na Forever še nepreverjena), klik znova = nazaj; `Summary.lua`: ob izhodu iz dungeona
+  povzetek runa v chat (čas, bossi, MVP, Medic, Kicks, Floor inspector – seštevek vseh bojev runa, samo party),
+  `/wowco report` ga pošlje v /party; `/wowco details on|off` – ob naloženem Details! se naš meter umakne (enkraten namig).
+- **Še odprto:** preizkus 0.5.0 v igri (posebej razčlenitev med bojem/po boju), `/wowco probe` v dungeonu.
 - Pravila: addon nikoli ne registrira `COMBAT_LOG_EVENT*`; nikoli ne kaže/pošilja drugih igralcev razen partyja (`Meter.Visible`;
   v izvozu je edino tuje ime vodja LASTNEGA partyja).
 

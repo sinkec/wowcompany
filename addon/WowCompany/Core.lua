@@ -75,6 +75,8 @@ local DEFAULTS = {
     logEverywhere = false, -- … and in the open world too (personal records: biggest crit anywhere)
     meterKind = "damage",
     meterScope = "current",
+    moreKind = "interrupts", -- what the meter's 4th button shows (Meter.MORE)
+    deferToDetails = false, -- /wowco details on: Details! does the meter, ours steps aside
 }
 
 local function initDB()

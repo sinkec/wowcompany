@@ -33,7 +33,7 @@ local ROWS, ROW_H = 9, 20
 
 local main -- the window, built on first use
 local rows, fightRows, cards, logRows, recordRows = {}, {}, {}, {}, {}
-local view = { tab = "now", sessionId = nil, sessionName = nil }
+local view = { tab = "now", sessionId = nil, sessionName = nil, detail = nil } -- detail = { guid, name }
 
 local function color(fs, c, a) fs:SetTextColor(c[1], c[2], c[3], a or 1) end
 
@@ -312,13 +312,27 @@ local function buildRows(parent)
         bar.name = text(bar, "GameFontHighlightSmall", "LEFT", C.text)
         bar.name:SetPoint("LEFT", 6, 0)
         bar.name:SetPoint("RIGHT", bar.amount, "LEFT", -6, 0)
+        -- click a player: their spells; click again (any row): back to the list
+        bar:EnableMouse(true)
+        bar:SetScript("OnMouseUp", function(self)
+            if view.detail then
+                view.detail = nil
+            elseif self.guid then
+                view.detail = { guid = self.guid, name = self.srcName }
+            end
+            UI.Refresh()
+        end)
         bar:Hide()
         rows[i] = bar
     end
 end
 
 -- Everything that touches possibly-secret values goes through pcall: a secret may be shown, not inspected.
-local function fillRow(bar, index, src, maxAmount, sum)
+local function fillRow(bar, index, src, maxAmount, sum, clickable)
+    -- only a plain player GUID opens a breakdown (mobs on the "Beat up" board do not)
+    local guid = ns.plain(src.sourceGUID)
+    bar.guid = (clickable and type(guid) == "string" and string.sub(guid, 1, 7) == "Player-") and guid or nil
+    bar.srcName = ns.plain(src.name)
     local r, g, b = classColor(src.classFilename)
     bar:SetStatusBarColor(r, g, b, ns.plain(src.isLocalPlayer) and 0.85 or 0.55)
     pcall(bar.SetMinMaxValues, bar, 0, maxAmount)
@@ -340,11 +354,63 @@ local function fillRow(bar, index, src, maxAmount, sum)
     bar:Show()
 end
 
+-- One player's spells (click on a row): same bars, spell names instead of players.
+local function refreshDetail()
+    local s = ns.db.settings
+    local spells = ns.Meter.Spells(s.meterScope, s.meterKind, view.sessionId, view.detail.guid)
+    local maxAmount, sum, plainNumbers = 0, 0, true
+    for i = 1, #(spells or {}) do
+        local amount = ns.plain(spells[i].amount)
+        if type(amount) ~= "number" then
+            plainNumbers = false
+            break
+        end
+        sum = sum + amount
+        if amount > maxAmount then maxAmount = amount end
+    end
+    local shown = 0
+    for i = 1, #(spells or {}) do
+        if shown >= ROWS then break end
+        shown = shown + 1
+        local sp, bar = spells[i], rows[shown]
+        bar.guid = nil
+        bar:SetStatusBarColor(C.brass[1], C.brass[2], C.brass[3], 0.6)
+        pcall(bar.SetMinMaxValues, bar, 0, plainNumbers and math.max(maxAmount, 1) or 1)
+        pcall(bar.SetValue, bar, plainNumbers and sp.amount or 0)
+        bar.name:SetText(shown .. ".  " .. sp.name .. (sp.pet and (" (" .. sp.pet .. ")") or ""))
+        show(bar.amount, ns.fmt(sp.amount))
+        showRate(bar.perSecond, sp.perSecond, nil)
+        local amount = ns.plain(sp.amount)
+        bar.share:SetText((plainNumbers and sum > 0 and type(amount) == "number")
+            and string.format("%d%%", math.floor(amount / sum * 100 + 0.5)) or "")
+        bar:Show()
+    end
+    for i = shown + 1, ROWS do rows[i]:Hide() end
+    main.meterTitle:SetText((view.detail.name or "Someone") .. " – spells (click to go back)")
+    main.meterTotal:SetText(plainNumbers and shown > 0 and ns.fmt(sum) or "")
+    if shown == 0 then
+        main.meterEmpty:SetText(spells and "Nothing to break down."
+            or "No breakdown here (hidden mid-fight?). Click to go back.")
+        main.meterEmpty:Show()
+    else
+        main.meterEmpty:Hide()
+    end
+end
+
 local function refreshMeter()
     local s = ns.db.settings
+    if ns.Summary and ns.Summary.MeterDeferred() then
+        for i = 1, ROWS do rows[i]:Hide() end
+        main.meterTitle:SetText("")
+        main.meterTotal:SetText("")
+        main.meterEmpty:SetText("Details! is doing the counting.\n/wowco details off brings ours back.")
+        main.meterEmpty:Show()
+        return
+    end
+    if view.detail then return refreshDetail() end
     local session = ns.Meter.Read(s.meterScope, s.meterKind, view.sessionId)
     -- only you and your party (Meter.Visible drops strangers and unverifiable rows)
-    local sources = ns.Meter.Visible(session)
+    local sources = ns.Meter.Visible(session, s.meterKind)
     -- bar length, share and total: from the visible rows when the numbers are plain
     local maxAmount, sum, plainNumbers = 0, 0, true
     for i = 1, #sources do
@@ -362,7 +428,7 @@ local function refreshMeter()
         if shown >= ROWS then break end
         shown = shown + 1
         fillRow(rows[shown], shown, sources[i], plainNumbers and math.max(maxAmount, 1) or session.maxAmount,
-            plainNumbers and sum or nil)
+            plainNumbers and sum or nil, s.meterKind ~= "enemies")
     end
     for i = shown + 1, ROWS do rows[i]:Hide() end
 
@@ -438,7 +504,7 @@ local function buildFights(parent)
         hl:SetColorTexture(C.gold[1], C.gold[2], C.gold[3], 0.12)
         row:SetScript("OnClick", function(self)
             if not self.fight or not self.fight.id then return end
-            view.sessionId, view.sessionName = self.fight.id, self.fight.name
+            view.sessionId, view.sessionName, view.detail = self.fight.id, self.fight.name, nil
             UI.Show("meter")
         end)
         fightRows[i] = row
@@ -706,10 +772,20 @@ local function build()
     main.kindButtons, main.scopeButtons = {}, {}
     local bx = 0
     for _, k in ipairs(ns.Meter.KINDS) do
+        local more = k.key == "interrupts" -- the 4th button cycles through Meter.MORE
         local b = button(meter, k.label, 58, function()
-            ns.db.settings.meterKind = k.key
+            local st = ns.db.settings
+            if more then
+                if ns.Meter.IsMore(st.meterKind) then st.moreKind = ns.Meter.NextMore(st.meterKind).key end
+                st.meterKind = st.moreKind
+            else
+                st.meterKind = k.key
+            end
+            view.detail = nil
             UI.Refresh()
-        end, k.label)
+        end, more and "More" or k.label,
+            more and "Kicks, dispels, shields, fire (avoidable damage), beat up (damage per enemy), deaths. "
+                .. "Click again for the next one." or nil)
         b:SetPoint("TOPLEFT", bx, 0)
         bx = bx + 61
         main.kindButtons[k.key] = b
@@ -719,7 +795,7 @@ local function build()
         local sc = ns.Meter.SCOPES[i]
         local b = button(meter, sc.label, 64, function()
             ns.db.settings.meterScope = sc.key
-            view.sessionId, view.sessionName = nil, nil
+            view.sessionId, view.sessionName, view.detail = nil, nil, nil
             UI.Refresh()
         end, sc.label)
         b:SetPoint("TOPRIGHT", -bx, 0)
@@ -780,7 +856,16 @@ function UI.Refresh()
     if view.tab == "now" then
         refreshNow()
     elseif view.tab == "meter" then
-        for key, b in pairs(main.kindButtons) do b:SetChosen(key == ns.db.settings.meterKind) end
+        local st = ns.db.settings
+        local more = ns.Meter.IsMore(st.meterKind) or ns.Meter.IsMore(st.moreKind) or ns.Meter.MORE[1]
+        for key, b in pairs(main.kindButtons) do
+            if key == "interrupts" then
+                b.label:SetText(more.label)
+                b:SetChosen(ns.Meter.IsMore(st.meterKind) ~= nil)
+            else
+                b:SetChosen(key == st.meterKind)
+            end
+        end
         for key, b in pairs(main.scopeButtons) do
             b:SetChosen(not view.sessionId and key == ns.db.settings.meterScope)
         end

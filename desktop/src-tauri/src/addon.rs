@@ -254,6 +254,7 @@ const BUNDLED: &[(&str, &str)] = &[
     ("Logging.lua", include_str!("../../../addon/WowCompany/Logging.lua")),
     ("Meter.lua", include_str!("../../../addon/WowCompany/Meter.lua")),
     ("Export.lua", include_str!("../../../addon/WowCompany/Export.lua")),
+    ("Summary.lua", include_str!("../../../addon/WowCompany/Summary.lua")),
     ("UI.lua", include_str!("../../../addon/WowCompany/UI.lua")),
     ("Minimap.lua", include_str!("../../../addon/WowCompany/Minimap.lua")),
     ("Probe.lua", include_str!("../../../addon/WowCompany/Probe.lua")),
