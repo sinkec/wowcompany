@@ -371,7 +371,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.4%.0|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.4%.1|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
