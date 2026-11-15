@@ -412,6 +412,8 @@ export const ingestRun = internalMutation({
 			await writeParticipants(ctx, runId, party, s.startedAt);
 			await writeHeroRecords(ctx, runId, s, party);
 			await writeParses(ctx, runId, s, party);
+			// Discord: enkrat, čez 5 min (drugi snemalec, dopolnitev iz addona); postRun preveri vidnost
+			await ctx.scheduler.runAfter(5 * 60_000, internal.discord.postRun, { runId });
 			return { runId, created: true, recorderAdded: true, replaced: false };
 		}
 

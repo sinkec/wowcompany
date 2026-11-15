@@ -294,6 +294,8 @@ export default defineSchema({
 		lootCount: v.optional(v.number()),
 		/** popolnost posnetka – ob združevanju obdržimo boljšega */
 		score: v.number(),
+		/** kdaj je bil run objavljen v Discord (objava gre enkrat, 5 min po prvem uploadu) */
+		discordPostedAt: v.optional(v.number()),
 		createdAt: v.number(),
 		updatedAt: v.number()
 	})

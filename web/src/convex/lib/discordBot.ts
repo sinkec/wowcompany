@@ -34,22 +34,38 @@ export type BotDetails = {
 	stats?: Record<string, number | string> | null;
 	professions?: { name: string; primary: boolean; skill: number; max: number }[];
 	allStats?: unknown[];
-	talents?: { name: string; spent: number; talents: { name: string; rank: number; maxRank: number | null }[] }[];
+	talents?: {
+		name: string;
+		spent: number;
+		talents: { name: string; rank: number; maxRank: number | null }[];
+	}[];
 };
 /** Prvi zapis zgodovine + število vseh sprememb. */
 export type BotHistory = { firstAt: number; firstLevel: number; changes: number };
 
 type Embed = Record<string, unknown>;
-const fmt = (n: number, d = 0) => n.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
+const fmt = (n: number, d = 0) =>
+	n.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
 const ts = (ms: number) => `<t:${Math.floor(ms / 1000)}:R>`; // Discord sam prikaže "pred 2 urama"
 const fullName = (s: { name: string; surname: string }) => `${s.name} ${s.surname}`.trim();
-const color = (ok: (f: string) => boolean, classId?: number) => (ok('classId') && classId && CLASS_COLORS[classId]) || 0xe5d9b6;
+const color = (ok: (f: string) => boolean, classId?: number) =>
+	(ok('classId') && classId && CLASS_COLORS[classId]) || 0xe5d9b6;
 
 function identity(s: BotSummary, ok: (f: string) => boolean) {
-	const who = [ok('level') ? `Level ${s.level}` : null, ok('gender') ? s.gender : null, ok('race') ? s.race : null, ok('className') ? s.className : null]
+	const who = [
+		ok('level') ? `Level ${s.level}` : null,
+		ok('gender') ? s.gender : null,
+		ok('race') ? s.race : null,
+		ok('className') ? s.className : null
+	]
 		.filter(Boolean)
 		.join(' ');
-	return [who || null, ok('guild') && s.guild ? `<${s.guild}>` : null, ok('faction') ? s.faction : null, ok('ruleset') ? s.ruleset : null]
+	return [
+		who || null,
+		ok('guild') && s.guild ? `<${s.guild}>` : null,
+		ok('faction') ? s.faction : null,
+		ok('ruleset') ? s.ruleset : null
+	]
 		.filter(Boolean)
 		.join(' · ');
 }
@@ -58,12 +74,16 @@ function identity(s: BotSummary, ok: (f: string) => boolean) {
 
 export function rosterEmbed(list: BotSummary[], fields: string[], site?: string): Embed {
 	const ok = (f: string) => fields.includes(f);
-	const sorted = [...list].sort((a, b) => (ok('level') ? b.level - a.level : 0) || fullName(a).localeCompare(fullName(b)));
+	const sorted = [...list].sort(
+		(a, b) => (ok('level') ? b.level - a.level : 0) || fullName(a).localeCompare(fullName(b))
+	);
 	const lines = sorted.map((s) => {
 		const name = site ? `[${fullName(s)}](${site}/c/${s.slug})` : fullName(s);
 		const bits = [
 			ok('level') ? `**${s.level}**` : null,
-			[ok('race') ? s.race : null, ok('className') ? s.className : null].filter(Boolean).join(' ') || null,
+			[ok('race') ? s.race : null, ok('className') ? s.className : null]
+				.filter(Boolean)
+				.join(' ') || null,
 			ok('ilvlEquipped') ? `ilvl ${s.ilvlEquipped}` : null,
 			ok('kills') ? `🗡️ ${fmt(s.kills)}` : null,
 			ok('deaths') ? `💀 ${fmt(s.deaths)}` : null,
@@ -81,12 +101,22 @@ export function rosterEmbed(list: BotSummary[], fields: string[], site?: string)
 
 // ------------------------------------------------------------------ /hero
 
-export function heroEmbed(s: BotSummary, d: BotDetails | null, history: BotHistory | null, fields: string[], site?: string): Embed {
+export function heroEmbed(
+	s: BotSummary,
+	d: BotDetails | null,
+	history: BotHistory | null,
+	fields: string[],
+	site?: string
+): Embed {
 	const ok = (f: string) => fields.includes(f);
 	const out: { name: string; value: string; inline?: boolean }[] = [];
 	const inline = (name: string, value: string) => out.push({ name, value, inline: true });
 
-	if (ok('ilvlEquipped')) inline('ilvl', ok('ilvlAverage') ? `${s.ilvlEquipped} *(best ${s.ilvlAverage})*` : `${s.ilvlEquipped}`);
+	if (ok('ilvlEquipped'))
+		inline(
+			'ilvl',
+			ok('ilvlAverage') ? `${s.ilvlEquipped} *(best ${s.ilvlAverage})*` : `${s.ilvlEquipped}`
+		);
 	else if (ok('ilvlAverage')) inline('Best ilvl', `${s.ilvlAverage}`);
 	if (ok('kills')) inline('Kills', fmt(s.kills));
 	if (ok('deaths')) inline('Deaths', `${fmt(s.deaths)} 💀`);
@@ -106,14 +136,22 @@ export function heroEmbed(s: BotSummary, d: BotDetails | null, history: BotHisto
 			.slice(0, 5)
 			.map((t) => `${t.name} ${t.rank}${t.maxRank ? `/${t.maxRank}` : ''}`)
 			.join(' · ');
-		out.push({ name: 'Talents', value: `**${s.talentSpec ?? '?'}** ${s.talentBuild}${picks ? `\n${picks}` : ''}` });
+		out.push({
+			name: 'Talents',
+			value: `**${s.talentSpec ?? '?'}** ${s.talentBuild}${picks ? `\n${picks}` : ''}`
+		});
 	}
 
 	if (ok('professions') && d?.professions?.length)
-		out.push({ name: 'Day jobs', value: d.professions.map((p) => `${p.name} **${p.skill}**/${p.max}`).join('\n') });
+		out.push({
+			name: 'Day jobs',
+			value: d.professions.map((p) => `${p.name} **${p.skill}**/${p.max}`).join('\n')
+		});
 
 	if (ok('equipment') && d?.equipment?.length) {
-		const best = [...d.equipment].filter((i) => i.slot !== 'Shirt' && i.slot !== 'Tabard').sort((a, b) => b.ilvl - a.ilvl);
+		const best = [...d.equipment]
+			.filter((i) => i.slot !== 'Shirt' && i.slot !== 'Tabard')
+			.sort((a, b) => b.ilvl - a.ilvl);
 		out.push({
 			name: `Shiniest gear (${d.equipment.length} pieces worn)`,
 			value: best
@@ -152,52 +190,172 @@ export function heroEmbed(s: BotSummary, d: BotDetails | null, history: BotHisto
 	}
 
 	if (ok('history') && history && history.changes > 1) {
-		const lv = ok('level') ? `level ${history.firstLevel} → ${s.level}` : `${history.changes} recorded changes`;
+		const lv = ok('level')
+			? `level ${history.firstLevel} → ${s.level}`
+			: `${history.changes} recorded changes`;
 		out.push({ name: 'Since we started watching', value: `${ts(history.firstAt)}: ${lv}` });
 	}
 
 	if (ok('allStats') && d?.allStats?.length && site)
-		out.push({ name: 'Every stat ever', value: `${d.allStats.length} more numbers on the [website](${site}/c/${s.slug}).` });
+		out.push({
+			name: 'Every stat ever',
+			value: `${d.allStats.length} more numbers on the [website](${site}/c/${s.slug}).`
+		});
 
 	const id = identity(s, ok);
 	const title = ok('deaths') ? `“${deathTitle(s.deaths)}”` : null;
 	return {
-		author: { name: fullName(s), ...(site ? { url: `${site}/c/${s.slug}` } : {}), ...(ok('avatar') && s.avatar ? { icon_url: s.avatar } : {}) },
-		description: [id ? `*${id}*` : null, title].filter(Boolean).join('\n') || 'Classified. The Guild Master likes secrets.',
+		author: {
+			name: fullName(s),
+			...(site ? { url: `${site}/c/${s.slug}` } : {}),
+			...(ok('avatar') && s.avatar ? { icon_url: s.avatar } : {})
+		},
+		description:
+			[id ? `*${id}*` : null, title].filter(Boolean).join('\n') ||
+			'Classified. The Guild Master likes secrets.',
 		color: color(ok, s.classId),
 		fields: out.slice(0, 25),
-		...(ok('avatar') && d?.render ? { image: { url: d.render } } : ok('avatar') && s.avatar ? { thumbnail: { url: s.avatar } } : {}),
+		...(ok('avatar') && d?.render
+			? { image: { url: d.render } }
+			: ok('avatar') && s.avatar
+				? { thumbnail: { url: s.avatar } }
+				: {}),
 		footer: { text: 'WowCompany · data refreshes when they log out' }
 	};
 }
 
 // ------------------------------------------------------------------ /leaderboard
 
-type Board = { key: string; title: string; note: string; field: string; value: (s: BotSummary) => number; digits?: number };
+type Board = {
+	key: string;
+	title: string;
+	note: string;
+	field: string;
+	value: (s: BotSummary) => number;
+	digits?: number;
+};
 
 export const BOARDS: Board[] = [
-	{ key: 'level', title: 'Highest Level', note: 'touch grass? never heard of her', field: 'level', value: (s) => s.level },
-	{ key: 'ilvl', title: 'Shiniest Gear', note: 'equipped item level', field: 'ilvlEquipped', value: (s) => s.ilvlEquipped },
-	{ key: 'kills', title: 'Serial Killer', note: 'things murdered', field: 'kills', value: (s) => s.kills },
-	{ key: 'deaths', title: 'Professional Corpse', note: 'deaths, lovingly counted', field: 'deaths', value: (s) => s.deaths },
-	{ key: 'kd', title: 'Hard to Kill', note: 'kills per death', field: 'kd', value: (s) => s.kills / Math.max(1, s.deaths), digits: 1 },
-	{ key: 'quests', title: 'Errand Boy', note: 'quests done for strangers', field: 'quests', value: (s) => s.quests },
-	{ key: 'hks', title: 'Honor? What Honor', note: 'honorable kills', field: 'honorableKills', value: (s) => s.honorableKills },
-	{ key: 'cheevos', title: 'Cheevo Hunter', note: 'achievement points', field: 'achievementPoints', value: (s) => s.achievementPoints },
-	{ key: 'falls', title: "Gravity's Favorite", note: 'deaths by falling', field: 'counters', value: (s) => s.counters?.falling_deaths ?? 0 },
-	{ key: 'food', title: 'Bottomless Pit', note: 'food eaten', field: 'counters', value: (s) => s.counters?.food ?? 0 },
-	{ key: 'drinks', title: 'Functional Alcoholic', note: 'drinks consumed', field: 'counters', value: (s) => s.counters?.drinks ?? 0 },
-	{ key: 'hearth', title: 'Homesick Little Baby', note: 'hearthstone uses', field: 'counters', value: (s) => s.counters?.hearthed ?? 0 },
-	{ key: 'need', title: 'Greedy Bastard', note: 'NEED rolls on loot', field: 'counters', value: (s) => s.counters?.need_rolls ?? 0 },
-	{ key: 'fish', title: 'Fish Whisperer', note: "fish caught. we don't ask.", field: 'counters', value: (s) => s.counters?.fish ?? 0 },
-	{ key: 'bandages', title: 'Field Medic', note: 'bandages slapped on', field: 'counters', value: (s) => s.counters?.bandages ?? 0 }
+	{
+		key: 'level',
+		title: 'Highest Level',
+		note: 'touch grass? never heard of her',
+		field: 'level',
+		value: (s) => s.level
+	},
+	{
+		key: 'ilvl',
+		title: 'Shiniest Gear',
+		note: 'equipped item level',
+		field: 'ilvlEquipped',
+		value: (s) => s.ilvlEquipped
+	},
+	{
+		key: 'kills',
+		title: 'Serial Killer',
+		note: 'things murdered',
+		field: 'kills',
+		value: (s) => s.kills
+	},
+	{
+		key: 'deaths',
+		title: 'Professional Corpse',
+		note: 'deaths, lovingly counted',
+		field: 'deaths',
+		value: (s) => s.deaths
+	},
+	{
+		key: 'kd',
+		title: 'Hard to Kill',
+		note: 'kills per death',
+		field: 'kd',
+		value: (s) => s.kills / Math.max(1, s.deaths),
+		digits: 1
+	},
+	{
+		key: 'quests',
+		title: 'Errand Boy',
+		note: 'quests done for strangers',
+		field: 'quests',
+		value: (s) => s.quests
+	},
+	{
+		key: 'hks',
+		title: 'Honor? What Honor',
+		note: 'honorable kills',
+		field: 'honorableKills',
+		value: (s) => s.honorableKills
+	},
+	{
+		key: 'cheevos',
+		title: 'Cheevo Hunter',
+		note: 'achievement points',
+		field: 'achievementPoints',
+		value: (s) => s.achievementPoints
+	},
+	{
+		key: 'falls',
+		title: "Gravity's Favorite",
+		note: 'deaths by falling',
+		field: 'counters',
+		value: (s) => s.counters?.falling_deaths ?? 0
+	},
+	{
+		key: 'food',
+		title: 'Bottomless Pit',
+		note: 'food eaten',
+		field: 'counters',
+		value: (s) => s.counters?.food ?? 0
+	},
+	{
+		key: 'drinks',
+		title: 'Functional Alcoholic',
+		note: 'drinks consumed',
+		field: 'counters',
+		value: (s) => s.counters?.drinks ?? 0
+	},
+	{
+		key: 'hearth',
+		title: 'Homesick Little Baby',
+		note: 'hearthstone uses',
+		field: 'counters',
+		value: (s) => s.counters?.hearthed ?? 0
+	},
+	{
+		key: 'need',
+		title: 'Greedy Bastard',
+		note: 'NEED rolls on loot',
+		field: 'counters',
+		value: (s) => s.counters?.need_rolls ?? 0
+	},
+	{
+		key: 'fish',
+		title: 'Fish Whisperer',
+		note: "fish caught. we don't ask.",
+		field: 'counters',
+		value: (s) => s.counters?.fish ?? 0
+	},
+	{
+		key: 'bandages',
+		title: 'Field Medic',
+		note: 'bandages slapped on',
+		field: 'counters',
+		value: (s) => s.counters?.bandages ?? 0
+	}
 ];
 
 /** Ali je lestvica dovoljena (K/D potrebuje oboje). */
 export const boardAllowed = (b: Board, fields: string[]) =>
-	b.field === 'kd' ? fields.includes('kills') && fields.includes('deaths') : fields.includes(b.field);
+	b.field === 'kd'
+		? fields.includes('kills') && fields.includes('deaths')
+		: fields.includes(b.field);
 
-export function leaderboardEmbed(key: string, list: BotSummary[], fields: string[], site?: string): Embed | null {
+export function leaderboardEmbed(
+	key: string,
+	list: BotSummary[],
+	fields: string[],
+	site?: string
+): Embed | null {
 	const b = BOARDS.find((x) => x.key === key);
 	if (!b || !boardAllowed(b, fields)) return null;
 	const medals = ['🥇', '🥈', '🥉'];
@@ -206,7 +364,10 @@ export function leaderboardEmbed(key: string, list: BotSummary[], fields: string
 		.filter((r) => r.v > 0)
 		.sort((a, b2) => b2.v - a.v)
 		.slice(0, 10)
-		.map((r, i) => `${medals[i] ?? `\`${i + 1}.\``} ${site ? `[${fullName(r.s)}](${site}/c/${r.s.slug})` : fullName(r.s)} — **${fmt(r.v, b.digits ?? 0)}**`);
+		.map(
+			(r, i) =>
+				`${medals[i] ?? `\`${i + 1}.\``} ${site ? `[${fullName(r.s)}](${site}/c/${r.s.slug})` : fullName(r.s)} — **${fmt(r.v, b.digits ?? 0)}**`
+		);
 	return {
 		title: b.title,
 		description: `*${b.note}*\n\n${rows.join('\n') || 'Nobody qualifies. Pathetic.'}`,
@@ -222,7 +383,29 @@ export const COMMANDS = [
 		name: 'hero',
 		description: "One hero's gear, stats and shame",
 		type: 1,
-		options: [{ type: 3, name: 'name', description: 'Hero name (start typing)', required: true, autocomplete: true }]
+		options: [
+			{
+				type: 3,
+				name: 'name',
+				description: 'Hero name (start typing)',
+				required: true,
+				autocomplete: true
+			}
+		]
+	},
+	{
+		name: 'parses',
+		description: "One hero's Company Parses this season, boss by boss",
+		type: 1,
+		options: [
+			{
+				type: 3,
+				name: 'name',
+				description: 'Hero name (start typing)',
+				required: true,
+				autocomplete: true
+			}
+		]
 	},
 	{
 		name: 'leaderboard',

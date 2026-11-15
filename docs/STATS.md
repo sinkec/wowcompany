@@ -341,7 +341,11 @@ Izdaje: S0 brez izdaje · S2+S3 → **Companion v0.2.0** (z addonom 0.5) · S4+S
   klik na igralca odpre razčlenitev.
 - ✅ **W5** `/rankings` (povezava v glavi): po dungeonu in bossu top 10 DPS/HPS (en vnos na junaka) + *Speed demons* (najhitrejši
   cleari v sezoni). Pozor: Convex ne dovoli ne-ASCII ključev v objektih (cirilični slugi) → vračamo sezname, ne `Record<slug,…>`.
-- ⏳ Naprej: W9 Discord, S2 addon 0.5, izdaja Companion v0.1.7 (shema 4 + rolli + omejitve). Na prod enkrat:
+- ✅ **W9 Discord:** objava runa 5 min po prvem uploadu (`discord.postRun`, enkrat – `runs.discordPostedAt`): bossi/čas,
+  party z DPS/HPS in povprečnim Company Parse (barvni emoji), *Parse of the run*, nagrade, smrti, kocke; ukaz **`/parses <junak>`**
+  (po dungeonu best % po bossih). Vidnost kot vedno v Discordu: polja `runs`/`runDetails`/`runDeaths`/`runLoot` v Office →
+  Visibility (Discord stolpec, privzeto izklopljena!). Po deployu: **Register commands** v Portal Room (nov ukaz).
+- ⏳ Naprej: S2 addon 0.5, izdaja Companion v0.1.7 (shema 4 + rolli + omejitve). Na prod enkrat:
   `bunx convex run --prod seasons:checkPatch` in `bunx convex run --prod companion:backfillParses '{}'` (iz `web/`).
 
 ## 10. Odločitve za uporabnika

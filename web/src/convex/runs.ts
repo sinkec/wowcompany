@@ -6,7 +6,8 @@ import { query, type QueryCtx } from './_generated/server.js';
 import { canSeePrivate } from './lib/access.js';
 import { recordKind } from './lib/companionSchema.js';
 import { runDetail, runListItem, type DetailsLike, type RunDocLike } from './lib/runsView.js';
-import { heroLogs as buildHeroLogs, poolKey, rankings as buildRankings } from './lib/parses.js';
+import { rankings as buildRankings } from './lib/parses.js';
+import { loadHeroLogs } from './lib/parsesDb.js';
 import { getSettings } from './lib/settings.js';
 import { listSeasons } from './seasons.js';
 
@@ -126,37 +127,7 @@ export const heroLogs = query({
 	handler: async (ctx, { slug, season }) => {
 		const { allowed } = await visibility(ctx);
 		if (!allowed('runs') || !allowed('runDetails')) return { locked: true as const };
-		const seasons = await listSeasons(ctx);
-		const chosen = season ?? seasons[0].number;
-		const mine = await ctx.db
-			.query('parses')
-			.withIndex('by_slug_and_season', (q) => q.eq('slug', slug).eq('season', chosen))
-			.take(500);
-		const pools = new Map<string, { slug: string; value: number }[]>();
-		for (const r of mine) {
-			const k = poolKey(r);
-			if (pools.has(k)) continue;
-			const rows = await ctx.db
-				.query('parses')
-				.withIndex('by_encounterId_and_difficultyId_and_role_and_season', (q) =>
-					q
-						.eq('encounterId', r.encounterId)
-						.eq('difficultyId', r.difficultyId)
-						.eq('role', r.role)
-						.eq('season', chosen)
-				)
-				.take(1000);
-			pools.set(
-				k,
-				rows.map((x) => ({ slug: x.slug, value: x.role === 'heal' ? x.hps : x.dps }))
-			);
-		}
-		const logs = buildHeroLogs(
-			slug,
-			mine.map((r) => ({ ...r, runId: r.runId as string })),
-			pools
-		);
-		return { locked: false as const, seasons, season: chosen, ...logs };
+		return { locked: false as const, ...(await loadHeroLogs(ctx, slug, season)) };
 	}
 });
 

@@ -6,6 +6,8 @@ import { action, internalAction, internalMutation, internalQuery } from './_gene
 import { authComponent } from './auth.js';
 import { isNewsworthy } from './lib/humor.js';
 import { SAMPLE_PAYLOAD, filterPayload, sessionEmbed, type Payload } from './lib/discordEmbed.js';
+import { runEmbed, type RunPost } from './lib/discordRuns.js';
+import { runStandings } from './lib/parsesDb.js';
 import { getSettings } from './lib/settings.js';
 import type { DiscordConfig } from './lib/discordConfig.js';
 
@@ -27,7 +29,13 @@ export const unposted = internalQuery({
 		const out = [];
 		for (const e of events) {
 			const p = await ctx.db.get(e.playerId);
-			out.push({ id: e._id, at: e.at, type: e.type, slug: p?.slug ?? null, payload: e.payload as Payload });
+			out.push({
+				id: e._id,
+				at: e.at,
+				type: e.type,
+				slug: p?.slug ?? null,
+				payload: e.payload as Payload
+			});
 		}
 		return out;
 	}
@@ -41,7 +49,10 @@ export const markPosted = internalMutation({
 	}
 });
 
-async function sendWebhook(url: string | null, body: object): Promise<{ ok: boolean; retryAfter?: number; error?: string }> {
+async function sendWebhook(
+	url: string | null,
+	body: object
+): Promise<{ ok: boolean; retryAfter?: number; error?: string }> {
 	if (!url) return { ok: false, error: 'No webhook configured. Set one in Office → Portal Room.' };
 	const res = await fetch(`${url}?wait=true`, {
 		method: 'POST',
@@ -62,7 +73,13 @@ export const postPending = internalAction({
 	handler: async (ctx): Promise<{ posted: number; skipped: number }> => {
 		const cfg: DiscordConfig = await ctx.runQuery(internal.integrations.config, {});
 		if (!cfg.webhookUrl) return { posted: 0, skipped: 0 };
-		type Raw = { id: Id<'events'>; at: number; type: string; slug: string | null; payload: Payload };
+		type Raw = {
+			id: Id<'events'>;
+			at: number;
+			type: string;
+			slug: string | null;
+			payload: Payload;
+		};
 		const raw: Raw[] = await ctx.runQuery(internal.discord.unposted, {});
 		if (!raw.length) return { posted: 0, skipped: 0 };
 		const fields: string[] = await ctx.runQuery(internal.discord.discordFields, {});
@@ -74,7 +91,13 @@ export const postPending = internalAction({
 		const skip: Id<'events'>[] = [];
 		const send: typeof events = [];
 		for (const e of events) {
-			if (!sessionsOn || e.type !== 'session' || now - e.at > MAX_AGE_MS || !isNewsworthy(e.payload)) skip.push(e.id);
+			if (
+				!sessionsOn ||
+				e.type !== 'session' ||
+				now - e.at > MAX_AGE_MS ||
+				!isNewsworthy(e.payload)
+			)
+				skip.push(e.id);
 			else send.push(e);
 		}
 		if (skip.length) await ctx.runMutation(internal.discord.markPosted, { ids: skip });
@@ -88,7 +111,11 @@ export const postPending = internalAction({
 				posted += batch.length;
 			} else if (r.retryAfter) {
 				// Discord rate limit: poskusi znova pozneje
-				await ctx.scheduler.runAfter(Math.ceil(r.retryAfter * 1000) + 500, internal.discord.postPending, {});
+				await ctx.scheduler.runAfter(
+					Math.ceil(r.retryAfter * 1000) + 500,
+					internal.discord.postPending,
+					{}
+				);
 				break;
 			} else {
 				console.error('Discord webhook:', r.error);
@@ -133,9 +160,15 @@ export const testPost = internalAction({
 	}
 });
 
-async function testPostImpl(fields: string[], url: string | null): Promise<{ ok: boolean; error?: string }> {
+async function testPostImpl(
+	fields: string[],
+	url: string | null
+): Promise<{ ok: boolean; error?: string }> {
 	if (!fields.includes('lastLogin'))
-		return { ok: false, error: 'Session posts are off. Flip the master switch in Visibility → Discord first.' };
+		return {
+			ok: false,
+			error: 'Session posts are off. Flip the master switch in Visibility → Discord first.'
+		};
 	const r = await sendWebhook(url, {
 		embeds: [
 			sessionEmbed({
@@ -145,7 +178,102 @@ async function testPostImpl(fields: string[], url: string | null): Promise<{ ok:
 				payload: filterPayload(SAMPLE_PAYLOAD, fields)
 			})
 		],
-		content: '🧪 Test post from WowCompany. If you can read this, the webhook works. Unlike your rotation.'
+		content:
+			'🧪 Test post from WowCompany. If you can read this, the webhook works. Unlike your rotation.'
 	});
-	return r.ok ? { ok: true } : { ok: false, error: r.error ?? 'rate limited, try again in a few seconds' };
+	return r.ok
+		? { ok: true }
+		: { ok: false, error: r.error ?? 'rate limited, try again in a few seconds' };
 }
+
+// ------------------------------------------------------------------ dungeon runs
+
+/** Podatki za objavo runa (null = ne obstaja ali že objavljen). */
+export const runPost = internalQuery({
+	args: { runId: v.id('runs') },
+	handler: async (ctx, { runId }) => {
+		const run = await ctx.db.get('runs', runId);
+		if (!run || run.discordPostedAt) return null;
+		const details = await ctx.db
+			.query('runDetails')
+			.withIndex('by_run', (q) => q.eq('runId', runId))
+			.unique();
+		// kocke: povprečje metov in zmage po junaku (samo party, iz rollov)
+		const dice = new Map<string, { sum: number; n: number; wins: number }>();
+		for (const r of details?.rolls ?? []) {
+			for (const e of r.entries) {
+				const d = dice.get(e.slug) ?? { sum: 0, n: 0, wins: 0 };
+				if (e.roll !== null) {
+					d.sum += e.roll;
+					d.n += 1;
+				}
+				if (r.winner === e.slug) d.wins += 1;
+				dice.set(e.slug, d);
+			}
+		}
+		const post: RunPost = {
+			id: run._id,
+			zone: run.zone.name,
+			durationMs: run.durationMs,
+			result: run.result,
+			leader: run.leader ?? null,
+			party: run.party.map((p) => ({
+				slug: p.slug,
+				name: p.name,
+				damage: p.damage,
+				healing: p.healing,
+				deaths: p.deaths
+			})),
+			awards: run.awards,
+			standings: await runStandings(ctx, runId),
+			dice: [...dice.entries()]
+				.filter(([, d]) => d.n > 0)
+				.map(([slug, d]) => ({ slug, avg: Math.round(d.sum / d.n), wins: d.wins }))
+		};
+		return { post, startedAt: run.startedAt, fields: (await getSettings(ctx)).discordFields };
+	}
+});
+
+export const markRunPosted = internalMutation({
+	args: { runId: v.id('runs') },
+	handler: async (ctx, { runId }) => {
+		if (await ctx.db.get('runs', runId))
+			await ctx.db.patch('runs', runId, { discordPostedAt: Date.now() });
+	}
+});
+
+/**
+ * Objava runa v Discord (načrtuje ingestRun 5 min po prvem uploadu, da ujame drugega snemalca in
+ * dopolnitev iz addona). Samo, če je polje `runs` za Discord vklopljeno in run ni star.
+ */
+export const postRun = internalAction({
+	args: { runId: v.id('runs') },
+	handler: async (ctx, { runId }): Promise<string> => {
+		const cfg: DiscordConfig = await ctx.runQuery(internal.integrations.config, {});
+		if (!cfg.webhookUrl) return 'no webhook';
+		const data: { post: RunPost; startedAt: number; fields: string[] } | null = await ctx.runQuery(
+			internal.discord.runPost,
+			{ runId }
+		);
+		if (!data) return 'gone or posted';
+		if (Date.now() - data.startedAt > 24 * 3600 * 1000) return 'too old';
+		const embed = runEmbed(data.post, data.fields, process.env.SITE_URL);
+		if (!embed) {
+			await ctx.runMutation(internal.discord.markRunPosted, { runId });
+			return 'runs hidden in Discord';
+		}
+		const r = await sendWebhook(cfg.webhookUrl, { embeds: [embed] });
+		if (r.ok) {
+			await ctx.runMutation(internal.discord.markRunPosted, { runId });
+			return 'posted';
+		}
+		if (r.retryAfter) {
+			await ctx.scheduler.runAfter(Math.ceil(r.retryAfter * 1000) + 500, internal.discord.postRun, {
+				runId
+			});
+			return 'rate limited';
+		}
+		console.error('Discord webhook (run):', r.error);
+		return r.error ?? 'failed';
+	}
+});
