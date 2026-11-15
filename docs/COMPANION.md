@@ -504,6 +504,21 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 
 ---
 
+### 14a. Omejitve in brisanje logov (15. 11. 2026)
+
+| Kje | Omejitev | Zakaj |
+|---|---|---|
+| Companion `wowrun` | loot ≤ 2000, top 25 urokov (dmg/heal) na igralca, death recap 20 dogodkov, časovnica 10 s | WC 59 min s 5 igralci = 226 predmetov, 30 KB JSON |
+| Companion `RunSummary::fit_size` | JSON ≤ 800 KB (Convex dokument ≤ 1 MiB): najprej grobejša časovnica (vsote ostanejo), nato recap 10, top 10 urokov, sivi loot | run se nikoli ne zavrne zaradi velikosti |
+| Strežnik `checkRun` | loot ≤ 2000, igralci ≤ 10, trajanje ≤ 6 h, starost ≤ 30 dni, telo ≤ 2 MB | |
+| Addon | loot vrstic ≤ 1000, runov ≤ 30 | SavedVariables ostanejo majhne |
+
+**Brisanje logov** (nastavitev *Delete logs…*, privzeto vklopljeno): minuto po zaprtju igre (in ob izhodu iz aplikacije),
+ko je log prebran do konca, **ni runa v snemanju in je vsak shranjen run na portalu** (`logs_still_needed`). Dokler kateri
+run čaka na upload (ali je padel), logi ostanejo in UI pove zakaj. Brez povezave ali z izklopljenim uploadom je kopija run v
+aplikaciji (SQLite), zato se logi brišejo. Gumb *Delete logs now* briše takoj (samo aktivne datoteke ostanejo).
+Na portal gre **analiza** (~30 KB na uro), ne surov log (~14 MB na uro, imena tujih igralcev) – surov log ostane samo na PC-ju.
+
 ## 15. Pravila za nadaljevanje (za Claude)
 - Odgovori uporabniku v **slovenščini**; vse besedilo aplikacije in portala v **angleščini**, WoW ton, umazan/črn humor.
 - Pred uporabo knjižnice preveri trenutno uradno dokumentacijo/verzijo; Convex koda po `src/convex/_generated/ai/guidelines.md`.

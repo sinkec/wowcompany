@@ -25,6 +25,8 @@ export type CleanupReport = {
 	kept: [string, string][];
 	freedBytes: number;
 	at: number;
+	/** why the automatic cleanup is waiting (runs not uploaded yet …) */
+	waiting?: string;
 };
 
 export type PendingLink = { code: string; linkUrl: string; expiresAt: number };

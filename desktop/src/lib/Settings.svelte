@@ -135,12 +135,13 @@
 				onchange={() => save({ ...status.settings, deleteLogsOnExit: draft.deleteLogsOnExit })}
 				class="size-4 accent-[var(--primary)]"
 			/>
-			Delete combat and chat logs when the app quits
+			Delete combat and chat logs once WoW is closed and every run is on the portal
 		</label>
 		<p class="text-xs text-muted-foreground">
-			Only <code>WoWCombatLog*.txt</code> and <code>WoWChatLog*.txt</code>. A file is kept if a run
-			is still being recorded from it, or if WoW wrote to it in the last 2 minutes (still logging).
-			Finished runs are already saved in the app, so nothing is lost.
+			Only <code>WoWCombatLog*.txt</code> and <code>WoWChatLog*.txt</code>, a minute after you close
+			WoW (and when the app quits). Logs stay while a run is being recorded or a run has not reached
+			the portal yet – the log is the only copy until then. Not linked or uploads off: the run saved
+			in the app is the copy, so the logs go.
 		</p>
 		<div class="flex flex-wrap items-center gap-3">
 			<button
@@ -160,6 +161,11 @@
 				</span>
 			{/if}
 		</div>
+		{#if status.watch.lastCleanup?.waiting}
+			<p class="text-xs text-muted-foreground">
+				Logs kept for now: {status.watch.lastCleanup.waiting}. They go once that is done.
+			</p>
+		{/if}
 		{#if status.watch.lastCleanup?.kept.length}
 			<ul class="text-xs text-muted-foreground">
 				{#each status.watch.lastCleanup.kept as [file, why] (file)}

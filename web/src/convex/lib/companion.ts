@@ -12,7 +12,7 @@ export const MAX_BODY_BYTES = 2 * 1024 * 1024;
 export const MAX_PLAYERS = 10;
 export const MAX_RUN_MS = 6 * 3_600_000;
 export const MAX_AGE_MS = 30 * 86_400_000;
-export const MAX_LOOT = 400;
+export const MAX_LOOT = 2000;
 /** Največ rekordov na igralca (ena vrsta = en rekord). */
 export const MAX_RECORDS = 5;
 

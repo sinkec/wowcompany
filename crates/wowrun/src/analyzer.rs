@@ -34,8 +34,8 @@ impl Default for Config {
             rejoin_grace_ms: 15 * 60_000,
             utc_offset_ms: 0,
             bucket_ms: 10_000,
-            recap_len: 10,
-            top_spells: 10,
+            recap_len: 20,
+            top_spells: 25,
             swing_dedupe_ms: 500,
             active_gap_ms: 3_500,
         }
@@ -183,8 +183,9 @@ pub struct RunAcc {
     loot: Vec<LootDrop>,
 }
 
-/// Max loot entries kept per run (document size guard).
-const MAX_LOOT: usize = 400;
+/// Max loot entries kept per run (the server accepts the same; a full party in a 1 h dungeon
+/// loots ~250 items, so this covers very long runs). Size is guarded by `RunSummary::fit_size`.
+pub const MAX_LOOT: usize = 2000;
 
 /// Chat name → comparable key: `Mendy-Bandage-PvP-EU` / `Mendy Bandage` → `mendy bandage`.
 fn name_key(name: &str) -> String {

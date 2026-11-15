@@ -21,6 +21,9 @@ pub struct CleanupReport {
     pub freed_bytes: u64,
     /// Wall-clock ms when it ran.
     pub at: i64,
+    /// Set when the automatic cleanup did not run: why the logs are still needed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub waiting: Option<String>,
 }
 
 /// Is the game running right now? `None` = could not tell (treated as "maybe").

@@ -36,6 +36,10 @@ fn load_personal(path: &Path) -> Personal {
 
 /// Logs older than this are not replayed at start-up.
 const MAX_LOG_AGE_AT_START: Duration = Duration::from_secs(12 * 3600);
+/// How often to look whether WoW is running (on Windows this starts a process).
+const GAME_CHECK: Duration = Duration::from_secs(30);
+/// Automatic log cleanup this long after the game was closed (see the watcher).
+const CLEANUP_AFTER_CLOSE: Duration = Duration::from_secs(60);
 
 pub fn wall_ms() -> i64 {
     SystemTime::now()
@@ -439,6 +443,8 @@ impl Core {
             let a = self.addon.lock().expect("addon lock");
             for r in runs.iter_mut() {
                 addon::apply(&a.export, r);
+                // a very long run must still fit in one server document
+                r.fit_size(wowrun::summary::MAX_RUN_BYTES);
             }
         }
         let q = self.queue.lock().expect("queue lock");
@@ -491,6 +497,10 @@ impl Core {
         let mut last_scan = None;
         let mut last_tick = Instant::now();
         let mut last_addon_sync: Option<Instant> = None;
+        let mut last_game_check: Option<Instant> = None;
+        let mut game_was_running: Option<bool> = None;
+        // the game was closed at this moment and its logs have not been cleaned up yet
+        let mut closed_at: Option<Instant> = None;
         loop {
             while let Ok(cmd) = rx.try_recv() {
                 match cmd {
@@ -600,6 +610,37 @@ impl Core {
                 let dir = self.watch.lock().expect("watch lock").logs_dir.clone();
                 if let Some(dir) = dir {
                     self.sync_addon(Path::new(&dir));
+                }
+            }
+
+            // Logs go once WoW is closed and every run from them is on the portal (not before:
+            // the raw log is the only copy until the upload went through).
+            if last_game_check.is_none_or(|t| t.elapsed() >= GAME_CHECK) {
+                last_game_check = Some(Instant::now());
+                let running = crate::cleanup::game_running();
+                if game_was_running == Some(true) && running == Some(false) {
+                    closed_at = Some(Instant::now());
+                }
+                if running == Some(true) {
+                    closed_at = None;
+                }
+                if running.is_some() {
+                    game_was_running = running;
+                }
+                // wait a bit: the addon's SavedVariables are written on logout and may still
+                // update a stored run (leader, loot quality), which then uploads again
+                if let Some(at) = closed_at
+                    && at.elapsed() >= CLEANUP_AFTER_CLOSE
+                    && !more
+                    && self.settings().delete_logs_on_exit
+                {
+                    match self.logs_still_needed() {
+                        Some(why) => self.note_cleanup_waiting(why),
+                        None => {
+                            let _ = self.cleanup_logs();
+                            closed_at = None;
+                        }
+                    }
                 }
             }
 
@@ -839,6 +880,33 @@ impl Core {
         Ok(report)
     }
 
+    /// Why the logs may not be deleted automatically yet, or `None` when everything they
+    /// contain is safe: no run is being recorded and every stored run is on the portal
+    /// (when uploads are off or the app is not linked, the run stored in the app is all there is).
+    fn logs_still_needed(&self) -> Option<String> {
+        if self.watch.lock().expect("watch lock").run_in_progress {
+            return Some("a run is still being recorded".into());
+        }
+        let uploading = self.settings().uploads_enabled && self.auth.lock().expect("auth lock").linked;
+        if uploading {
+            let c = self.counts();
+            let waiting = c.pending + c.failed;
+            if waiting > 0 {
+                return Some(format!("{waiting} run(s) not on the portal yet"));
+            }
+        }
+        None
+    }
+
+    fn note_cleanup_waiting(&self, why: String) {
+        let mut w = self.watch.lock().expect("watch lock");
+        let mut report = w.last_cleanup.clone().unwrap_or_default();
+        if report.waiting.as_deref() != Some(why.as_str()) {
+            report.waiting = Some(why);
+            w.last_cleanup = Some(report);
+        }
+    }
+
     /// Called when the app quits (tray → Quit, OS shutdown).
     pub fn on_exit(&self) {
         // personal records survive the logs
@@ -847,13 +915,16 @@ impl Core {
             return;
         }
         // The game is closed: whatever run was still open is over. Store it first (it uploads on
-        // the next start), so its log file is no longer needed and can be deleted with the rest.
+        // the next start); until it is on the portal its log stays and goes in a later cleanup.
         if crate::cleanup::game_running() == Some(false) {
             let (tx, rx) = mpsc::channel();
             self.send(Cmd::Finish(tx));
             let _ = rx.recv_timeout(Duration::from_secs(3));
         }
-        let _ = self.cleanup_logs();
+        // a run that has not reached the portal keeps its log; the next cleanup gets it
+        if self.logs_still_needed().is_none() {
+            let _ = self.cleanup_logs();
+        }
     }
 
     pub fn candidates(&self) -> Vec<Candidate> {
@@ -1025,5 +1096,42 @@ mod tests {
         let q = core.queue.lock().unwrap();
         let json = q.get_json("feedfacefeedface").unwrap().unwrap();
         assert!(json.contains("\"leader\":\"Fizzle Boom\""));
+    }
+
+    #[test]
+    fn logs_stay_until_every_run_is_on_the_portal() {
+        let t = crate::testutil::TempDir::new("logs-needed");
+        let core = Core::open(&t.path().join("cfg"), &t.path().join("data")).unwrap();
+        let mut p = Pipeline::new(2, 0);
+        let mut personal = Personal::new(0);
+        let mut runs = Vec::new();
+        for l in fixture().lines() {
+            runs.extend(p.feed(l, &mut personal));
+        }
+        runs.extend(p.finish());
+        let run = runs.remove(0);
+        core.store_runs(vec![run.clone()]);
+        core.auth.lock().unwrap().linked = true;
+
+        // linked + uploading: a pending run keeps the logs
+        assert!(core.logs_still_needed().unwrap().contains("not on the portal"));
+        // uploaded → the logs may go
+        core.queue
+            .lock()
+            .unwrap()
+            .mark_uploaded(&run.run_key, "https://x/runs/1", wall_ms())
+            .unwrap();
+        assert_eq!(core.logs_still_needed(), None);
+        // a run being recorded always keeps them
+        core.watch.lock().unwrap().run_in_progress = true;
+        assert!(core.logs_still_needed().is_some());
+        core.watch.lock().unwrap().run_in_progress = false;
+        // not linked: nothing will ever upload, the run stored in the app is the copy
+        let mut other = run.clone();
+        other.run_key = "fedcba9876543210".into();
+        core.store_runs(vec![other]);
+        assert!(core.logs_still_needed().is_some());
+        core.auth.lock().unwrap().linked = false;
+        assert_eq!(core.logs_still_needed(), None);
     }
 }

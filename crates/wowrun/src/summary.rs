@@ -247,3 +247,132 @@ pub struct PlayerTimeline {
     pub healing: Vec<i64>,
     pub taken: Vec<i64>,
 }
+
+/// Largest run JSON we send: Convex stores the analysis in one document (limit 1 MiB).
+pub const MAX_RUN_BYTES: usize = 800 * 1024;
+
+impl RunSummary {
+    fn json_len(&self) -> usize {
+        serde_json::to_vec(self).map_or(0, |v| v.len())
+    }
+
+    /// Shrinks the run until its JSON fits in `max_bytes`, giving up the least useful detail
+    /// first: a coarser timeline, then shorter death recaps, then fewer spells per player, then
+    /// grey (poor) loot. Nothing is dropped from a run that already fits. Returns whether it changed.
+    pub fn fit_size(&mut self, max_bytes: usize) -> bool {
+        let mut changed = false;
+        while self.json_len() > max_bytes && self.timeline.bucket_ms < 10 * 60_000 && !self.timeline.players.is_empty()
+        {
+            self.timeline.coarsen();
+            changed = true;
+        }
+        if self.json_len() > max_bytes {
+            for d in &mut self.deaths {
+                let extra = d.recap.len().saturating_sub(10);
+                d.recap.drain(..extra);
+            }
+            changed = true;
+        }
+        if self.json_len() > max_bytes {
+            for p in &mut self.players {
+                p.top_damage.truncate(10);
+                p.top_healing.truncate(10);
+            }
+        }
+        if self.json_len() > max_bytes {
+            self.loot.retain(|l| l.quality != Some(0));
+        }
+        changed
+    }
+}
+
+impl Timeline {
+    /// Doubles the bucket size (pairs of buckets are added together).
+    pub fn coarsen(&mut self) {
+        let pairs = |v: &[i64]| v.chunks(2).map(|c| c.iter().sum()).collect::<Vec<i64>>();
+        self.bucket_ms *= 2;
+        for p in &mut self.players {
+            p.damage = pairs(&p.damage);
+            p.healing = pairs(&p.healing);
+            p.taken = pairs(&p.taken);
+        }
+    }
+}
+
+#[cfg(test)]
+mod size_tests {
+    use super::*;
+
+    fn big_run() -> RunSummary {
+        let n = 6 * 360; // 6 h of 10 s buckets
+        RunSummary {
+            schema: SCHEMA_VERSION,
+            run_key: "0123456789abcdef".into(),
+            zone: Zone {
+                instance_id: 230,
+                name: "Blackrock Depths".into(),
+                difficulty_id: 1,
+                instance_uid: Some(1),
+            },
+            started_at: 0,
+            ended_at: 6 * 3_600_000,
+            duration_ms: 6 * 3_600_000,
+            end_reason: EndReason::LeftInstance,
+            result: RunResult {
+                bosses_killed: 1,
+                bosses_total: None,
+                wipes: 0,
+                cleared: false,
+            },
+            recorder: None,
+            players: vec![],
+            segments: vec![],
+            deaths: vec![],
+            timeline: Timeline {
+                bucket_ms: 10_000,
+                players: (0..5)
+                    .map(|i| PlayerTimeline {
+                        slug: format!("hero-{i}"),
+                        damage: vec![123_456; n],
+                        healing: vec![65_432; n],
+                        taken: vec![98_765; n],
+                    })
+                    .collect(),
+            },
+            loot: (0..2000)
+                .map(|i| LootDrop {
+                    slug: Some("hero-0".into()),
+                    looter: "Hero Zero".into(),
+                    item: format!("Some Rather Long Item Name of the Whale {i}"),
+                    item_id: Some(i),
+                    quality: Some((i % 3) as u8),
+                    count: 1,
+                    at_ms: i as i64 * 1000,
+                })
+                .collect(),
+            leader: None,
+        }
+    }
+
+    #[test]
+    fn small_run_is_left_alone() {
+        let mut r = big_run();
+        let before = r.clone();
+        assert!(!r.fit_size(usize::MAX));
+        assert_eq!(r, before);
+    }
+
+    #[test]
+    fn big_run_shrinks_timeline_first_and_keeps_totals() {
+        let mut r = big_run();
+        let total: i64 = r.timeline.players[0].damage.iter().sum();
+        let green = r.loot.iter().filter(|l| l.quality == Some(2)).count();
+        assert!(r.fit_size(200 * 1024));
+        assert!(r.json_len() <= 200 * 1024, "{}", r.json_len());
+        assert!(r.timeline.bucket_ms > 10_000);
+        assert_eq!(r.timeline.players[0].damage.iter().sum::<i64>(), total);
+        // only grey loot may go, never the good stuff
+        assert!(r.loot.iter().all(|l| l.quality != Some(0)));
+        assert_eq!(r.loot.iter().filter(|l| l.quality == Some(2)).count(), green);
+    }
+}
