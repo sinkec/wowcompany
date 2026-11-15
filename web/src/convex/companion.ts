@@ -2,7 +2,7 @@
 // HTTP vstopne točke so v companionHttp.ts; tu so mutacije/poizvedbe.
 import { HOUR, MINUTE, RateLimiter } from '@convex-dev/rate-limiter';
 import { ConvexError, v } from 'convex/values';
-import { components } from './_generated/api.js';
+import { components, internal } from './_generated/api.js';
 import type { Id } from './_generated/dataModel.js';
 import {
 	internalMutation,
@@ -569,6 +569,33 @@ export const deleteRun = internalMutation({
 		}
 		if (await ctx.db.get('runs', runId)) await ctx.db.delete('runs', runId);
 		return null;
+	}
+});
+
+/**
+ * Enkratno/CLI: parse za že naložene rune (pred Company Parses). Po straneh, da ostane v mejah
+ * ene transakcije: `bunx convex run [--prod] companion:backfillParses '{}'` (nadaljuje sama).
+ */
+export const backfillParses = internalMutation({
+	args: { cursor: v.optional(v.union(v.string(), v.null())) },
+	handler: async (ctx, { cursor }) => {
+		const page = await ctx.db.query('runs').paginate({ numItems: 20, cursor: cursor ?? null });
+		let written = 0;
+		for (const run of page.page) {
+			const details = await ctx.db
+				.query('runDetails')
+				.withIndex('by_run', (q) => q.eq('runId', run._id))
+				.unique();
+			if (!details) continue;
+			const s = { ...run, segments: details.segments } as unknown as RunSummary;
+			await writeParses(ctx, run._id, s, run.party);
+			written += 1;
+		}
+		if (!page.isDone)
+			await ctx.scheduler.runAfter(0, internal.companion.backfillParses, {
+				cursor: page.continueCursor
+			});
+		return { runs: written, done: page.isDone };
 	}
 });
 
