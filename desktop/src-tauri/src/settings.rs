@@ -25,6 +25,9 @@ pub struct Settings {
     pub device_name: String,
     /// Delete WoWCombatLog/WoWChatLog files when the app quits (active files are kept).
     pub delete_logs_on_exit: bool,
+    /// Automatic cleanup keeps logs younger than this many days (0 = delete as soon as the runs are
+    /// on the portal). For people who upload logs elsewhere too, or want them for later.
+    pub keep_logs_days: u32,
 }
 
 impl Default for Settings {
@@ -36,6 +39,7 @@ impl Default for Settings {
             min_players: 2,
             device_name: default_device_name(),
             delete_logs_on_exit: true,
+            keep_logs_days: 0,
         }
     }
 }

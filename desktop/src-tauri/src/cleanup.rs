@@ -108,7 +108,13 @@ pub fn cleanup_logs(dir: &Path, protect: &[PathBuf], recent: Duration, now: Syst
             .and_then(|m| now.duration_since(m).ok())
             .is_some_and(|age| age < recent);
         if fresh {
-            report.kept.push((name, "the game is still writing to it".into()));
+            // more than a few minutes = the "keep logs for N days" setting, not a game still writing
+            let why = if recent > Duration::from_secs(600) {
+                "younger than the keep-logs setting"
+            } else {
+                "the game is still writing to it"
+            };
+            report.kept.push((name, why.into()));
             continue;
         }
         match fs::remove_file(&path) {
@@ -202,6 +208,19 @@ mod tests {
         let closed = cleanup_logs(d, &[], Duration::ZERO, SystemTime::now());
         assert_eq!(closed.deleted.len(), 2);
         assert!(closed.kept.is_empty());
+    }
+
+    #[test]
+    fn keep_logs_setting_keeps_young_files_and_says_why() {
+        let t = TempDir::new("cleanup-keep");
+        let d = t.path();
+        fs::write(d.join("WoWCombatLog-111426_200000.txt"), "yesterday's run").unwrap();
+        let r = cleanup_logs(d, &[], Duration::from_secs(7 * 86_400), SystemTime::now());
+        assert!(r.deleted.is_empty());
+        assert_eq!(r.kept[0].1, "younger than the keep-logs setting");
+        // a week later it goes
+        let later = SystemTime::now() + Duration::from_secs(8 * 86_400);
+        assert_eq!(cleanup_logs(d, &[], Duration::from_secs(7 * 86_400), later).deleted.len(), 1);
     }
 
     #[test]

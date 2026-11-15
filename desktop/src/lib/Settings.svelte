@@ -143,6 +143,25 @@
 			the portal yet – the log is the only copy until then. Not linked or uploads off: the run saved
 			in the app is the copy, so the logs go.
 		</p>
+		<label class="flex flex-wrap items-center gap-2 text-sm">
+			Keep logs for
+			<input
+				type="number"
+				min="0"
+				max="365"
+				bind:value={draft.keepLogsDays}
+				onchange={() =>
+					save({
+						...status.settings,
+						keepLogsDays: Math.max(0, Math.min(365, Math.round(Number(draft.keepLogsDays) || 0)))
+					})}
+				class="w-16 rounded-md border border-border bg-background/60 px-2 py-1 text-right tabular-nums"
+			/>
+			days
+			<span class="text-xs text-muted-foreground"
+				>(0 = as soon as the runs are on the portal; more if you also upload logs elsewhere)</span
+			>
+		</label>
 		<div class="flex flex-wrap items-center gap-3">
 			<button
 				class="btn btn-outline"

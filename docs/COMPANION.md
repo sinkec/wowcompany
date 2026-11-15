@@ -516,7 +516,7 @@ Ko je točka potrjena, jo odkljukaj in popravi kodo/razdelek 3.
 **Brisanje logov** (nastavitev *Delete logs…*, privzeto vklopljeno): minuto po zaprtju igre (in ob izhodu iz aplikacije),
 ko je log prebran do konca, **ni runa v snemanju in je vsak shranjen run na portalu** (`logs_still_needed`). Dokler kateri
 run čaka na upload (ali je padel), logi ostanejo in UI pove zakaj. Brez povezave ali z izklopljenim uploadom je kopija run v
-aplikaciji (SQLite), zato se logi brišejo. Gumb *Delete logs now* briše takoj (samo aktivne datoteke ostanejo).
+aplikaciji (SQLite), zato se logi brišejo. Gumb *Delete logs now* briše takoj (samo aktivne datoteke ostanejo). Nastavitev **Keep logs for N days** (privzeto 0): samodejno brisanje ohrani loge, mlajše od N dni (razlog v UI: *younger than the keep-logs setting*); gumb jo ignorira.
 Na portal gre **analiza** (~30 KB na uro), ne surov log (~14 MB na uro, imena tujih igralcev) – surov log ostane samo na PC-ju.
 
 ## 15. Pravila za nadaljevanje (za Claude)

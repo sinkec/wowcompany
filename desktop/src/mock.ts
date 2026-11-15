@@ -16,7 +16,8 @@ const status: Status = {
 		uploadsEnabled: true,
 		minPlayers: 2,
 		deviceName: 'battlestation (Linux)',
-		deleteLogsOnExit: true
+		deleteLogsOnExit: true,
+		keepLogsDays: 0
 	},
 	auth: {
 		linked: q.get('linked') !== '0',

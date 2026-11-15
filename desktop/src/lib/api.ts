@@ -8,6 +8,8 @@ export type Settings = {
 	minPlayers: number;
 	deviceName: string;
 	deleteLogsOnExit: boolean;
+	/** automatic cleanup keeps logs younger than this (0 = delete once the runs are on the portal) */
+	keepLogsDays: number;
 };
 
 export type LootDrop = {

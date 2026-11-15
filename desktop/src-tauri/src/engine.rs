@@ -642,7 +642,7 @@ impl Core {
                     match self.logs_still_needed() {
                         Some(why) => self.note_cleanup_waiting(why),
                         None => {
-                            let _ = self.cleanup_logs();
+                            let _ = self.cleanup_logs_auto();
                             closed_at = None;
                         }
                     }
@@ -862,7 +862,18 @@ impl Core {
     }
 
     /// Deletes combat/chat logs in the Logs folder (see `cleanup` for what is kept).
+    /// "Delete logs now": everything that is not in use.
     pub fn cleanup_logs(&self) -> Result<crate::cleanup::CleanupReport, String> {
+        self.cleanup_logs_keeping(Duration::ZERO)
+    }
+
+    /// Automatic cleanup: also keeps logs younger than the "keep logs for N days" setting.
+    fn cleanup_logs_auto(&self) -> Result<crate::cleanup::CleanupReport, String> {
+        let days = u64::from(self.settings().keep_logs_days);
+        self.cleanup_logs_keeping(Duration::from_secs(days * 86_400))
+    }
+
+    fn cleanup_logs_keeping(&self, keep: Duration) -> Result<crate::cleanup::CleanupReport, String> {
         let (dir, protect) = {
             let w = self.watch.lock().expect("watch lock");
             let dir = w.logs_dir.clone().ok_or("No Logs folder yet.")?;
@@ -878,7 +889,8 @@ impl Core {
         let recent = match crate::cleanup::game_running() {
             Some(false) => Duration::ZERO,
             _ => Duration::from_secs(120),
-        };
+        }
+        .max(keep);
         let mut report = crate::cleanup::cleanup_logs(&dir, &protect, recent, SystemTime::now());
         report.at = wall_ms();
         self.watch.lock().expect("watch lock").last_cleanup = Some(report.clone());
@@ -928,7 +940,7 @@ impl Core {
         }
         // a run that has not reached the portal keeps its log; the next cleanup gets it
         if self.logs_still_needed().is_none() {
-            let _ = self.cleanup_logs();
+            let _ = self.cleanup_logs_auto();
         }
     }
 
