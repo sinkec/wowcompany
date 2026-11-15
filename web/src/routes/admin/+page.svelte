@@ -86,7 +86,9 @@
 		target === 'discordFields'
 			? [
 					'lastLogin',
-					...(ov.data?.fields ?? []).filter((f) => f !== 'lastLogin' && !RUN_FIELDS.includes(f))
+					...(ov.data?.fields ?? []).filter((f) => f !== 'lastLogin' && !RUN_FIELDS.includes(f)),
+					// dungeon runi (Companion): objava runa + /parses, neodvisno od objav sej
+					...RUN_FIELDS
 				]
 			: (ov.data?.fields ?? []);
 	const sessionsOn = $derived(ov.data?.settings.discordFields.includes('lastLogin') ?? false);
@@ -173,8 +175,13 @@
 	}
 
 	const DISCORD_LABELS: Record<string, string> = {
-		lastLogin: 'Post session summaries on logout (master switch)'
+		lastLogin: 'Post session summaries on logout (master switch)',
+		runs: 'Post dungeon runs (master switch for run posts)',
+		runDetails: 'Run numbers, Company Parses and /parses',
+		runDeaths: 'Deaths in run posts',
+		runLoot: 'Dice (need/greed) in run posts'
 	};
+	const runsOn = $derived(ov.data?.settings.discordFields.includes('runs') ?? false);
 	const VIS_COLUMNS: { target: Target; title: string; note: string }[] = [
 		{
 			target: 'publicFields',
@@ -393,14 +400,27 @@
 							<div class="mt-3">
 								{#each fieldsFor(col.target) as f, i (f)}
 									{@const on = ov.data?.settings[col.target].includes(f) ?? false}
-									{@const master = col.target === 'discordFields' && f === 'lastLogin'}
+									{@const master =
+										col.target === 'discordFields' && (f === 'lastLogin' || f === 'runs')}
+									{@const isRun = RUN_FIELDS.includes(f)}
+									{#if col.target === 'discordFields' && f === 'runs'}
+										<h3
+											class="mt-5 mb-2 text-xs font-semibold tracking-wide text-primary uppercase"
+										>
+											Dungeon runs (Companion)
+										</h3>
+										<p class="mb-2 text-xs text-muted-foreground">
+											A post 5 minutes after a run is uploaded, and the /parses command. Independent
+											of the session posts above.
+										</p>
+									{/if}
 									<label
 										class="flex items-center justify-between gap-3 py-2 text-sm {master
 											? 'mb-2 rounded-md border border-primary/50 bg-primary/10 px-3 font-semibold'
 											: 'border-b border-border/40 last:border-0'} {col.target ===
 											'discordFields' &&
 										!master &&
-										!sessionsOn
+										(isRun ? !runsOn : !sessionsOn)
 											? 'opacity-50'
 											: ''}"
 									>
@@ -408,7 +428,7 @@
 											{(col.target === 'discordFields' && DISCORD_LABELS[f]) ||
 												FIELD_LABELS[f] ||
 												f}
-											{#if col.target === 'discordFields' && !master && !POST_FIELDS.includes(f)}
+											{#if col.target === 'discordFields' && !master && !isRun && !POST_FIELDS.includes(f)}
 												<span
 													class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground"
 													>slash commands only</span
@@ -417,7 +437,12 @@
 										</span>
 										<Switch checked={on} onCheckedChange={(v) => toggleField(col.target, f, v)} />
 									</label>
-									{#if master && !sessionsOn}
+									{#if master && f === 'runs' && !runsOn}
+										<p class="-mt-1 mb-2 text-xs text-muted-foreground italic">
+											Off: no run posts, and /parses says the parses are classified.
+										</p>
+									{/if}
+									{#if master && f === 'lastLogin' && !sessionsOn}
 										<p class="-mt-1 mb-2 text-xs text-muted-foreground italic">
 											Master switch is off: nothing gets posted, no matter what's below.
 										</p>
