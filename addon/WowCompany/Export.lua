@@ -124,8 +124,8 @@ local function sync()
         local list = ns.db.runs
         local last = list[#list]
         if not last or last.startedAt ~= run.startedAt then
-            local instanceId = 0
-            if type(GetInstanceInfo) == "function" then
+            local instanceId = run.instanceId or 0
+            if instanceId == 0 and ns.Logging.InDungeon() and type(GetInstanceInfo) == "function" then
                 local ok, _, _, _, _, _, _, _, id = pcall(GetInstanceInfo)
                 id = ok and ns.plain(id) or nil
                 if type(id) == "number" then instanceId = id end

@@ -172,12 +172,17 @@ local function trackRun()
     local state = ns.db.state
     local now = ns.now()
     if ns.Logging.InDungeon() then
-        local ok, name = pcall(GetInstanceInfo)
+        local ok, name, _, _, _, _, _, _, id = pcall(GetInstanceInfo)
         name = ok and ns.plain(name) or nil
+        id = ok and ns.plain(id) or nil
         local run = state.run
         local stale = run and run.leftAt and (now - run.leftAt) > RUN_RESUME
         if not run or run.zone ~= name or stale then
-            state.run = { zone = name, startedAt = now, afterFight = lastFightId() }
+            -- the instance id is read here, inside the dungeon (later, outside, it is the continent's)
+            state.run = {
+                zone = name, instanceId = type(id) == "number" and id or nil,
+                startedAt = now, afterFight = lastFightId(),
+            }
         else
             run.leftAt = nil
         end
