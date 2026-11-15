@@ -271,3 +271,54 @@ export function rankings(
 				}))
 		}));
 }
+
+/**
+ * Company All-Stars po dungeonu: za vsakega bossa junak dobi `120 × njegov najboljši / najboljši v
+ * skupini` (skupina = boss + težavnost + DPS ali Healer tabla; tanki tekmujejo med DPS), vzame se
+ * boljša od obeh tabel; točke se seštejejo po dungeonu. Zaokroženo na 0,1.
+ */
+export function allStars(
+	rows: ParseRow[]
+): { zone: string; heroes: { slug: string; points: number; bosses: number }[] }[] {
+	// najboljši po (dungeon, boss, tabla, junak)
+	const best = new Map<string, number>();
+	for (const r of rows) {
+		const board = r.role === 'heal' ? 'heal' : 'dps';
+		const value = board === 'heal' ? r.hps : r.dps;
+		if (value <= 0) continue;
+		const k = `${r.zone}|${r.encounterId}:${r.difficultyId}|${board}|${r.slug}`;
+		best.set(k, Math.max(best.get(k) ?? 0, value));
+	}
+	const top = new Map<string, number>();
+	for (const [k, v] of best) {
+		const g = k.slice(0, k.lastIndexOf('|'));
+		top.set(g, Math.max(top.get(g) ?? 0, v));
+	}
+	// točke po (dungeon, boss, junak): boljša tabla
+	const perBoss = new Map<string, number>();
+	for (const [k, v] of best) {
+		const g = k.slice(0, k.lastIndexOf('|'));
+		const [zone, boss, , slug] = k.split('|');
+		const pts = (120 * v) / (top.get(g) ?? v);
+		const key = `${zone}|${boss}|${slug}`;
+		perBoss.set(key, Math.max(perBoss.get(key) ?? 0, pts));
+	}
+	const zones = new Map<string, Map<string, { points: number; bosses: number }>>();
+	for (const [k, pts] of perBoss) {
+		const [zone, , slug] = k.split('|');
+		const z = zones.get(zone) ?? new Map();
+		const h = z.get(slug) ?? { points: 0, bosses: 0 };
+		h.points += pts;
+		h.bosses += 1;
+		z.set(slug, h);
+		zones.set(zone, z);
+	}
+	return [...zones.entries()]
+		.sort((a, b) => a[0].localeCompare(b[0]))
+		.map(([zone, m]) => ({
+			zone,
+			heroes: [...m.entries()]
+				.map(([slug, h]) => ({ slug, points: Math.round(h.points * 10) / 10, bosses: h.bosses }))
+				.sort((a, b) => b.points - a.points)
+		}));
+}

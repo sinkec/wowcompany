@@ -6,7 +6,7 @@ import { query, type QueryCtx } from './_generated/server.js';
 import { canSeePrivate } from './lib/access.js';
 import { recordKind } from './lib/companionSchema.js';
 import { runDetail, runListItem, type DetailsLike, type RunDocLike } from './lib/runsView.js';
-import { rankings as buildRankings } from './lib/parses.js';
+import { allStars, rankings as buildRankings } from './lib/parses.js';
 import { loadHeroLogs } from './lib/parsesDb.js';
 import { getSettings } from './lib/settings.js';
 import { listSeasons } from './seasons.js';
@@ -164,6 +164,7 @@ export const rankings = query({
 			.withIndex('by_season', (q) => q.eq('season', chosen))
 			.take(3000);
 		const boards = buildRankings(rows.map((r) => ({ ...r, runId: r.runId as string })));
+		const stars = allStars(rows);
 
 		// najhitrejši cleari (ves dungeon), v časovnem oknu sezone
 		const recent = await ctx.db
@@ -205,6 +206,7 @@ export const rankings = query({
 			seasons,
 			season: chosen,
 			boards,
+			stars,
 			speed: [...fastest.entries()]
 				.map(([zone, list]) => ({
 					zone,

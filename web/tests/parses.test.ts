@@ -7,7 +7,8 @@ import {
 	poolKey,
 	roleOf,
 	standing,
-	rankings
+	rankings,
+	allStars
 } from '../src/convex/lib/parses.ts';
 import type { RunSummary } from '../src/convex/lib/companionSchema.ts';
 
@@ -179,5 +180,34 @@ describe('rankings', () => {
 			['b', 40, 'r1']
 		]);
 		expect(boss.heal.map((e) => [e.slug, e.value])).toEqual([['c', 80]]);
+	});
+});
+
+describe('all-stars', () => {
+	test('120 for the best on each boss, summed per dungeon, healers on their own board', () => {
+		const base = {
+			zone: 'Wailing Caverns',
+			difficultyId: 1,
+			taken: 0,
+			ilvl: null,
+			durationMs: 30_000,
+			at: 1,
+			encounter: 'x'
+		};
+		const rows = [
+			{ ...base, slug: 'a', encounterId: 1, role: 'dps' as const, dps: 50, hps: 0 },
+			{ ...base, slug: 'b', encounterId: 1, role: 'dps' as const, dps: 25, hps: 0 },
+			{ ...base, slug: 'a', encounterId: 2, role: 'dps' as const, dps: 10, hps: 0 },
+			{ ...base, slug: 'b', encounterId: 2, role: 'dps' as const, dps: 40, hps: 0 },
+			{ ...base, slug: 'h', encounterId: 1, role: 'heal' as const, dps: 1, hps: 30 }
+		];
+		const z = allStars(rows)[0];
+		expect(z.heroes).toEqual(
+			[
+				{ slug: 'a', points: 150, bosses: 2 }, // 120 + 30
+				{ slug: 'b', points: 180, bosses: 2 }, // 60 + 120
+				{ slug: 'h', points: 120, bosses: 1 }
+			].sort((x, y) => y.points - x.points)
+		);
 	});
 });

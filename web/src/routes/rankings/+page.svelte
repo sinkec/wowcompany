@@ -98,8 +98,27 @@
 		{/if}
 
 		{#each d.boards as z (z.zone)}
+			{@const stars = d.stars.find((x) => x.zone === z.zone)?.heroes ?? []}
 			<section class="space-y-3">
 				<h2 class="font-display text-xl font-semibold text-primary">{z.zone}</h2>
+				{#if stars.length}
+					<div
+						class="wow-frame flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-lg px-4 py-2 text-sm"
+					>
+						<span
+							class="text-xs tracking-wide text-muted-foreground uppercase"
+							title="Each boss: 120 points for the company's best, the rest in proportion. Summed over the dungeon."
+							>All-Stars</span
+						>
+						{#each stars.slice(0, 8) as h, i (h.slug)}
+							<span class="flex items-baseline gap-1">
+								<span class="text-xs">{MEDAL[i] ?? `${i + 1}.`}</span>
+								{@render who(h.slug)}
+								<span class="text-primary tabular-nums">{h.points.toFixed(1)}</span>
+							</span>
+						{/each}
+					</div>
+				{/if}
 				<div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
 					{#each z.bosses as b (b.encounterId + ':' + b.difficultyId)}
 						<div class="wow-frame rounded-lg p-4">
