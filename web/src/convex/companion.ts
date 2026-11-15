@@ -5,13 +5,16 @@ import { ConvexError, v } from 'convex/values';
 import { components, internal } from './_generated/api.js';
 import type { Id } from './_generated/dataModel.js';
 import {
+	internalAction,
 	internalMutation,
+	internalQuery,
 	mutation,
 	query,
 	type MutationCtx,
 	type QueryCtx
 } from './_generated/server.js';
 import { getViewer } from './lib/access.js';
+import { itemIcon, mapLimit } from './lib/blizzard.js';
 import {
 	addRecorder,
 	beatsRecord,
@@ -414,6 +417,7 @@ export const ingestRun = internalMutation({
 			await writeParses(ctx, runId, s, party);
 			// Discord: enkrat, čez 5 min (drugi snemalec, dopolnitev iz addona); postRun preveri vidnost
 			await ctx.scheduler.runAfter(5 * 60_000, internal.discord.postRun, { runId });
+			await ctx.scheduler.runAfter(0, internal.companion.fetchGearIcons, { runId });
 			return { runId, created: true, recorderAdded: true, replaced: false };
 		}
 
@@ -431,6 +435,7 @@ export const ingestRun = internalMutation({
 			await writeParticipants(ctx, existing._id, party, s.startedAt);
 			await writeHeroRecords(ctx, existing._id, s, party);
 			await writeParses(ctx, existing._id, s, party);
+			await ctx.scheduler.runAfter(0, internal.companion.fetchGearIcons, { runId: existing._id });
 		} else {
 			// isti posnetek z več podatki o lootu (ID/kakovost iz addona pride pozno) ali z rolli
 			// (novejša aplikacija): zamenjaj samo to
@@ -641,5 +646,58 @@ export const deleteDevice = internalMutation({
 	handler: async (ctx, { deviceId }) => {
 		if (await ctx.db.get('devices', deviceId)) await ctx.db.delete('devices', deviceId);
 		return null;
+	}
+});
+
+// ------------------------------------------------------------------ ikone opreme (oprema ob killu)
+
+/** ID-ji predmetov opreme runa, ki še nimajo ikone v cacheu. */
+export const missingGearIcons = internalQuery({
+	args: { runId: v.id('runs') },
+	handler: async (ctx, { runId }) => {
+		const d = await ctx.db
+			.query('runDetails')
+			.withIndex('by_run', (q) => q.eq('runId', runId))
+			.unique();
+		const ids = [
+			...new Set((d?.players ?? []).flatMap((p) => (p.gear ?? []).map((g) => g.itemId)))
+		];
+		const out: number[] = [];
+		for (const itemId of ids) {
+			const hit = await ctx.db
+				.query('itemIcons')
+				.withIndex('by_item', (q) => q.eq('itemId', itemId))
+				.first();
+			if (!hit) out.push(itemId);
+		}
+		return out.slice(0, 100);
+	}
+});
+
+export const saveItemIcons = internalMutation({
+	args: { icons: v.array(v.object({ itemId: v.number(), url: v.union(v.string(), v.null()) })) },
+	handler: async (ctx, { icons }) => {
+		for (const icon of icons) {
+			const hit = await ctx.db
+				.query('itemIcons')
+				.withIndex('by_item', (q) => q.eq('itemId', icon.itemId))
+				.first();
+			if (!hit) await ctx.db.insert('itemIcons', icon);
+		}
+	}
+});
+
+/** Po uploadu: ikone za opremo iz COMBATANT_INFO (Blizzard media, enkrat na predmet za vedno). */
+export const fetchGearIcons = internalAction({
+	args: { runId: v.id('runs') },
+	handler: async (ctx, { runId }) => {
+		const ids: number[] = await ctx.runQuery(internal.companion.missingGearIcons, { runId });
+		if (!ids.length) return 0;
+		const icons = await mapLimit(ids, 4, async (itemId) => ({
+			itemId,
+			url: await itemIcon(itemId)
+		}));
+		await ctx.runMutation(internal.companion.saveItemIcons, { icons });
+		return icons.length;
 	}
 });

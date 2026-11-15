@@ -11,7 +11,7 @@
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import Locked from '#lib/components/wow/Locked.svelte';
 	import RunTimeline from '#lib/components/wow/RunTimeline.svelte';
-	import { classColor } from '#lib/wow.js';
+	import { classColor, iconFallback } from '#lib/wow.js';
 	import {
 		ACTIVE_QUIP,
 		END_REASON,
@@ -75,6 +75,9 @@
 
 	// Bosses: odprta razčlenitev igralca (`${boss}:${slug}`)
 	let openBoss = $state<string | null>(null);
+	// oprema ob zadnjem pullu (COMBATANT_INFO) + ikone iz cachea
+	const iconOf = $derived(new Map((run?.gearIcons ?? []).map((g) => [g.itemId, g.url] as const)));
+	const gearOf = (slug: string) => players.find((x) => x.slug === slug)?.gear ?? [];
 
 	// need/greed rolli: po predmetih + kocke po igralcih (srečnež, preklete kocke)
 	const rolls = $derived(run?.rolls ?? []);
@@ -541,6 +544,39 @@
 													</table>
 												{/if}
 											{/each}
+											{#if gearOf(p.slug).length}
+												<div>
+													<div class="mb-1 font-semibold text-muted-foreground">
+														Wearing at the last pull
+														<span class="font-normal"
+															>· avg ilvl {Math.round(
+																gearOf(p.slug).reduce((n, g) => n + g.ilvl, 0) /
+																	gearOf(p.slug).length
+															)}</span
+														>
+													</div>
+													<div class="flex flex-wrap gap-1">
+														{#each gearOf(p.slug) as g, gi (gi)}
+															<div
+																class="relative size-8 overflow-hidden rounded border border-border/60 bg-muted"
+																title="Item {g.itemId} · ilvl {g.ilvl}"
+															>
+																{#if iconOf.get(g.itemId)}<img
+																		src={iconOf.get(g.itemId)}
+																		alt=""
+																		class="size-full"
+																		loading="lazy"
+																		onerror={iconFallback}
+																	/>{/if}
+																<span
+																	class="absolute right-0 bottom-0 bg-background/80 px-0.5 text-[9px] leading-none tabular-nums"
+																	>{g.ilvl}</span
+																>
+															</div>
+														{/each}
+													</div>
+												</div>
+											{/if}
 											<div class="grid gap-3 sm:grid-cols-2">
 												{#if p.targets?.length}
 													<div>
