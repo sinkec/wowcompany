@@ -35,6 +35,11 @@
 - **Replay za stare rune:** `bun scripts/replay-backfill.ts --prod ../wowlog/WoWCombatLog-*.txt` (poganja uporabnik –
   zapis v prod je za Claude blokiran).
 
+- **Replay v2:** luknje v logu (hoja brez boja = brez pozicij) premosti pot po "hodnikih" (graf vseh točk partyja,
+  Dijkstra, ≤ 12 yd/s), sicer skok. **Zemljevid dungeona:** Guild Master v Replay naloži posnetek igrine karte (M) →
+  `dungeonMaps` (Convex storage, WebP ≤ 1600 px) in ga poravna z drsniki; velja po `instanceId`. Ruins of Lordaeron
+  že ima karto (16. 11.).
+
 **Izdano:** Companion 0.1.12 (latest.json podpisan, samoposodobitev deluje), nameščen pri uporabniku 16. 11. ob 10:26.
 
 **Naslednji koraki:** preveri pravi dungeon z 0.1.12 (replay, poročilo, samoposodobitev na 0.1.13), Discord objavo,
