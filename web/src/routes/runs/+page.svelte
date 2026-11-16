@@ -15,10 +15,10 @@
 <div class="space-y-6">
 	<section class="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
 		<div class="min-w-0 space-y-1 sm:flex-1">
-			<h1 class="flex items-center gap-3 text-3xl font-bold text-primary md:text-4xl">
+			<h1 class="page-title flex items-center gap-3">
 				<Swords class="size-8" /> Dungeon Runs
 			</h1>
-			<p class="text-muted-foreground">
+			<p class="page-lead">
 				Every dungeon the party survived — or didn't. Recorded by the Companion app, uploaded by
 				whoever was snitching, judged by everyone. Click a run for the full autopsy.
 			</p>

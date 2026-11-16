@@ -20,10 +20,10 @@
 <div class="space-y-6">
 	<section class="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
 		<div class="min-w-0 space-y-1 sm:flex-1">
-			<h1 class="flex items-center gap-3 text-3xl font-bold text-primary md:text-4xl">
+			<h1 class="page-title flex items-center gap-3">
 				<Trophy class="size-8" /> Rankings
 			</h1>
-			<p class="text-muted-foreground">
+			<p class="page-lead">
 				Best boss kill per hero, per season. Numbers from the Companion's combat logs, bragging
 				rights from you. Healers get their own board so they stop complaining.
 			</p>
@@ -59,7 +59,7 @@
 
 		{#if d.speed.length}
 			<section class="wow-frame rounded-lg p-4">
-				<h2 class="font-display text-lg font-semibold text-primary">Speed demons</h2>
+				<h2 class="card-title">Speed demons</h2>
 				<p class="text-xs text-muted-foreground italic">
 					fastest full clears. skipping the trash is a lifestyle.
 				</p>
@@ -92,7 +92,7 @@
 
 		{#if d.value.length}
 			<section class="wow-frame rounded-lg p-4">
-				<h2 class="font-display text-lg font-semibold text-primary">Best value</h2>
+				<h2 class="card-title">Best value</h2>
 				<p class="text-xs text-muted-foreground italic">
 					average experience and coin per hour inside, from whoever had the Companion running. time
 					is money, and you are broke.
@@ -122,7 +122,7 @@
 
 		{#if d.mashers.length}
 			<section class="wow-frame rounded-lg p-4">
-				<h2 class="font-display text-lg font-semibold text-primary">Keyboard Hall of Shame</h2>
+				<h2 class="card-title">Keyboard Hall of Shame</h2>
 				<p class="text-xs text-muted-foreground italic">
 					button presses before the spell was ready, per hour inside. only counts whoever had the
 					Companion running – the game logs failed casts for the log owner alone.
@@ -148,13 +148,13 @@
 		{#each d.boards as z (z.zone)}
 			{@const stars = d.stars.find((x) => x.zone === z.zone)?.heroes ?? []}
 			<section class="space-y-3">
-				<h2 class="font-display text-xl font-semibold text-primary">{z.zone}</h2>
+				<h2 class="section-title">{z.zone}</h2>
 				{#if stars.length}
 					<div
 						class="wow-frame flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-lg px-4 py-2 text-sm"
 					>
 						<span
-							class="text-xs tracking-wide text-muted-foreground uppercase"
+							class="eyebrow"
 							title="Each boss: 120 points for the company's best, the rest in proportion. Summed over the dungeon."
 							>All-Stars</span
 						>
@@ -173,7 +173,7 @@
 							<h3 class="font-semibold">{b.encounter}</h3>
 							{#each [{ title: 'Damage', list: b.dps, unit: 'dps' }, { title: 'Healing', list: b.heal, unit: 'hps' }] as board (board.title)}
 								{#if board.list.length}
-									<div class="mt-2 text-xs tracking-wide text-muted-foreground uppercase">
+									<div class="eyebrow mt-2">
 										{board.title}
 									</div>
 									{#each board.list as e, i (e.slug)}

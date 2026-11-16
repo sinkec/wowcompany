@@ -191,6 +191,22 @@ export default defineSchema({
 		gamePatch: v.optional(v.string())
 	}).index('by_key', ['key']),
 
+	// Novice na naslovnici: uradne WoW novice (dnevni cron, lib/news.ts) + objave druščine
+	// (nova verzija igre, nova sezona, ročne objave Guild Mastra). Skrite ostanejo, da se ne vrnejo.
+	news: defineTable({
+		key: v.string(),
+		source: v.union(v.literal('blizzard'), v.literal('company')),
+		title: v.string(),
+		summary: v.string(),
+		url: v.optional(v.string()),
+		image: v.optional(v.string()),
+		publishedAt: v.number(),
+		hidden: v.boolean()
+	})
+		.index('by_key', ['key'])
+		.index('by_publishedAt', ['publishedAt'])
+		.index('by_hidden_and_publishedAt', ['hidden', 'publishedAt']),
+
 	// Skrivnosti, nastavljene prek admin vmesnika (Portal Room). Berejo jih SAMO interne funkcije;
 	// v brskalnik nikoli ne gredo. Manjkajoče vrednosti -> rezerva iz okoljskih spremenljivk.
 	secrets: defineTable({

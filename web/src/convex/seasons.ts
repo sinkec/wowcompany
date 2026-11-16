@@ -12,6 +12,7 @@ import {
 	type QueryCtx
 } from './_generated/server.js';
 import { requireAdmin } from './lib/access.js';
+import { addCompanyNews } from './news.js';
 import { get as bnetGet, staticNs } from './lib/blizzard.js';
 import { patchFromNamespace, patchLine } from './lib/parses.js';
 import { DEFAULT_SETTINGS, getSettings } from './lib/settings.js';
@@ -75,6 +76,13 @@ export const start = mutation({
 			startedAt: Date.now(),
 			patch
 		});
+		await addCompanyNews(
+			ctx,
+			`season-${number}`,
+			`${clean || `Season ${number}`} has begun`,
+			'The parse ladder starts from zero. Everyone is a nobody again – go fix that.',
+			'/rankings'
+		);
 		return number;
 	}
 });
@@ -100,6 +108,13 @@ export const setGamePatch = internalMutation({
 			.withIndex('by_key', (q) => q.eq('key', 'main'))
 			.unique();
 		if (doc?.gamePatch === patch) return null;
+		if (doc?.gamePatch)
+			await addCompanyNews(
+				ctx,
+				`patch-${patch}`,
+				`Patch ${patch} is live`,
+				`The game moved from ${doc.gamePatch} to ${patch}. New bugs to discover, old ones to miss.`
+			);
 		if (doc) await ctx.db.patch('settings', doc._id, { gamePatch: patch });
 		else await ctx.db.insert('settings', { key: 'main', ...DEFAULT_SETTINGS, gamePatch: patch });
 		// prva znana verzija = verzija Season 1

@@ -61,8 +61,8 @@
 
 <div class="mx-auto max-w-2xl space-y-8">
 	<section class="space-y-2">
-		<h1 class="text-3xl font-bold text-primary md:text-4xl">Petition the Guild Master</h1>
-		<p class="text-muted-foreground">
+		<h1 class="page-title">Petition the Guild Master</h1>
+		<p class="page-lead">
 			Want your hero tracked, judged and publicly shamed? Tell us who you are. The Guild Master will review your petition
 			while pretending to be busy.
 		</p>
@@ -124,7 +124,7 @@
 		</form>
 
 		<section class="space-y-3">
-			<h2 class="text-xl font-semibold">Your petitions</h2>
+			<h2 class="section-title">Your petitions</h2>
 			{#if !mine.data?.claims.length}
 				<p class="text-sm text-muted-foreground italic">None yet. Shy, are we?</p>
 			{:else}

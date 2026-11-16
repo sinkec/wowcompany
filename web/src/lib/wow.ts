@@ -148,3 +148,15 @@ export const FIELD_LABELS: Record<string, string> = {
 
 /** Začetek 7-dnevnega okna, zaokrožen na uro (stabilni argumenti -> Convex lahko predpomni poizvedbo). */
 export const weekSince = () => Math.floor(Date.now() / 3_600_000) * 3_600_000 - 7 * 24 * 3_600_000;
+
+/** Celopostavna upodobitev lika (prozoren PNG) iz URL-ja avatarja – isti Blizzard render, brez dodatnega API klica. */
+export const renderFromAvatar = (avatar: string | null | undefined) =>
+	avatar && /-avatar\.jpg$/.test(avatar) ? avatar.replace(/-avatar\.jpg$/, '-main-raw.png') : null;
+
+/** Ploščica dungeona z Blizzardovega CDN-ja (obstaja samo za klasične dungeone; sicer onerror -> rezerva). */
+export const dungeonTile = (zone: string) =>
+	`https://render.worldofwarcraft.com/eu/zones/${zone
+		.toLowerCase()
+		.replace(/['’:]/g, '')
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-|-$/g, '')}-small.jpg`;

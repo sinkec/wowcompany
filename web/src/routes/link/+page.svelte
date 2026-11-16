@@ -50,8 +50,8 @@
 
 <div class="mx-auto max-w-2xl space-y-8">
 	<section class="space-y-2">
-		<h1 class="text-3xl font-bold text-primary md:text-4xl">WowCompany Companion</h1>
-		<p class="text-muted-foreground">
+		<h1 class="page-title">WowCompany Companion</h1>
+		<p class="page-lead">
 			The desktop app reads your combat log, judges your dungeon runs and snitches to the portal.
 			Link it to your account here. Members only — strangers can watch their own deaths in private.
 		</p>
@@ -130,7 +130,7 @@
 		{/if}
 
 		<section class="space-y-3">
-			<h2 class="text-xl font-semibold">My devices</h2>
+			<h2 class="section-title">My devices</h2>
 			<DevicesList />
 		</section>
 	{/if}

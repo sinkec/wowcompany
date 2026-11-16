@@ -217,8 +217,8 @@
 {:else}
 	<div class="space-y-6">
 		<section>
-			<h1 class="text-3xl font-bold text-primary md:text-4xl">The Guild Master's Office</h1>
-			<p class="text-muted-foreground">
+			<h1 class="page-title">The Guild Master's Office</h1>
+			<p class="page-lead">
 				Judge petitions, banish heroes, decide who sees what. Power corrupts. Enjoy.
 			</p>
 		</section>
@@ -277,7 +277,7 @@
 				{/if}
 				{#if claims.data?.decided.length}
 					<section>
-						<h2 class="mb-2 text-sm font-semibold text-primary">Recently judged</h2>
+						<h2 class="card-title mb-2">Recently judged</h2>
 						<ul class="space-y-1 text-sm">
 							{#each claims.data.decided as c (c.id)}
 								<li class="flex justify-between gap-3">
@@ -384,7 +384,7 @@
 						<section class="wow-frame rounded-lg p-4">
 							<div class="flex flex-wrap items-start justify-between gap-2">
 								<div>
-									<h2 class="font-display text-lg font-semibold text-primary">{col.title}</h2>
+									<h2 class="card-title">{col.title}</h2>
 									<p class="text-xs text-muted-foreground">{col.note}</p>
 								</div>
 								<div class="flex gap-1">
@@ -405,7 +405,7 @@
 									{@const isRun = RUN_FIELDS.includes(f)}
 									{#if col.target === 'discordFields' && f === 'runs'}
 										<h3
-											class="mt-5 mb-2 text-xs font-semibold tracking-wide text-primary uppercase"
+											class="eyebrow mt-5 mb-2 text-primary"
 										>
 											Dungeon runs (Companion)
 										</h3>
@@ -478,7 +478,7 @@
 					{@const st = ov.data.settings}
 					{@const est = ov.data.estimate}
 					<section class="wow-frame space-y-4 rounded-lg p-4">
-						<h2 class="text-sm font-semibold text-primary">Blizzard polling</h2>
+						<h2 class="card-title">Blizzard polling</h2>
 						<div>
 							<div class="mb-2 text-sm">Check every</div>
 							<div class="flex flex-wrap gap-1">
@@ -533,7 +533,7 @@
 					{#if seasonState.data}
 						{@const ss = seasonState.data}
 						<section class="wow-frame space-y-3 rounded-lg p-4 lg:col-span-2">
-							<h2 class="text-sm font-semibold text-primary">Parse seasons</h2>
+							<h2 class="card-title">Parse seasons</h2>
 							<p class="text-xs text-muted-foreground">
 								Company Parses are ranked per season. Big patch, new gear, everyone suddenly hits
 								harder → start a fresh season so old numbers stop haunting the ladder. Old seasons
@@ -585,7 +585,7 @@
 					{/if}
 
 					<section class="wow-frame space-y-3 rounded-lg p-4">
-						<h2 class="text-sm font-semibold text-primary">
+						<h2 class="card-title">
 							Convex free tier budget (rough estimate)
 						</h2>
 						<p class="text-xs text-muted-foreground">
@@ -626,7 +626,7 @@
 						<!-- webhook -->
 						<section class="wow-frame space-y-3 rounded-lg p-4">
 							<div class="flex items-center justify-between gap-2">
-								<h2 class="font-display text-lg font-semibold text-primary">Messenger Raven</h2>
+								<h2 class="card-title">Messenger Raven</h2>
 								{#if st.webhook.configured}
 									<Badge class="gap-1"><CircleCheck class="size-3" /> connected</Badge>
 								{:else}
@@ -703,7 +703,7 @@
 						<!-- app / slash commands -->
 						<section class="wow-frame space-y-3 rounded-lg p-4">
 							<div class="flex items-center justify-between gap-2">
-								<h2 class="font-display text-lg font-semibold text-primary">
+								<h2 class="card-title">
 									Discord Bot (slash commands)
 								</h2>
 								{#if st.bot.configured && st.bot.publicKeySet}

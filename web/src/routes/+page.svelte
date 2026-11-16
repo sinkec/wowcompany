@@ -15,12 +15,14 @@
 	import RosterTable from '#lib/components/wow/RosterTable.svelte';
 	import GossipFeed from '#lib/components/wow/GossipFeed.svelte';
 	import Leaderboard from '#lib/components/wow/Leaderboard.svelte';
-	import Locked from '#lib/components/wow/Locked.svelte';
+	import HomeHero from '#lib/components/wow/HomeHero.svelte';
+	import NewsSection from '#lib/components/wow/NewsSection.svelte';
 	import type { RosterEntry } from '#lib/types.js';
 	import { classColor, fmt, weekSince } from '#lib/wow.js';
 
 	const roster = useQuery(api.players.list, { since: weekSince() });
 	const feed = useQuery(api.events.recent, { limit: 20 });
+	const news = useQuery(api.news.list, { limit: 6 });
 	// rekordi iz dungeon runov (Companion): null = skrito za obiskovalca
 	const topCrits = useQuery(api.runs.topRecords, { kind: 'crit' });
 	const topTaken = useQuery(api.runs.topRecords, { kind: 'hitTaken' });
@@ -88,7 +90,6 @@
 		const vals = withData.map(f).filter((v): v is number => typeof v === 'number');
 		return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
 	};
-	const top = $derived([...withData].sort((a, b) => (b.summary?.level ?? 0) - (a.summary?.level ?? 0))[0]);
 	const avgLevel = $derived(withData.length ? (sum((c) => c.summary?.level) ?? 0) / withData.length : 0);
 	const totalKills = $derived(sum((c) => c.summary?.kills));
 	const totalDeaths = $derived(sum((c) => c.summary?.deaths));
@@ -112,15 +113,28 @@
 	};
 </script>
 
-<div class="space-y-10">
-	<!-- hero -->
-	<section class="space-y-2">
-		<h1 class="text-3xl font-bold text-primary md:text-5xl">The Company of Questionable Decisions</h1>
-		<p class="max-w-2xl text-muted-foreground">
-			Levels, loot and spectacular deaths of our WoW Forever heroes. Mostly the deaths. Updated within minutes of
-			someone finally logging off and going to bed.
-		</p>
-	</section>
+<div class="space-y-12">
+	<HomeHero
+		backdrop={news.data?.find((n) => n.image)?.image ?? null}
+		heroes={[...withData]
+			.sort((a, b) => (b.summary?.level ?? 0) - (a.summary?.level ?? 0))
+			.map((c) => ({
+				slug: c.slug,
+				name: c.displayName,
+				level: c.summary?.level ?? null,
+				classId: c.summary?.classId ?? null,
+				avatar: c.summary?.avatar ?? null
+			}))}
+		stats={[
+			{ label: 'Adventurers', value: players.length ? fmt(players.length) : null },
+			{ label: 'Average level', value: withData.length ? fmt(avgLevel, 1) : null },
+			{ label: 'Levels this week', value: weekLevels == null ? null : `+${fmt(weekLevels)}` },
+			{ label: 'Things murdered', value: totalKills == null ? null : fmt(totalKills) },
+			{ label: 'Times eaten dirt', value: totalDeaths == null ? null : fmt(totalDeaths) }
+		].filter((x): x is { label: string; value: string } => x.value != null)}
+	/>
+
+	<NewsSection news={news.data ?? []} />
 
 	{#if roster.isLoading}
 		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -131,30 +145,10 @@
 	{:else if players.length === 0}
 		<div class="wow-frame flex flex-col items-center gap-3 rounded-lg p-12 text-center">
 			<Skull class="size-12 text-primary/70" />
-			<h2 class="text-xl font-semibold">No heroes yet</h2>
+			<h2 class="section-title">No heroes yet</h2>
 			<p class="text-muted-foreground">Even the Scourge has more friends than this.</p>
 		</div>
 	{:else}
-		<!-- team tiles -->
-		<section class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-			{#each [
-				{ l: 'Adventurers', v: fmt(players.length), s: 'and counting (barely)' },
-				{ l: 'Average level', v: fmt(avgLevel, 1), s: 'mediocre, statistically' },
-				{ l: 'Top dog', v: top?.summary?.level != null ? `${top.summary.level}` : '–', s: top?.displayName },
-				{ l: 'Levels this week', v: weekLevels == null ? null : `+${fmt(weekLevels)}`, s: 'jobs neglected' },
-				{ l: 'Things murdered', v: totalKills == null ? null : fmt(totalKills), s: 'boars mostly' },
-				{ l: 'Times eaten dirt', v: totalDeaths == null ? null : fmt(totalDeaths), s: 'group total, shameful' }
-			] as tile (tile.l)}
-				<div class="wow-frame rounded-lg p-3">
-					<div class="text-xs text-muted-foreground">{tile.l}</div>
-					<div class="font-display text-2xl font-bold tabular-nums">
-						{#if tile.v == null}<Locked compact />{:else}{tile.v}{/if}
-					</div>
-					{#if tile.s}<div class="truncate text-xs text-muted-foreground italic">{tile.s}</div>{/if}
-				</div>
-			{/each}
-		</section>
-
 		<!--
 			Roster + Tavern Gossip: roster ima fiksno višino (2 × 2 kartici ali 8 vrstic), več junakov = listanje/iskanje.
 			Gossip se raztegne točno na višino rosterja (absolutno pozicioniran znotraj stolpca) in ima lasten drsnik.
@@ -163,7 +157,7 @@
 			<!-- roster -->
 			<section class="min-w-0 space-y-3" aria-label="Roster">
 				<div class="flex h-9 items-center justify-between gap-2">
-					<h2 class="text-xl font-semibold">
+					<h2 class="section-title">
 						The Roster <span class="text-base font-normal text-muted-foreground">({players.length})</span>
 					</h2>
 					<div class="flex items-center gap-2">
@@ -241,7 +235,7 @@
 			<aside class="relative min-w-0">
 				<div class="flex flex-col gap-3 lg:absolute lg:inset-0">
 					<div class="flex h-9 shrink-0 items-center">
-						<h2 class="text-xl font-semibold">Tavern Gossip</h2>
+						<h2 class="section-title">Tavern Gossip</h2>
 					</div>
 					<GossipFeed
 						events={feed.data ?? []}
@@ -255,9 +249,9 @@
 
 		<!-- leaderboards -->
 		<section class="space-y-3">
-			<h2 class="text-xl font-semibold">Leaderboards of Glory & Shame</h2>
+			<h2 class="section-title">Leaderboards of Glory & Shame</h2>
 			{#if !priv}
-				<p class="text-sm text-muted-foreground">Some boards are members-only. The embarrassing ones, obviously.</p>
+				<p class="section-lead">Some boards are members-only. The embarrassing ones, obviously.</p>
 			{/if}
 			<Tabs.Root value="glory">
 				<Tabs.List>
@@ -299,9 +293,9 @@
 
 		<!-- class mix -->
 		{#if classes.length}
-			<section class="wow-frame rounded-lg p-4">
-				<h3 class="mb-1 text-sm font-semibold text-primary">Party Composition</h3>
-				<p class="mb-3 text-xs text-muted-foreground italic">a raid leader's nightmare</p>
+			<section class="panel">
+				<h3 class="card-title">Party Composition</h3>
+				<p class="section-lead mb-3 italic">a raid leader's nightmare</p>
 				<div class="flex h-3 gap-0.5 overflow-hidden rounded-full">
 					{#each classes as cl (cl.name)}
 						<div style="flex: {cl.n}; background: {classColor(cl.id)}" title="{cl.name}: {cl.n}"></div>

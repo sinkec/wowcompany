@@ -56,7 +56,7 @@
 <section id="download" class="wow-frame space-y-4 rounded-lg p-5">
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div>
-			<h2 class="font-display text-xl font-semibold text-primary">Get the app</h2>
+			<h2 class="section-title">Get the app</h2>
 			<p class="text-sm text-muted-foreground">
 				Windows and Linux (Steam/Proton, Lutris). Free, small, and only snitches on your party —
 				never on strangers.

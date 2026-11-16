@@ -157,7 +157,7 @@
 				{#each [{ l: 'Item level', v: s.ilvlEquipped, sub: s.ilvlAverage != null ? `best owned ${s.ilvlAverage}` : '' }, { l: 'Things murdered', v: s.kills, sub: c.week?.kills ? `+${fmt(c.week.kills)} this week` : '' }, { l: 'Deaths', v: s.deaths, sub: kd != null ? `K/D ${fmt(kd, 1)} · ${kdQuip(kd)}` : '' }, { l: 'Quests', v: s.quests, sub: c.week?.quests ? `+${fmt(c.week.quests)} this week` : 'unpaid labor' }, { l: 'Honorable kills', v: s.honorableKills, sub: 'honor is relative' }, { l: 'Health', v: stats ? n('health') : null, sub: stats ? `${fmt(n('power'))} ${stats.powerType ?? ''}` : '' }] as t (t.l)}
 					<div class="wow-frame rounded-lg p-3">
 						<div class="text-xs text-muted-foreground">{t.l}</div>
-						<div class="font-display text-2xl font-bold tabular-nums">
+						<div class="stat-value">
 							{#if t.v == null}<Locked compact />{:else}{fmt(t.v)}{/if}
 						</div>
 						{#if t.sub}<div class="text-xs leading-snug text-muted-foreground italic">
@@ -206,7 +206,7 @@
 												? 'hover:border-primary/60'
 												: ''}"
 										>
-											<div class="text-xs tracking-wide text-muted-foreground uppercase">
+											<div class="eyebrow">
 												{RECORD_LABEL[kind].title}
 											</div>
 											<div class="text-2xl font-bold text-primary tabular-nums">
@@ -277,7 +277,7 @@
 						{#if stats}
 							{#each [{ h: 'Base', rows: [['Strength', fmt(n('strength'))], ['Agility', fmt(n('agility'))], ['Stamina', fmt(n('stamina'))], ['Intellect', fmt(n('intellect'))], ['Spirit', fmt(n('spirit'))], ['Armor', fmt(n('armor'))]] }, { h: 'Melee / Ranged', rows: [['Attack power', fmt(n('attackPower'))], ['Ranged AP', fmt(n('rangedAttackPower'))], ['Crit', pct('meleeCrit')], ['Ranged crit', pct('rangedCrit')], ['Main hand DPS', fmt(n('mainHandDps'), 1)]] }, { h: 'Spells', rows: [['Spell power', fmt(n('spellPower'))], ['Healing', fmt(n('spellHealing'))], ['Spell crit', pct('spellCrit')], ['Mana regen', fmt(n('manaRegen'))]] }, { h: 'Defense', rows: [['Defense', fmt(n('defense'))], ['Dodge', pct('dodge')], ['Parry', pct('parry')], ['Block', pct('block')]] }, { h: 'Resistances', rows: [['Fire', fmt(n('resistFire'))], ['Frost', fmt(n('resistFrost'))], ['Shadow', fmt(n('resistShadow'))], ['Nature', fmt(n('resistNature'))], ['Arcane', fmt(n('resistArcane'))]] }] as g (g.h)}
 								<div>
-									<h3 class="mb-1 text-xs font-semibold tracking-wider text-primary uppercase">
+									<h3 class="eyebrow mb-1 text-primary">
 										{g.h}
 									</h3>
 									<dl class="space-y-0.5">
@@ -331,7 +331,7 @@
 									<LineChart title={ch.t} points={pts} color={ch.col} />
 								{:else}
 									<div class="wow-frame rounded-lg p-4">
-										<div class="mb-2 text-sm font-semibold text-primary">{ch.t}</div>
+										<div class="card-title mb-2">{ch.t}</div>
 										<Locked what="this chart" />
 									</div>
 								{/if}
@@ -374,7 +374,7 @@
 							<div class="grid gap-6 md:grid-cols-2">
 								{#each [true, false] as primary (primary)}
 									<div>
-										<h3 class="mb-2 text-xs font-semibold tracking-wider text-primary uppercase">
+										<h3 class="eyebrow mb-2 text-primary">
 											{primary ? 'Day Jobs' : 'Side Hustles'}
 										</h3>
 										{#each professions.filter((p) => p.primary === primary) as p (p.name)}
@@ -411,7 +411,7 @@
 						<div class="columns-1 gap-4 md:columns-2 lg:columns-3">
 							{#each statGroups as [cat, rows] (cat)}
 								<section class="wow-frame mb-4 break-inside-avoid rounded-lg p-3">
-									<h3 class="mb-1 text-xs font-semibold tracking-wider text-primary uppercase">
+									<h3 class="eyebrow mb-1 text-primary">
 										{cat}
 									</h3>
 									{#each rows as r, i (i)}

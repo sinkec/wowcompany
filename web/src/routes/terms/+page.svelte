@@ -1,7 +1,7 @@
 <svelte:head><title>Terms — WowCompany</title></svelte:head>
 
 <article class="wow-frame mx-auto max-w-3xl space-y-5 rounded-lg p-6 leading-relaxed md:p-10">
-	<h1 class="text-3xl font-bold text-primary">Terms of Use</h1>
+	<h1 class="page-title">Terms of Use</h1>
 	<p class="text-sm text-muted-foreground">Last updated: November 13, 2026</p>
 
 	<p>

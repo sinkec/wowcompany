@@ -127,6 +127,119 @@
 	}
 }
 
+/*
+ * DESIGN RULES – ena tipografska lestvica za cel portal. Strani uporabljajo te razrede (ali
+ * komponento PageHeader), ne lastnih kombinacij velikosti:
+ *   .page-title    naslov strani (h1)            Cinzel 30/36 px, zlato
+ *   .page-lead     podnaslov pod naslovom strani  16 px, utišano, max 42rem
+ *   .section-title naslov sekcije (h2)            Cinzel 20 px, zlato
+ *   .card-title    naslov kartice/panela (h3)     Cinzel 16 px, zlato
+ *   .section-lead  opis pod naslovom sekcije/kartice 14 px, utišano
+ *   .eyebrow       nadnaslov, oznaka skupine      11 px, velike črke
+ *   .stat-value    velika številka v ploščici     Cinzel 24 px, tabularne številke
+ *   .stat-label    oznaka ploščice                12 px, utišano
+ *   .panel         kartica/okvir (= wow-frame + zaobljenost + odmik)
+ */
+@layer components {
+	.page-title {
+		font-family: var(--font-display);
+		font-size: 1.875rem;
+		line-height: 2.25rem;
+		font-weight: 700;
+		color: var(--primary);
+		letter-spacing: 0.02em;
+	}
+	@media (min-width: 768px) {
+		.page-title {
+			font-size: 2.25rem;
+			line-height: 2.5rem;
+		}
+	}
+	.page-lead {
+		margin-top: 0.25rem;
+		max-width: 42rem;
+		font-size: 1rem;
+		line-height: 1.5rem;
+		color: var(--muted-foreground);
+	}
+	.section-title {
+		font-family: var(--font-display);
+		font-size: 1.25rem;
+		line-height: 1.75rem;
+		font-weight: 600;
+		color: var(--primary);
+	}
+	.card-title {
+		font-family: var(--font-display);
+		font-size: 1rem;
+		line-height: 1.5rem;
+		font-weight: 600;
+		color: var(--primary);
+	}
+	.section-lead {
+		font-size: 0.875rem;
+		line-height: 1.25rem;
+		color: var(--muted-foreground);
+	}
+	.eyebrow {
+		font-size: 0.6875rem;
+		line-height: 1rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted-foreground);
+	}
+	.stat-value {
+		font-family: var(--font-display);
+		font-size: 1.5rem;
+		line-height: 2rem;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+	}
+	.stat-label {
+		font-size: 0.75rem;
+		line-height: 1rem;
+		color: var(--muted-foreground);
+	}
+	.panel {
+		border-radius: var(--radius);
+		padding: 1.25rem;
+		border: 1px solid oklch(0.62 0.1 80 / 55%);
+		box-shadow:
+			inset 0 0 0 1px oklch(0.1 0.01 60 / 80%),
+			inset 0 1px 0 oklch(0.85 0.1 85 / 15%),
+			0 6px 24px oklch(0 0 0 / 45%);
+		background-image: linear-gradient(180deg, oklch(0.24 0.016 60), oklch(0.19 0.012 60));
+	}
+	/* počasno pojavljanje ob nalaganju (spoštuje prefers-reduced-motion) */
+	.rise {
+		animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+	}
+	@keyframes rise {
+		from {
+			opacity: 0;
+			transform: translateY(12px);
+		}
+	}
+	.drift {
+		animation: drift 30s ease-in-out infinite alternate;
+	}
+	@keyframes drift {
+		from {
+			transform: scale(1.05) translate3d(0, 0, 0);
+		}
+		to {
+			transform: scale(1.15) translate3d(-2%, -1%, 0);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.rise,
+		.drift {
+			animation: none;
+		}
+	}
+}
+
 /* Drsnik v WoW slogu (Tavern Gossip in druga drsna območja). */
 @layer components {
 	.wow-scroll {

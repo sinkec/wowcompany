@@ -16,4 +16,7 @@ crons.cron('companion link cleanup', '30 4 * * *', internal.companion.cleanupLin
 // Verzija igre (za predlog nove sezone lestvic): 1 klic na dan.
 crons.cron('game patch', '15 5 * * *', internal.seasons.checkPatch, {});
 
+// Uradne WoW novice za naslovnico: 1 HTTP klic na dan.
+crons.cron('wow news', '45 5 * * *', internal.news.refreshBlizzard, {});
+
 export default crons;

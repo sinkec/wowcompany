@@ -141,10 +141,10 @@
 <div class="grid gap-3 md:grid-cols-2">
 	{#each [{ title: 'My actions', blocks: mine, extra: combat.mine.misses, extraTitle: 'Misses by type' }, { title: 'What happened to me?', blocks: me, extra: combat.me.avoided, extraTitle: 'Avoided by type' }] as col (col.title)}
 		<section class="rounded-md border border-border/50 p-3">
-			<h4 class="mb-2 text-sm font-semibold text-primary">{col.title}</h4>
+			<h4 class="card-title mb-2">{col.title}</h4>
 			{#each col.blocks as b (b.title)}
 				<div class="mb-2">
-					<div class="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+					<div class="eyebrow">
 						{b.title}
 					</div>
 					{#each b.rows as r (r.label)}
@@ -159,7 +159,7 @@
 				</div>
 			{/each}
 			{#if col.extra.length}
-				<div class="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+				<div class="eyebrow">
 					{col.extraTitle}
 				</div>
 				<div class="flex flex-wrap gap-x-3 text-xs">

@@ -191,7 +191,7 @@
 			<div class="flex flex-wrap items-start gap-4">
 				<div class="min-w-0 flex-1 space-y-1">
 					<div class="flex flex-wrap items-center gap-2">
-						<h1 class="text-3xl font-bold text-primary md:text-4xl">{run.zone}</h1>
+						<h1 class="page-title">{run.zone}</h1>
 						{#if badge}<span
 								class="rounded border px-2 py-0.5 text-sm font-semibold {TONE[badge.tone]}"
 								>{badge.text}</span
@@ -868,7 +868,7 @@
 							{/each}
 						</div>
 						{#if rolls.length}
-							<h3 class="pt-2 text-sm font-bold tracking-wide text-primary uppercase">
+							<h3 class="eyebrow pt-2 text-primary">
 								Need, greed &amp; broken friendships
 							</h3>
 							{#if dice.length > 1}
@@ -944,7 +944,7 @@
 									</tbody>
 								</table>
 							</div>
-							<h3 class="pt-2 text-sm font-bold tracking-wide text-primary uppercase">
+							<h3 class="eyebrow pt-2 text-primary">
 								Everything looted
 							</h3>
 						{/if}
@@ -1005,7 +1005,7 @@
 							{#each bestRecords as { kind, best } (kind)}
 								{#if best}
 									<div class="wow-frame rounded-lg p-4">
-										<div class="text-xs tracking-wide text-muted-foreground uppercase">
+										<div class="eyebrow">
 											{RECORD_LABEL[kind].title}
 										</div>
 										<div class="mt-1 text-3xl font-bold text-primary tabular-nums">

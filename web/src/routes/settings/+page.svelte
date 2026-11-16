@@ -152,8 +152,8 @@
 
 <div class="space-y-6">
 	<div>
-		<h1 class="text-3xl font-bold text-primary md:text-4xl">Your Quarters</h1>
-		<p class="text-muted-foreground">
+		<h1 class="page-title">Your Quarters</h1>
+		<p class="page-lead">
 			Rename yourself, herd your alts, exile your devices. Self-care, WoW style.
 		</p>
 	</div>
@@ -195,7 +195,7 @@
 				{#if tab === 'profile'}
 					<form onsubmit={saveName} class="wow-frame space-y-4 rounded-lg p-5">
 						<div>
-							<h2 class="font-display text-xl font-semibold text-primary">What do we call you?</h2>
+							<h2 class="section-title">What do we call you?</h2>
 							<p class="text-sm text-muted-foreground">
 								Your real-ish name, shown in the menu and to the Guild Master. Your heroes keep
 								their own names.
@@ -224,7 +224,7 @@
 
 					<section class="wow-frame space-y-3 rounded-lg p-5">
 						<div>
-							<h2 class="font-display text-xl font-semibold text-primary">Main hero</h2>
+							<h2 class="section-title">Main hero</h2>
 							<p class="text-sm text-muted-foreground">
 								The one you're proud of. Shown next to your name. The others are “alts”, i.e.
 								regrets.
@@ -259,7 +259,7 @@
 					<section class="space-y-3">
 						<div class="flex flex-wrap items-end justify-between gap-2">
 							<div>
-								<h2 class="font-display text-xl font-semibold text-primary">Your heroes</h2>
+								<h2 class="section-title">Your heroes</h2>
 								<p class="text-sm text-muted-foreground">
 									{me.characters.length
 										? `${me.characters.length} hero${me.characters.length === 1 ? '' : 'es'} under your name. That's ${me.characters.length > 3 ? 'a problem' : 'fine'}.`
@@ -320,7 +320,7 @@
 
 					<form onsubmit={addAlt} class="wow-frame space-y-3 rounded-lg p-5">
 						<div>
-							<h2 class="font-display text-xl font-semibold text-primary">Add an alt</h2>
+							<h2 class="section-title">Add an alt</h2>
 							<p class="text-sm text-muted-foreground">
 								Full name exactly as in game. The Guild Master approves it — paperwork builds
 								character.
@@ -364,7 +364,7 @@
 					<section class="wow-frame space-y-4 rounded-lg p-5">
 						<div class="flex flex-wrap items-end justify-between gap-2">
 							<div>
-								<h2 class="font-display text-xl font-semibold text-primary">Companion devices</h2>
+								<h2 class="section-title">Companion devices</h2>
 								<p class="text-sm text-muted-foreground">
 									PCs running the Companion app under your name. Lost a laptop? Revoke it before it
 									uploads your shame.
@@ -378,7 +378,7 @@
 					</section>
 				{:else}
 					<section class="wow-frame space-y-4 rounded-lg p-5">
-						<h2 class="font-display text-xl font-semibold text-primary">Account</h2>
+						<h2 class="section-title">Account</h2>
 						<dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[10rem_1fr]">
 							<dt class="text-muted-foreground">Signed in as</dt>
 							<dd class="flex items-center gap-2">

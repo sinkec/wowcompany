@@ -28,13 +28,13 @@
 	<div class="flex flex-wrap items-end justify-between gap-3">
 		<div class="flex flex-wrap gap-3">
 			<div class="wow-frame rounded-lg px-4 py-2">
-				<div class="text-xs tracking-wide text-muted-foreground uppercase">Best Perf. Avg</div>
+				<div class="eyebrow">Best Perf. Avg</div>
 				<div class="text-2xl font-bold tabular-nums" style="color: {parseColor(d.bestPerfAvg)}">
 					{pctText(d.bestPerfAvg)}
 				</div>
 			</div>
 			<div class="wow-frame rounded-lg px-4 py-2">
-				<div class="text-xs tracking-wide text-muted-foreground uppercase">Median Perf. Avg</div>
+				<div class="eyebrow">Median Perf. Avg</div>
 				<div class="text-2xl font-bold tabular-nums" style="color: {parseColor(d.medianPerfAvg)}">
 					{pctText(d.medianPerfAvg)}
 				</div>
