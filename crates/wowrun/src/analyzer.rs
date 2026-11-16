@@ -3,6 +3,7 @@
 use crate::summary::*;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use wowlog::unit::flags;
+use wowlog::unit::Advanced;
 use wowlog::{DamageSource, Kind, Record, Unit};
 
 /// Tunables shared by the detector and the analyzer.
@@ -206,6 +207,8 @@ struct SegPlayerAcc {
 
 /// Resolution of a boss fight's timeline (the run timeline has 10 s buckets – too coarse for a 30 s boss).
 pub const BOSS_BUCKET_MS: i64 = 2_000;
+/// Replay position sampling (one point per player per bucket).
+pub const REPLAY_BUCKET_MS: i64 = 2_000;
 
 /// An aura being tracked for uptime: who holds the credit, on which units it is up right now.
 #[derive(Debug, Clone, Default)]
@@ -317,6 +320,8 @@ pub struct RunAcc {
     rolls: Vec<LootRoll>,
     /// The recorder's gains from the chat log (XP, money, reputation, skills, levels).
     progress: Option<RunProgress>,
+    /// Replay: per player guid, the last position seen in each `REPLAY_BUCKET_MS` bucket.
+    positions: HashMap<String, ReplayTrack>,
     /// Open aura intervals: (credited player guid, spell id, debuff on enemies).
     auras: HashMap<(String, u32, bool), AuraTrack>,
     /// Leader from the chat log (see `Detector::push_group`): `Some(None)` = the log writer.
@@ -357,6 +362,7 @@ impl RunAcc {
             rolls: Vec::new(),
             auras: HashMap::new(),
             progress: None,
+            positions: HashMap::new(),
             chat_leader: None,
         }
     }
@@ -716,6 +722,30 @@ impl RunAcc {
         (s && !d && !rec.dest.is_none()) || (d && !s && !rec.source.is_none())
     }
 
+    /// Replay: remember where a party member stood (the last sample of each bucket wins).
+    fn note_position(&mut self, a: &Advanced, since_start: i64) {
+        // uiMapID is 0 in some Forever dungeons (no map of their own): the points still count
+        if (a.x == 0.0 && a.y == 0.0) || since_start < 0 {
+            return;
+        }
+        let b = (since_start / REPLAY_BUCKET_MS) as u32;
+        let slug = self.players.get(&a.info_guid).map(|p| p.slug.clone()).unwrap_or_default();
+        let tr = self
+            .positions
+            .entry(a.info_guid.clone())
+            .or_insert_with(|| ReplayTrack { slug, ..Default::default() });
+        let (x, y, map) = ((a.x * 10.0).round() as i32, (a.y * 10.0).round() as i32, a.ui_map_id.max(0) as u32);
+        if tr.t.last() == Some(&b) {
+            let i = tr.t.len() - 1;
+            (tr.x[i], tr.y[i], tr.map[i]) = (x, y, map);
+        } else if tr.t.len() < Replay::MAX_POINTS {
+            tr.t.push(b);
+            tr.x.push(x);
+            tr.y.push(y);
+            tr.map.push(map);
+        }
+    }
+
     /// Feeds one record (only while the player is inside the instance).
     pub fn push(&mut self, rec: &Record, cfg: &Config) {
         let ts = rec.timestamp;
@@ -739,6 +769,9 @@ impl RunAcc {
                     self.pet_owner
                         .entry(a.info_guid.clone())
                         .or_insert_with(|| owner.clone());
+                }
+                if let (Some(start), true) = (self.started_at, self.players.contains_key(&a.info_guid)) {
+                    self.note_position(a, ts - start);
                 }
                 if let Some(p) = self.players.get_mut(&a.info_guid) {
                     p.level = Some(a.level);
@@ -1451,6 +1484,19 @@ impl RunAcc {
                 .as_ref()
                 .and_then(|who| self.chat_player(who.as_ref()))
                 .map(|p| p.name.clone()),
+            replay: {
+                let mut players: Vec<ReplayTrack> = self
+                    .positions
+                    .values()
+                    .filter(|t| t.t.len() >= 2)
+                    .cloned()
+                    .collect();
+                players.sort_by(|a, b| a.slug.cmp(&b.slug));
+                (!players.is_empty()).then_some(Replay {
+                    bucket_ms: REPLAY_BUCKET_MS,
+                    players,
+                })
+            },
         };
         summary.link_rolls_to_loot();
         summary

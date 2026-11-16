@@ -13,6 +13,7 @@ import {
 	playerSummary,
 	recordKind,
 	recorder,
+	replay,
 	runResult,
 	segment,
 	timeline,
@@ -316,6 +317,8 @@ export default defineSchema({
 		result: runResult,
 		party: v.array(partyMember),
 		recordedBy: v.array(recorder),
+		/** obstaja runReplay (da strani ni treba brati 50 KB dokumenta za gumb) */
+		hasReplay: v.optional(v.boolean()),
 		awards: v.array(award),
 		/** vodja partyja (iz addona WowCompany prek Companiona); manjka, če ga nihče ni poslal */
 		leader: v.optional(v.string()),
@@ -349,6 +352,9 @@ export default defineSchema({
 		index: v.number(),
 		players: v.array(bossDetailPlayer)
 	}).index('by_run_and_index', ['runId', 'index']),
+
+	// Replay runa: pozicije partyja (en dokument na run, ~50 KB) – bere se samo ob odprtem zavihku Replay.
+	runReplay: defineTable({ runId: v.id('runs'), ...replay.fields }).index('by_run', ['runId']),
 
 	// Vseživljenjski rekordi spremljanih junakov (največji crit …): ena vrstica na junaka in vrsto.
 	// Posodobi jih ingestRun, ko run prinese večjo številko. Vidnost: polje 'runDetails'.

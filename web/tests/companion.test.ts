@@ -413,3 +413,22 @@ describe('failed-cast awards', () => {
 		expect(castFailAwards([{ slug: 'x', castFails: F({ spam: 10 }) }])).toEqual([]);
 	});
 });
+
+describe('replay', () => {
+	const T = (slug: string, n = 3) => ({
+		slug,
+		t: Array.from({ length: n }, (_, i) => i * 2),
+		x: Array.from({ length: n }, (_, i) => 18084 + i * 10),
+		y: Array.from({ length: n }, () => 1366),
+		map: Array.from({ length: n }, () => 0)
+	});
+	const slug = () => RUN().players[0].slug;
+	test('party positions pass', () =>
+		expect(checkRun(RUN({ replay: { bucketMs: 2000, players: [T(slug())] } }), NOW)).toBeNull());
+	test.each([
+		['a stranger', { bucketMs: 2000, players: [T('random-stranger')] }],
+		['arrays of different length', { bucketMs: 2000, players: [{ ...T(slug()), y: [1] }] }],
+		['time going backwards', { bucketMs: 2000, players: [{ ...T(slug()), t: [4, 2, 0] }] }],
+		['a silly bucket', { bucketMs: 1, players: [T(slug())] }]
+	])('rejects %s', (_, replay) => expect(checkRun(RUN({ replay }), NOW)).not.toBeNull());
+});

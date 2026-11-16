@@ -93,6 +93,7 @@ export const get = query({
 			run: {
 				...runDetail(run as RunDocLike, details as DetailsLike | null, classOf, allowed),
 				progress,
+				hasReplay: (run.hasReplay ?? false) && allowed('runDetails'),
 				// nagrade za neuspele caste (vsak snemalec ima v logu samo svoje)
 				failAwards: castFailAwards(progress)
 			}
@@ -199,6 +200,21 @@ export const bossDetail = query({
 			.withIndex('by_run_and_index', (q) => q.eq('runId', runId).eq('index', index))
 			.unique();
 		return doc?.players ?? null;
+	}
+});
+
+/** Replay (pozicije partyja); bere se samo, ko je zavihek Replay odprt. */
+export const replay = query({
+	args: { id: v.string() },
+	handler: async (ctx, { id }) => {
+		const { allowed } = await visibility(ctx);
+		const runId = ctx.db.normalizeId('runs', id);
+		if (!runId || !allowed('runs') || !allowed('runDetails')) return null;
+		const doc = await ctx.db
+			.query('runReplay')
+			.withIndex('by_run', (q) => q.eq('runId', runId))
+			.unique();
+		return doc ? { bucketMs: doc.bucketMs, players: doc.players } : null;
 	}
 });
 

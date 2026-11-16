@@ -308,6 +308,20 @@ export const personalUpload = v.object({
 	)
 });
 
+/**
+ * Replay: pozicije partyja vsakih `bucketMs` (Companion v0.1.12+). Svetovne koordinate v desetinkah
+ * jarda (x = sever, y = zahod), vzporedni seznami; `t` = indeks vedra od začetka runa.
+ */
+export const replayTrack = v.object({
+	slug: v.string(),
+	t: v.array(v.number()),
+	x: v.array(v.number()),
+	y: v.array(v.number()),
+	map: v.array(v.number())
+});
+export const replay = v.object({ bucketMs: v.number(), players: v.array(replayTrack) });
+export type Replay = Infer<typeof replay>;
+
 /** Kar pošlje aplikacija (POST /companion/runs). */
 export const runSummary = v.object({
 	schema: v.union(v.literal(1), v.literal(2), v.literal(3), v.literal(4)),
@@ -329,7 +343,9 @@ export const runSummary = v.object({
 	/** need/greed rolli (Companion v0.1.7+) */
 	rolls: v.optional(v.array(lootRoll)),
 	/** pridobitve snemalca (Companion v0.1.11+) */
-	progress: v.optional(runProgress)
+	progress: v.optional(runProgress),
+	/** pozicije za replay (Companion v0.1.12+) – shrani se v svojo tabelo runReplay */
+	replay: v.optional(replay)
 });
 
 export const award = v.object({

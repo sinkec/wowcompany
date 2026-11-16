@@ -13,6 +13,7 @@
 	import CombatLogPanel from '#lib/components/wow/CombatLogPanel.svelte';
 	import RunTimeline from '#lib/components/wow/RunTimeline.svelte';
 	import { classColor, iconFallback } from '#lib/wow.js';
+	import RunReplay from '#lib/components/wow/RunReplay.svelte';
 	import {
 		ACTIVE_QUIP,
 		END_REASON,
@@ -51,7 +52,7 @@
 	const totalDeaths = $derived(run?.totalDeaths ?? null);
 
 	// ?tab=meter|bosses|deaths|timeline|spells → povezava naravnost na zavihek
-	const TABS = ['meter', 'numbers', 'bosses', 'deaths', 'loot', 'timeline', 'spells'];
+	const TABS = ['meter', 'numbers', 'bosses', 'deaths', 'loot', 'timeline', 'replay', 'spells'];
 	function initialTab(a: { details: boolean; deaths: boolean; loot: boolean }) {
 		const t = page.url.searchParams.get('tab') ?? '';
 		const ok = (x: string) => (x === 'deaths' ? a.deaths : x === 'loot' ? a.loot : a.details);
@@ -304,6 +305,7 @@
 							>{/if}</Tabs.Trigger
 					>
 					<Tabs.Trigger value="timeline" disabled={!run.access.details}>Timeline</Tabs.Trigger>
+					{#if run.hasReplay}<Tabs.Trigger value="replay">Replay</Tabs.Trigger>{/if}
 					<Tabs.Trigger value="spells" disabled={!run.access.details}>Combat Log</Tabs.Trigger>
 				</Tabs.List>
 
@@ -1083,6 +1085,22 @@
 								{classes}
 							/>
 						</section>
+					{/if}
+				</Tabs.Content>
+
+				<!-- REPLAY (naloži se samo, ko je zavihek odprt) -->
+				<Tabs.Content value="replay" class="mt-4">
+					{#if run.hasReplay}
+						<RunReplay
+							runId={id}
+							zone={run.zone}
+							durationMs={run.durationMs}
+							segments={run.segments ?? []}
+							deaths={run.deaths ?? []}
+							timeline={run.timeline}
+							{names}
+							{classes}
+						/>
 					{/if}
 				</Tabs.Content>
 

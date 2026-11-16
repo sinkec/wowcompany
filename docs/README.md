@@ -7,28 +7,32 @@
 | [ADDON.md](ADDON.md) | addon `WowCompany`: §1 stanje, §4.1 dejstva o Forever API-ju |
 | [STATS.md](STATS.md) | v0.3: statistika po vzoru Warcraft Logs + Details!, Company Parses, sezone, preureditev repozitorija |
 
-## ZAČNI TUKAJ – stanje 16. 11. 2026 ponoči
+## ZAČNI TUKAJ – stanje 16. 11. 2026 (dopoldne)
 
-**V produkciji in pri uporabniku:**
-- Portal (`main` = zadnji commit, Vercel + Convex prod): dungeon runi z rolli in kakovostjo lootu (Blizzard retail/classic
-  namespace – Forever `item/{id}` = 404), razčlenitev po bossih (klik ▸: graf 2 s, uroki, buffi/debuffi, oprema, kategorije
-  *My actions* / *What happened to me?* kot v igrinem Combat Log Config), zavihek **Combat Log** za cel run, *coin & glory*
-  (XP, zlato, reputacija, veščine, neuspeli casti), nagrade za neuspele caste, Company Parses (lik → **Logs**), **/rankings**
-  (top 10, All-Stars, Speed demons, Best value, Keyboard Hall of Shame), sezone, Discord objave runov + `/parses`
-  (Office → Visibility → Discord → *Dungeon runs*; po deployu *Register commands*).
-- Companion **v0.1.11** izdan in nameščen (`~/Applications/WowCompany-Companion.AppImage`; `0.1.6.AppImage.bak` lahko gre).
-- Addon **0.5.3** v mapi igre: lasten zavihek chata **WowCompany** (loot, rolli, sistem, party, XP, denar, reputacija, veščine –
-  preverjeno, da ga Forever dovoli), meter *More*, klik na vrstico = uroki, povzetek runa + *Send now / Later*,
-  `/wowco report|details|ask|chat`.
-- Filtri v igrinem *Combat Log Config* vplivajo samo na prikaz v chatu, ne na datoteko combat loga (preverjeno).
-- Chat log pa zapiše samo, kar prikaže kakšno okno chata → zato zavihek WowCompany.
+**Narejeno danes (commiti na `main`, še ne nujno pushani – preveri `git status`):**
+- **Naslovnica:** hero z ozadjem iz najnovejše uradne novice in 3 naključnimi junaki (Blizzard render `-main-raw.png`
+  iz avatarja) + šaljivi komentarji; **novice** (`news` tabela, dnevni cron `wow news` bere `model = {…}` z
+  worldofwarcraft.blizzard.com/en-gb/news; Forever/hotfixi vidni, ostalo skrito; patch in sezona objavita sama).
+- **Design rules** v `web/src/routes/layout.css`: `.page-title .page-lead .section-title .card-title .section-lead
+  .eyebrow .stat-value .stat-label .panel` – nove strani uporabljajo samo te.
+- **Admin** (Guild Master's Office): stranski meni po skupinah Community / Website (Who sees what, News, Seasons) /
+  Discord (Connection, Posts, Slash commands) / System. **Uporabnik** (/settings): Overview (main + koraki), Heroes,
+  Companion & addon, Account.
+- **Companion 0.1.12:** samoposodobitev (tauri-plugin-updater, `latest.json` na GitHub Releases, podpis z ključem v
+  `~/.tauri/wowcompany-updater.key` – **varnostna kopija!**), samodejna posodobitev addona v mapi igre (opozori, ali
+  zadošča /reload ali je treba igro znova zagnati), **poročilo runa** v zavihku Runs.
+- **Addon 0.5.4:** ob nalaganju pove, da ga je Companion posodobil. Igra med igranjem ne more brati datotek, zato
+  addon sam ne more narediti /reload ob posodobitvi.
+- **Replay** (zavihek na strani runa): analizator vzorči x/y partyja vsaki 2 s (`RunSummary.replay`, tabela
+  `runReplay`, zastavica `runs.hasReplay`), zemljevid iz poti, bossi, smrti, trak s play/pavza/hitrost, `?t=` sekunde.
+  Koordinate: x = sever, y = zahod (preverjeno na Northwatch). Nekateri Forever dungeoni imajo uiMapID 0.
 
-**Naslednji koraki (predlog):**
-1. Ko uporabnik odigra dungeon z 0.1.11: preveri run na portalu (*coin & glory*, nagrade, ▸ kategorije, Combat Log, rolli,
-   parsi, Rankings), Discord objavo, `/wowco probe` v dungeonu (oblika `combatSpells` med bojem – razčlenitev v igri je preverjena samo s smoke testom).
-2. Prijatelji (Chugga Zugga, Zadn Cajt …) naj posodobijo Companion – njihovi stari runi nimajo razčlenitve.
-3. Odprto iz načrta: **replay** (zemljevid pozicij/smrti iz X/Y v logu, C9), **poročilo runa v Companionu** (C5),
-   po potrebi loot/rolli/časovnica iz `runDetails` v ločene dokumente (PLAN.md §8a, samo če DB I/O raste).
+**Za izdajo 0.1.12 (uporabnik):** GitHub skrivnosti `TAURI_SIGNING_PRIVATE_KEY` in `..._PASSWORD` (iz `~/.tauri`),
+push `main` (najprej strežnik – sprejme `replay`), nato oznaka `companion-v0.1.12`. Ročna namestitev 0.1.12 je zadnja:
+od tu naprej se Companion posodablja sam.
+
+**Naslednji koraki:** preveri pravi dungeon z 0.1.12 (replay, poročilo, samoposodobitev na 0.1.13), Discord objavo,
+`/wowco probe`; po želji ročno umerjen zemljevid dungeona (slika + meje iz `C_Map` v addonu).
 
 **Kje je kaj:** [STATS.md](STATS.md) §9.1 (kaj je narejeno), [ADDON.md](ADDON.md) §1 (addon), [COMPANION.md](COMPANION.md)
 §14/§14a (preverjanja, omejitve, brisanje logov), [PLAN.md](PLAN.md) §0 (ukazi) in §8a (DB I/O).

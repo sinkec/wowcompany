@@ -44,6 +44,49 @@ pub struct RunSummary {
     /// levels). Only the recorder – the chat log says nothing about the others' gains.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress: Option<RunProgress>,
+    /// Where the party stood, every `bucket_ms` (advanced log x/y/uiMapID) – the portal's replay.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replay: Option<Replay>,
+}
+
+/// Positions for the replay map. World coordinates in tenths of a yard: `x` grows to the north,
+/// `y` to the west (the map draws east to the right: screen x = -y, screen y = -x).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Replay {
+    pub bucket_ms: i64,
+    pub players: Vec<ReplayTrack>,
+}
+
+/// One player's path: parallel arrays, `t` = bucket index from the run start (increasing).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayTrack {
+    pub slug: String,
+    pub t: Vec<u32>,
+    pub x: Vec<i32>,
+    pub y: Vec<i32>,
+    /// uiMapID per point (dungeons with several floors switch maps)
+    pub map: Vec<u32>,
+}
+
+impl Replay {
+    /// Most points kept per player (a 2 h run at 2 s).
+    pub const MAX_POINTS: usize = 3600;
+
+    /// Keeps every other point (twice the bucket) – for runs that are too big to upload.
+    pub fn coarsen(&mut self) {
+        self.bucket_ms *= 2;
+        for p in &mut self.players {
+            let keep: Vec<usize> = (0..p.t.len())
+                .filter(|&i| i == 0 || p.t[i] / 2 != p.t[i - 1] / 2)
+                .collect();
+            p.t = keep.iter().map(|&i| p.t[i] / 2).collect();
+            p.x = keep.iter().map(|&i| p.x[i]).collect();
+            p.y = keep.iter().map(|&i| p.y[i]).collect();
+            p.map = keep.iter().map(|&i| p.map[i]).collect();
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -592,6 +635,17 @@ impl RunSummary {
     /// grey (poor) loot. Nothing is dropped from a run that already fits. Returns whether it changed.
     pub fn fit_size(&mut self, max_bytes: usize) -> bool {
         let mut changed = false;
+        // the replay is the most expendable: coarser first, then gone
+        while self.json_len() > max_bytes
+            && let Some(r) = self.replay.as_mut()
+        {
+            if r.bucket_ms >= 16_000 {
+                self.replay = None;
+            } else {
+                r.coarsen();
+            }
+            changed = true;
+        }
         while self.json_len() > max_bytes && self.timeline.bucket_ms < 10 * 60_000 && !self.timeline.players.is_empty()
         {
             self.timeline.coarsen();
@@ -683,6 +737,7 @@ mod size_tests {
             },
             rolls: vec![],
             progress: None,
+            replay: None,
             loot: (0..2000)
                 .map(|i| LootDrop {
                     slug: Some("hero-0".into()),

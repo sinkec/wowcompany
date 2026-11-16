@@ -382,6 +382,21 @@ async function writeProgress(ctx: MutationCtx, runId: Id<'runs'>, s: RunSummary)
 	else await ctx.db.insert('runProgress', row);
 }
 
+/** Replay v svojo tabelo (en dokument). Novejši/boljši posnetek ga zamenja; brez replaya ostane star. */
+async function writeReplay(ctx: MutationCtx, runId: Id<'runs'>, s: RunSummary, replace: boolean) {
+	if (!s.replay?.players.length) return;
+	const old = await ctx.db
+		.query('runReplay')
+		.withIndex('by_run', (q) => q.eq('runId', runId))
+		.unique();
+	if (old && !replace) return;
+	if (old) await ctx.db.replace('runReplay', old._id, { runId, ...s.replay });
+	else {
+		await ctx.db.insert('runReplay', { runId, ...s.replay });
+		await ctx.db.patch('runs', runId, { hasReplay: true });
+	}
+}
+
 async function writeBossDetails(
 	ctx: MutationCtx,
 	runId: Id<'runs'>,
@@ -495,6 +510,7 @@ export const ingestRun = internalMutation({
 			await writeHeroRecords(ctx, runId, s, party);
 			await writeParses(ctx, runId, s, party);
 			await writeProgress(ctx, runId, s);
+			await writeReplay(ctx, runId, s, true);
 			// Discord: enkrat, čez 5 min (drugi snemalec, dopolnitev iz addona); postRun preveri vidnost
 			await ctx.scheduler.runAfter(5 * 60_000, internal.discord.postRun, { runId });
 			await ctx.scheduler.runAfter(0, internal.companion.enrichItems, { runId });
@@ -551,6 +567,8 @@ export const ingestRun = internalMutation({
 		}
 		// pridobitve snemalca vedno (vsak snemalec ima svoje), tudi ko posnetek ni boljši
 		await writeProgress(ctx, existing._id, s);
+		// replay: boljši posnetek ga zamenja, sicer samo, če ga še ni
+		await writeReplay(ctx, existing._id, s, better);
 		return { runId: existing._id, created: false, recorderAdded: added, replaced: better };
 	}
 });
@@ -666,6 +684,9 @@ export const deleteRun = internalMutation({
 			.query('runBossDetails')
 			.withIndex('by_run_and_index', (q) => q.eq('runId', runId))) {
 			await ctx.db.delete('runBossDetails', b._id);
+		}
+		for await (const r of ctx.db.query('runReplay').withIndex('by_run', (q) => q.eq('runId', runId))) {
+			await ctx.db.delete('runReplay', r._id);
 		}
 		for await (const c of ctx.db.query('clears').withIndex('by_run', (q) => q.eq('runId', runId))) {
 			await ctx.db.delete('clears', c._id);

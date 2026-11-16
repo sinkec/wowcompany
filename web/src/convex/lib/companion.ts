@@ -62,6 +62,9 @@ export function runScore(
 	);
 }
 
+/** Točk na igralca v replayu (2 h pri 2 s; Companion pošlje največ 3600). */
+export const MAX_REPLAY_POINTS = 4000;
+
 /** Vsebinske omejitve, ki jih validator ne pokrije. Vrne opis napake ali null. */
 export function checkRun(s: RunSummary, now: number): string | null {
 	if (s.players.length < 1 || s.players.length > MAX_PLAYERS)
@@ -104,6 +107,25 @@ export function checkRun(s: RunSummary, now: number): string | null {
 		)
 	)
 		return 'bad roll entry';
+	const rp = s.replay;
+	if (rp) {
+		if (!(rp.bucketMs >= 500 && rp.bucketMs <= 60_000) || rp.players.length > MAX_PLAYERS)
+			return 'bad replay';
+		for (const tr of rp.players) {
+			const n = tr.t.length;
+			if (
+				!slugs.has(tr.slug) ||
+				n > MAX_REPLAY_POINTS ||
+				tr.x.length !== n ||
+				tr.y.length !== n ||
+				tr.map.length !== n ||
+				tr.t.some((t, i) => !Number.isInteger(t) || t < 0 || (i > 0 && t <= tr.t[i - 1])) ||
+				tr.x.some((c) => !Number.isInteger(c) || Math.abs(c) > 1e8) ||
+				tr.y.some((c) => !Number.isInteger(c) || Math.abs(c) > 1e8)
+			)
+				return 'bad replay track';
+		}
+	}
 	const g = s.progress;
 	if (g) {
 		const okText = (t: string) => t.length > 0 && t.length <= 80;
