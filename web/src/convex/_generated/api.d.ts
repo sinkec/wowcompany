@@ -16,6 +16,7 @@ import type * as companion from "../companion.js";
 import type * as companionHttp from "../companionHttp.js";
 import type * as crons from "../crons.js";
 import type * as discord from "../discord.js";
+import type * as dungeonMaps from "../dungeonMaps.js";
 import type * as events from "../events.js";
 import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   companionHttp: typeof companionHttp;
   crons: typeof crons;
   discord: typeof discord;
+  dungeonMaps: typeof dungeonMaps;
   events: typeof events;
   http: typeof http;
   integrations: typeof integrations;

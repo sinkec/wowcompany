@@ -12,7 +12,7 @@ import { loadHeroLogs } from './lib/parsesDb.js';
 import { getSettings } from './lib/settings.js';
 import { listSeasons } from './seasons.js';
 
-async function visibility(ctx: QueryCtx) {
+export async function visibility(ctx: QueryCtx) {
 	const [privateOk, settings] = await Promise.all([canSeePrivate(ctx), getSettings(ctx)]);
 	const pub = new Set(settings.publicFields);
 	return { privateOk, allowed: (k: string) => privateOk || pub.has(k) };

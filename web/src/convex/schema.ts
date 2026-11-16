@@ -361,6 +361,18 @@ export default defineSchema({
 		players: v.array(bossDetailPlayer)
 	}).index('by_run_and_index', ['runId', 'index']),
 
+	// Zemljevid dungeona za replay: posnetek zaslona igrine karte (M), ki ga Guild Master naloži in
+	// poravna s potmi partyja. `align` v jardih zaslonskih koordinat replaya (vzhod desno, sever gor).
+	dungeonMaps: defineTable({
+		instanceId: v.number(),
+		zone: v.string(),
+		storageId: v.id('_storage'),
+		/** razmerje širina/višina slike */
+		aspect: v.number(),
+		align: v.object({ x: v.number(), y: v.number(), width: v.number(), rotate: v.number() }),
+		updatedAt: v.number()
+	}).index('by_instance', ['instanceId']),
+
 	// Arhivi realmov: ko druščina zamenja realm, se junaki, runi in sezone starega realma označijo
 	// s `key` (samo branje za člane, /archive). Vrnitev v 30 dneh jih obnovi, potem jih cron izbriše.
 	archives: defineTable({

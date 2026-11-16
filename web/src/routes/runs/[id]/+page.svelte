@@ -1094,6 +1094,7 @@
 						<RunReplay
 							runId={id}
 							zone={run.zone}
+							instanceId={run.instanceId}
 							durationMs={run.durationMs}
 							segments={run.segments ?? []}
 							deaths={run.deaths ?? []}
