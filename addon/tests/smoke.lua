@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.5.6" end,
+    GetAddOnMetadata = function() return "0.5.7" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -424,7 +424,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.5%.6|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.5%.7|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -559,6 +559,18 @@ ns.UI.Refresh()
 check(textOf("71170:12") == nil and textOf("0:46") ~= nil and textOf("65.20 DPS") ~= nil,
     "now: out of combat the last fight is read by id – no 71170:12 and 0.00 DPS from a broken 'current'")
 game.brokenCurrent = nil
+-- past fights may come without a duration in the session table: the game's duration call fills it in
+local fromId = C_DamageMeter.GetCombatSessionFromID
+C_DamageMeter.GetCombatSessionFromID = function(id, kind) local x = fromId(id, kind) x.durationSeconds = nil return x end
+local listed = C_DamageMeter.GetAvailableCombatSessions
+C_DamageMeter.GetAvailableCombatSessions = function()
+    local l = listed()
+    for _, x in ipairs(l) do x.durationSeconds = nil end
+    return l
+end
+ns.UI.Refresh()
+check(textOf("0:46") ~= nil, "now: duration from GetSessionDurationSeconds when the session table has none")
+C_DamageMeter.GetCombatSessionFromID, C_DamageMeter.GetAvailableCombatSessions = fromId, listed
 -- diagnostics: opt-in, written at logout, gone when switched off
 check(WowCompanyDB.settings.diagnostics == false, "diagnostics: off by default")
 SlashCmdList.WOWCOMPANY("diag on")
