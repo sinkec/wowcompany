@@ -1,6 +1,6 @@
 [package]
 name = "wowcompany-companion"
-version = "0.1.12"
+version = "0.1.13"
 description = "WowCompany Companion – dungeon run tracker for WoW Forever"
 edition.workspace = true
 license.workspace = true
