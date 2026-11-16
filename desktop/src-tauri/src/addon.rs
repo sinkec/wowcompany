@@ -319,7 +319,6 @@ const BUNDLED: &[(&str, &str)] = &[
     ("Meter.lua", include_str!("../../../addon/WowCompany/Meter.lua")),
     ("Export.lua", include_str!("../../../addon/WowCompany/Export.lua")),
     ("Summary.lua", include_str!("../../../addon/WowCompany/Summary.lua")),
-    ("UI.lua", include_str!("../../../addon/WowCompany/UI.lua")),
     ("Window.lua", include_str!("../../../addon/WowCompany/Window.lua")),
     ("Options.lua", include_str!("../../../addon/WowCompany/Options.lua")),
     ("Minimap.lua", include_str!("../../../addon/WowCompany/Minimap.lua")),
@@ -405,6 +404,15 @@ pub fn install(logs_dir: &Path) -> Result<String, String> {
             continue;
         }
         fs::write(&path, text).map_err(|e| format!("cannot write {name}: {e}"))?;
+    }
+    // files of older versions that the addon no longer has (e.g. UI.lua before 0.6.4)
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for e in entries.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name.ends_with(".lua") && name != "CompanionData.lua" && !BUNDLED.iter().any(|(n, _)| *n == name) {
+                let _ = fs::remove_file(e.path());
+            }
+        }
     }
     let media = dir.join("Media");
     fs::create_dir_all(&media).map_err(|e| format!("cannot create {}: {e}", media.display()))?;

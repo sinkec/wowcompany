@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.6.3" end,
+    GetAddOnMetadata = function() return "0.6.4" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -276,7 +276,7 @@ check(ns.db == nil, "ignores other addons loading")
 fire("ADDON_LOADED", "WowCompany")
 check(type(WowCompanyDB) == "table" and WowCompanyDB.settings.autoLog == true, "saved variables get defaults")
 check(said("loaded"), "greets on load")
-check(WowCompanyMeter ~= nil and WowCompanyMeter:IsShown() and not (WowCompanyFrame and WowCompanyFrame:IsShown()), "first run: the meter window opens by itself, the big panel does not")
+check(WowCompanyMeter ~= nil and WowCompanyMeter:IsShown(), "first run: the meter window opens by itself")
 check(WowCompanyOptions ~= nil, "options: the settings page is built at load")
 check(pcall(ns.Options.Open) and pcall(ns.Options.Refresh), "options: /wowco options opens it")
 local function escCloses(name)
@@ -291,8 +291,7 @@ WowCompanyDB.settings.winLocked = false
 ns.Window.ApplyLock()
 check(pcall(WowCompany_OnCompartmentClick) and not WowCompanyMeter:IsShown(), "addon compartment toggles the meter")
 WowCompany_OnCompartmentClick()
-slash("panel") -- the rest of the tests use the big panel
-check(WowCompanyFrame.point[1] == "TOP", "default position is the top of the screen")
+check(WowCompanyMeter.point[1] == "RIGHT", "meter: default spot on the right of the screen")
 
 -- formatting helpers
 check(ns.fmt(1234567.4) == "1234567", "fmt uses the game's number formatter")
@@ -389,34 +388,24 @@ WowCompanyDB.settings.winKind = "damage"
 check(pcall(ns.Window.OpenBreakdown, "Player-1-0000000A", "Grobos Stinkfoot", "MAGE"), "meter: spell breakdown opens")
 check(pcall(WowCompanyMeter.scripts.OnUpdate, WowCompanyMeter, 1), "meter: refresh tick")
 ns.Window.CloseBreakdown()
-if WowCompanyFrame:IsShown() then slash("panel") end
-slash("panel")
-check(WowCompanyFrame:IsShown() and WowCompanyDB.settings.open == true, "/wowco panel opens the big window")
 
--- drag, pin, reset
-local win = WowCompanyFrame
-win.scripts.OnDragStart(win)
-check(win.moving == true, "unpinned window can be dragged")
-win.scripts.OnDragStop(win)
-check(WowCompanyDB.settings.pos[1] == "CENTER" and WowCompanyDB.settings.pos[3] == 10, "drop remembers the position")
-local pin
+-- drag, lock, reset (the meter window)
+local win = WowCompanyMeter
+local titleBar
 for i = 1, #frames do
-    local label = rawget(frames[i], "label") -- unknown widget fields are functions, so no plain .label
-    if label and label.text == "pin" then pin = frames[i] end
+    if frames[i] ~= win and frames[i] ~= WowCompanyMinimapButton and frames[i].scripts.OnDragStart then titleBar = frames[i] end
 end
-check(pin ~= nil, "there is a pin button")
-pin.scripts.OnClick(pin)
-check(WowCompanyDB.settings.pinned == true and pin.label.text == "pinned", "pin button pins")
+titleBar.scripts.OnDragStart(titleBar)
+check(win.moving == true, "meter: drag by the title bar")
+titleBar.scripts.OnDragStop(titleBar)
+check(WowCompanyDB.settings.win[1] == "CENTER" and WowCompanyDB.settings.win[3] == 10, "meter: drop remembers the spot")
+WowCompanyDB.settings.winLocked = true
 win.moving = false
-win.scripts.OnDragStart(win)
-check(win.moving == false, "pinned window does not move")
+titleBar.scripts.OnDragStart(titleBar)
+check(win.moving == false, "locked meter does not move")
 slash("reset")
-check(WowCompanyDB.settings.pos == nil and not WowCompanyDB.settings.pinned and win.point[1] == "TOP"
-    and pin.label.text == "pin", "/wowco reset: back to the top, unpinned")
-for _, tab in ipairs({ "now", "meter", "fights", "records", "logging" }) do
-    local ok, err = pcall(ns.UI.Show, tab)
-    check(ok, "draws the " .. tab .. " tab" .. (ok and "" or (": " .. tostring(err))))
-end
+check(WowCompanyDB.settings.win == nil and WowCompanyDB.settings.winLocked == false and win.point[1] == "RIGHT",
+    "/wowco reset: default spot, unlocked")
 -- PRIVACY: strangers are never listed; party members only when they really are in the party
 game.instanceType = "none"
 local function names(list)
@@ -450,15 +439,7 @@ check(run ~= nil and run.zone == "Somewhere" and run.fights == 0 and run.bosses 
 WowCompanyDB.state.run.afterFight = 1 -- as if fight 1 happened before the dungeon
 run = ns.Meter.Run()
 check(run.fights == 2 and run.bosses == 1, "fights and bosses of the run are counted from the meter")
-ns.UI.Show("now")
-local banner
-for i = 1, #frames do
-    local t = rawget(frames[i], "text")
-    if type(t) == "string" and string.find(t, "Somewhere", 1, true) and string.find(t, "2 fights", 1, true) then
-        banner = t
-    end
-end
-check(banner ~= nil and string.find(banner, "1 boss", 1, true) ~= nil, "now: dungeon banner sums up the run")
+
 game.instanceType = "none"
 fire("ZONE_CHANGED_NEW_AREA")
 check(ns.Meter.Run() == nil and WowCompanyDB.state.run.leftAt ~= nil, "leaving pauses the run")
@@ -479,7 +460,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.6%.3|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.6%.4|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -538,10 +519,26 @@ local wasOpen = WowCompanyMeter:IsShown()
 mm.scripts.OnClick(mm, "LeftButton")
 check(WowCompanyMeter:IsShown() ~= wasOpen, "minimap: click toggles the meter window")
 mm.scripts.OnClick(mm, "LeftButton")
+local opened = false
+local realOpen = ns.Options.Open
+ns.Options.Open = function() opened = true end
 mm.scripts.OnClick(mm, "RightButton")
-check(game.combatLog == true and game.chatLog == true, "minimap: right click starts logging")
-mm.scripts.OnClick(mm, "RightButton")
-check(game.combatLog == false, "minimap: right click again stops it")
+ns.Options.Open = realOpen
+check(opened, "minimap: right-click opens the settings")
+-- the logging light in the meter title switches the logs
+local light
+for i = 1, #frames do
+    local f = frames[i]
+    if f.scripts.OnClick and f.scripts.OnEnter and rawget(f, "kind") == "Button" and f ~= mm then
+        local okTip = pcall(f.scripts.OnEnter, f)
+        if okTip and GameTooltip.text == "Logging" then light = f end
+    end
+end
+check(light ~= nil, "meter: there is a logging light")
+light.scripts.OnClick(light)
+check(game.combatLog == true and game.chatLog == true, "logging light: click starts logging")
+light.scripts.OnClick(light)
+check(game.combatLog == false, "logging light: click again stops it")
 cursor = { 500, 700 } -- straight above the minimap
 mm.scripts.OnDragStart(mm)
 mm.scripts.OnUpdate(mm)
@@ -556,11 +553,11 @@ check(mm:IsShown(), "/wowco minimap shows it again")
 
 -- records written by the Companion (CompanionData.lua)
 check(ns.Export.Records() == nil, "no Companion data yet")
-ns.UI.Show("records")
+ns.Window.ShowRecords()
 local emptyShown
 for i = 1, #frames do
     local t = rawget(frames[i], "text")
-    if type(t) == "string" and string.find(t, "No records here yet", 1, true) then emptyShown = frames[i].shown end
+    if type(t) == "string" and string.find(t, "No records yet", 1, true) then emptyShown = frames[i].shown end
 end
 check(emptyShown == true, "records: empty state explains what to do")
 WowCompanyCompanionData = { schema = 1, characters = {
@@ -571,7 +568,7 @@ WowCompanyCompanionData = { schema = 1, characters = {
     } },
 } }
 check(ns.Export.Records().name == "Grobos Stinkfoot", "records: picks this character, not another one on file")
-ns.UI.Refresh()
+ns.Window.Refresh()
 local function hasText(pattern)
     for i = 1, #frames do
         local t = rawget(frames[i], "text")
@@ -579,8 +576,10 @@ local function hasText(pattern)
     end
     return false
 end
-check(hasText("1,204") and hasText("Fireball into Mottled Boar") and hasText("open world, Durotar"), "records: crit with spell, target and place")
-check(hasText("1,890") and hasText("Lava") and not hasText("99999") and not hasText("99,999"), "records: hit taken shown, the other character's numbers are not")
+check(hasText("1.20K") and hasText("Biggest crit: Fireball into Mottled Boar"), "records: crit with spell and target")
+check(hasText("1.89K") and hasText("Lava") and not hasText("100.0K") and not hasText("Nope"),
+    "records: hit taken shown, the other character's numbers are not")
+ns.Window.SetDisplay("damage")
 WowCompanyCompanionData = nil
 
 -- buttons explain themselves on hover and never break
@@ -605,17 +604,14 @@ local function widgetWith(pattern)
         if type(t) == "string" and string.find(t, pattern) then return frames[i] end
     end
 end
-ns.UI.Show("meter")
+ns.Window.SetDisplay("damage")
 check(widgetWith("Fizzle Boom") == nil and widgetWith("Grobos Stinkfoot") ~= nil,
     "meter window lists you, not the stranger")
-check(textOf("3,000") ~= nil and textOf("5,000") == nil, "meter total counts only what is shown")
-ns.UI.Show("now")
-check(textOf("Unknown scuffle") ~= nil, "now: out of combat shows the last fight")
-check(textOf("3,000") ~= nil and textOf("65.20 DPS") ~= nil, "now: own damage and DPS on the card (not the party's 5,000)")
+check(textOf("65.20") ~= nil, "meter: your per-second value")
 game.brokenCurrent = true
-ns.UI.Refresh()
-check(textOf("71170:12") == nil and textOf("0:46") ~= nil and textOf("65.20 DPS") ~= nil,
-    "now: out of combat the last fight is read by id – no 71170:12 and 0.00 DPS from a broken 'current'")
+ns.Window.Refresh()
+check(widgetWith("71170") == nil and textOf("[0:46] Damage") ~= nil,
+    "meter: a broken 'current' duration is not shown – the game's duration call is (0:46)")
 game.brokenCurrent = nil
 -- past fights may come without a duration in the session table: the game's duration call fills it in
 local fromId = C_DamageMeter.GetCombatSessionFromID
@@ -626,8 +622,8 @@ C_DamageMeter.GetAvailableCombatSessions = function()
     for _, x in ipairs(l) do x.durationSeconds = nil end
     return l
 end
-ns.UI.Refresh()
-check(textOf("0:46") ~= nil, "now: duration from GetSessionDurationSeconds when the session table has none")
+ns.Window.Refresh()
+check(textOf("[0:46] Damage") ~= nil, "meter: duration from GetSessionDurationSeconds when the session table has none")
 C_DamageMeter.GetCombatSessionFromID, C_DamageMeter.GetAvailableCombatSessions = fromId, listed
 -- diagnostics: opt-in, written at logout, gone when switched off
 check(WowCompanyDB.settings.diagnostics == false, "diagnostics: off by default")
@@ -642,35 +638,26 @@ check(ns.toJson({ a = 'say "hi"\n', b = { 1, 2 }, c = 0 / 0 }) == '{"a":"say \\"
     "diagnostics: JSON escapes quotes and control characters")
 SlashCmdList.WOWCOMPANY("diag off")
 check(WowCompanyDB.probe == nil and WowCompanyDB.diag == nil, "diagnostics: switching off deletes the report")
-check(textOf("Overall  3,000") ~= nil and textOf("DAMAGE") ~= nil, "now: card carries its label and the overall figure")
-check(widgetWith("Last fight") ~= nil, "now: says it is the last fight")
 fire("PLAYER_REGEN_DISABLED")
-ns.UI.Refresh()
-check(textOf("Mottled Boar") ~= nil and widgetWith("In combat") ~= nil, "now: in combat shows the target")
 game.secrets = true
-local okNow, errNow = pcall(ns.UI.Refresh)
-check(okNow, "now: survives secret values mid-fight" .. (okNow and "" or (": " .. tostring(errNow))))
-check(textOf(SECRET) == nil, "now: open world, identity hidden mid-fight -> no numbers of unknown owners")
+local okNow, errNow = pcall(ns.Window.Refresh)
+check(okNow, "meter: survives secret values mid-fight" .. (okNow and "" or (": " .. tostring(errNow))))
+check(textOf(SECRET) == nil, "meter: open world, identity hidden mid-fight -> no numbers of unknown owners")
 game.grouped, game.instanceType = true, "party"
-ns.UI.Refresh()
-check(textOf(SECRET) ~= nil, "now: dungeon with the party -> the party total is passed to the UI untouched")
+ns.Window.Refresh()
+check(textOf(SECRET) ~= nil, "meter: dungeon with the party -> secret values are passed to the UI untouched")
 game.grouped, game.instanceType = false, "none"
 game.secrets = false
 fire("PLAYER_REGEN_ENABLED")
-ns.UI.Refresh()
-check(widgetWith("Last fight") ~= nil, "now: back to last fight after combat")
 
 game.secrets = true
-local ok, err = pcall(ns.UI.Show, "meter")
+local ok, err = pcall(ns.Window.Refresh)
 check(ok, "draws the meter with secret values" .. (ok and "" or (": " .. tostring(err))))
 for _, kind in ipairs(ns.Meter.KINDS) do
-    WowCompanyDB.settings.meterKind = kind.key
-    check(pcall(ns.UI.Refresh), "meter kind " .. kind.key)
+    WowCompanyDB.settings.winKind = kind.key
+    check(pcall(ns.Window.Refresh), "meter kind " .. kind.key)
 end
-local onUpdate = WowCompanyFrame.scripts.OnUpdate
-check(pcall(onUpdate, WowCompanyFrame, 0.6), "live refresh tick")
-slash("panel")
-check(not WowCompanyFrame:IsShown(), "/wowco panel closes it")
+check(pcall(WowCompanyMeter.scripts.OnUpdate, WowCompanyMeter, 1), "live refresh tick")
 game.secrets = false
 
 -- probe: samples and report
@@ -700,58 +687,35 @@ ns.on("PLAYER_DEAD", function() error("boom") end)
 check(pcall(fire, "PLAYER_DEAD") and #WowCompanyDB.errors == 1, "a failing handler is recorded, not raised")
 
 -- ------------------------------------------------------------------ 0.5: more kinds, breakdown, summary, Details!
-ns.UI.Show("meter")
 local st = WowCompanyDB.settings
-st.meterKind = "damage"
-local moreButton = WowCompanyFrame and nil
-for i = 1, #frames do
-    if rawget(frames[i], "label") and frames[i].label.text == "Kicks" then moreButton = frames[i] end
-end
-ns.UI.Refresh()
-for i = 1, #frames do
-    local l = rawget(frames[i], "label")
-    if l and (l.text == "Kicks" or l.text == "Dispels" or l.text == "Shields") and frames[i].scripts.OnClick then
-        moreButton = frames[i]
-    end
-end
-check(moreButton ~= nil, "meter: the 4th button is there")
-moreButton.scripts.OnClick(moreButton)
-check(st.meterKind == "interrupts", "more: first click opens kicks")
-moreButton.scripts.OnClick(moreButton)
-moreButton.scripts.OnClick(moreButton)
-check(st.meterKind == "absorbs" and moreButton.label.text == "Shields", "more: next clicks cycle (dispels, shields)")
 for _, k in ipairs(ns.Meter.MORE) do
-    st.meterKind = k.key
-    check(pcall(ns.UI.Refresh), "meter kind " .. k.key)
+    st.winKind = k.key
+    check(pcall(ns.Window.Refresh), "meter kind " .. k.key)
 end
-st.meterKind = "enemies"
-ns.UI.Refresh()
+ns.Window.SetDisplay("enemies")
 check(widgetWith("Deviate Creeper") ~= nil and widgetWith("Fizzle Boom") == nil, "beat up: lists mobs, never a player")
--- click a player for the spells, click again to go back
-st.meterKind = "damage"
-ns.UI.Refresh()
+-- click a player for the spells, click again to close
+ns.Window.SetDisplay("damage")
 local mine
 for i = 1, #frames do
-    -- the big window's row (it remembers srcName), not the meter window's bar
-    if rawget(frames[i], "guid") == "Player-1-0000000A" and rawget(frames[i], "srcName") then mine = frames[i] end
+    if rawget(frames[i], "guid") == "Player-1-0000000A" and frames[i].kind == "StatusBar" then mine = frames[i] end
 end
-check(mine ~= nil, "breakdown: your row is clickable")
-mine.scripts.OnMouseUp(mine)
-check(widgetWith("Fireball") ~= nil and widgetWith("Frostbolt") ~= nil and widgetWith("click to go back") ~= nil,
-    "breakdown: your spells by name")
-check(textOf("60%") ~= nil, "breakdown: share of each spell")
-mine.scripts.OnMouseUp(mine)
-check(widgetWith("Fireball") == nil or not widgetWith("click to go back"), "breakdown: click again goes back")
+check(mine ~= nil, "breakdown: your bar is clickable")
+mine.scripts.OnMouseUp(mine, "LeftButton")
+check(widgetWith("Fireball") ~= nil and widgetWith("Frostbolt") ~= nil and textOf("60.0%") ~= nil,
+    "breakdown: your spells by name with their share")
+mine.scripts.OnMouseUp(mine, "LeftButton")
+check(not WowCompanyBreakdown:IsShown(), "breakdown: click again closes it")
 game.secrets = true
-check(pcall(ns.UI.Refresh), "breakdown: survives secrets")
+check(pcall(ns.Window.Refresh), "breakdown: survives secrets")
 game.secrets = false
 -- Details! defer
 game.details = true
 slash("details on")
-ns.UI.Refresh()
+ns.Window.Refresh()
 check(widgetWith("Details! is doing the counting") ~= nil, "details on: our meter steps aside")
 slash("details off")
-ns.UI.Refresh()
+ns.Window.Refresh()
 check(widgetWith("Grobos Stinkfoot") ~= nil, "details off: our meter is back")
 game.details = false
 -- run summary after leaving the dungeon

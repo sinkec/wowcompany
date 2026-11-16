@@ -193,5 +193,5 @@ end)
 ns.command("details", "details on|off – let Details! do the meter (ours hides)", function(rest)
     if rest == "on" or rest == "off" then ns.db.settings.deferToDetails = rest == "on" end
     ns.say(ns.db.settings.deferToDetails and "meter: Details! does it." or "meter: ours.")
-    if ns.UI and ns.UI.Refresh then ns.UI.Refresh() end
+    if ns.Window and ns.Window.Refresh then ns.Window.Refresh() end
 end)

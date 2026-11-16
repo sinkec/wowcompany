@@ -146,7 +146,7 @@ function Logging.Set(on, byUser)
         if byUser or state.weStartedChat then set(LoggingChat, false) end
         state.weStartedCombat, state.weStartedChat = nil, nil
     end
-    if ns.UI and ns.UI.Refresh then ns.UI.Refresh() end
+    if ns.Window and ns.Window.Refresh then ns.Window.Refresh() end
 end
 
 local function describe()
@@ -222,7 +222,7 @@ function Logging.SetEverywhere(on)
         cancelOff()
         Logging.Set(false, false)
     end
-    if ns.UI and ns.UI.Refresh then ns.UI.Refresh() end
+    if ns.Window and ns.Window.Refresh then ns.Window.Refresh() end
 end
 
 ns.command("log", "log on | off | auto | everywhere – combat and chat logging", function(rest)

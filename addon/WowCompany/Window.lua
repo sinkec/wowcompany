@@ -4,8 +4,8 @@
 -- window. Right-click: the displays (bookmarks). Drag the corner to resize, the title to move.
 --
 -- Same rules as everywhere: only you and your party (Meter.Visible), secret values are shown but
--- never compared or added up. The big panel (Now · Records · Logging) opens from the menu or with
--- shift-click on the minimap button.
+-- never compared or added up. A dot in the title shows whether the logs are on (click: on/off);
+-- "Your records" (from the Companion) is one of the displays. Settings: Options → AddOns.
 
 local _, ns = ...
 
@@ -189,10 +189,10 @@ local function displayMenu(anchor)
     for _, k in ipairs(displays()) do
         table.insert(items, {
             text = k.label,
-            checked = opts().winKind == k.key and not state.mySpells,
+            checked = opts().winKind == k.key and not state.mySpells and not state.records,
             func = function()
                 opts().winKind = k.key
-                state.mySpells = false
+                state.mySpells, state.records = false, false
                 Win.CloseBreakdown()
             end,
         })
@@ -201,7 +201,12 @@ local function displayMenu(anchor)
     table.insert(items, {
         text = "My spells",
         checked = state.mySpells == true,
-        func = function() state.mySpells = true end,
+        func = function() state.mySpells, state.records = true, false end,
+    })
+    table.insert(items, {
+        text = "Your records",
+        checked = state.records == true,
+        func = function() state.records, state.mySpells = true, false end,
     })
     showMenu(anchor, items)
 end
@@ -283,8 +288,11 @@ local function optionsMenu(anchor)
     local s = opts()
     showMenu(anchor, {
         { text = "WowCompany", title = true },
-        { text = "Run, records & logging…", func = function() ns.UI.Show("now") end },
         { text = "Settings…", func = function() ns.Options.Open() end },
+        { text = ns.Logging.CombatOn() and "Stop logging now" or "Start logging now", func = function()
+            local on = ns.Logging.CombatOn() and ns.Logging.ChatOn()
+            ns.Logging.Set(not on, true)
+        end },
         { separator = true },
         { text = "Lock window (Esc leaves it open)", checked = s.winLocked == true, func = function()
             s.winLocked = not s.winLocked
@@ -416,6 +424,10 @@ function Win.OpenBreakdown(guid, name, class)
         breakdown:SetPoint("TOPLEFT", win, "TOPRIGHT", 2, 0)
     end
     breakdown:Show()
+    if win.light then
+        local on = ns.Logging.CombatOn() and ns.Logging.ChatOn()
+        win.light:SetColorTexture(on and 0.3 or 1, on and 0.9 or 0.32, on and 0.4 or 0.26, 1)
+    end
     fillBreakdown()
 end
 
@@ -493,6 +505,35 @@ local function newBar(i)
     return bar
 end
 
+-- your personal records (written by the Companion into CompanionData.lua) as rows
+local RECORDS = {
+    { kind = "crit", label = "Biggest crit", prep = "into" },
+    { kind = "hit", label = "Biggest hit", prep = "into" },
+    { kind = "critHeal", label = "Biggest crit heal", prep = "on" },
+    { kind = "heal", label = "Biggest heal", prep = "on" },
+    { kind = "hitTaken", label = "Hardest hit taken", prep = "from" },
+}
+
+local function recordRows()
+    local mine = ns.Export.Records()
+    local out = {}
+    for _, def in ipairs(RECORDS) do
+        for _, r in ipairs(mine and mine.records or {}) do
+            if type(r) == "table" and r.kind == def.kind then
+                table.insert(out, {
+                    name = def.label .. ": " .. tostring(r.spell or "?")
+                        .. (r.unit and (" " .. def.prep .. " " .. tostring(r.unit)) or ""),
+                    totalAmount = r.amount,
+                    classFilename = type(UnitClass) == "function" and select(2, UnitClass("player")) or nil,
+                    spellRow = true,
+                    note = (r.inDungeon and "" or "open world, ") .. tostring(r.zone or "somewhere"),
+                })
+            end
+        end
+    end
+    return out
+end
+
 -- my spells as rows: the local player's breakdown in the main window
 local function mySpellRows(s, session)
     local mine = ns.Meter.Mine(session)
@@ -536,7 +577,13 @@ function Win.Refresh()
     local s = opts()
     local session = readSession()
     local rows
-    if state.mySpells then
+    -- Details! does the counting (/wowco details on): our bars step aside, records still work
+    local deferred = not state.records and ns.Summary and ns.Summary.MeterDeferred()
+    if deferred then
+        rows = {}
+    elseif state.records then
+        rows = recordRows()
+    elseif state.mySpells then
         rows = mySpellRows(s, session)
     else
         rows = ns.Meter.Visible(session, s.winKind)
@@ -565,7 +612,7 @@ function Win.Refresh()
             setText(bar.amount, ns.short(src.totalAmount))
             setText(bar.per, ns.fmtRate(src.amountPerSecond))
             local a = ns.plain(src.totalAmount)
-            bar.pct:SetText(s.winPercent ~= false and plain and sum > 0 and type(a) == "number"
+            bar.pct:SetText(not state.records and s.winPercent ~= false and plain and sum > 0 and type(a) == "number"
                 and string.format("%.0f%%", a / sum * 100) or "")
             bar.pct:SetWidth(s.winPercent ~= false and 34 or 1)
             local guid = ns.plain(src.sourceGUID)
@@ -586,13 +633,18 @@ function Win.Refresh()
     else
         secs = fightSeconds(session)
     end
-    local label = state.mySpells and ("My spells – " .. kindDef(s.winKind).label) or kindDef(s.winKind).label
+    local label = state.records and "Your records"
+        or state.mySpells and ("My spells – " .. kindDef(s.winKind).label) or kindDef(s.winKind).label
+    if state.records then secs = nil end
     local seg = state.sessionName or (s.winScope == "overall" and "Overall" or nil)
     win.title:SetText((secs and ("[" .. ns.fmtTime(secs) .. "] ") or "") .. label
         .. (seg and ("  |cff9d9d9d" .. seg .. "|r") or ""))
     if #rows == 0 then
         local hidden = session and type(session.combatSources) == "table" and #session.combatSources > 0
-        win.empty:SetText(not ns.Meter.Available() and "No damage meter here."
+        win.empty:SetText(deferred and "Details! is doing the counting.\n/wowco details off brings ours back."
+            or state.records and ("No records yet. Keep the Companion running and make\n"
+                .. "something bleed – they arrive at your next login.")
+            or not ns.Meter.Available() and "No damage meter here."
             or hidden and "Hidden mid-fight." or "Nothing yet. Go hit something.")
         win.empty:Show()
     else
@@ -689,8 +741,29 @@ local function build()
     local segmentBtn = iconButton(bar, "Interface\\Icons\\INV_Misc_PocketWatch_01", "Segments", segmentMenu)
     segmentBtn:SetPoint("RIGHT", displayBtn, "LEFT", -3, 0)
 
+    -- logging light: green = combat and chat log on (the Companion gets everything), red = off
+    local light = CreateFrame("Button", nil, bar)
+    light:SetSize(8, 8)
+    light:SetPoint("LEFT", logo, "RIGHT", 4, 0)
+    win.light = light:CreateTexture(nil, "ARTWORK")
+    win.light:SetAllPoints()
+    light:SetScript("OnClick", function()
+        local on = ns.Logging.CombatOn() and ns.Logging.ChatOn()
+        ns.Logging.Set(not on, true)
+        Win.Refresh()
+    end)
+    light:SetScript("OnEnter", function(self)
+        if type(GameTooltip) ~= "table" then return end
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("Logging", GOLD[1], GOLD[2], GOLD[3])
+        GameTooltip:AddLine(ns.Logging.Describe(), 1, 1, 1, true)
+        GameTooltip:AddLine("Click: logs on / off", 0.6, 0.6, 0.6)
+        GameTooltip:Show()
+    end)
+    light:SetScript("OnLeave", function() if type(GameTooltip) == "table" then GameTooltip:Hide() end end)
+
     win.title = font(bar, "GameFontNormalSmall", "LEFT")
-    win.title:SetPoint("LEFT", logo, "RIGHT", 4, 0)
+    win.title:SetPoint("LEFT", light, "RIGHT", 4, 0)
     win.title:SetPoint("RIGHT", segmentBtn, "LEFT", -4, 0)
 
     win.body = CreateFrame("Frame", nil, win)
@@ -749,6 +822,18 @@ function Win.Toggle()
     if win and win:IsShown() then win:Hide() else Win.Show() end
 end
 
+-- a meter display by key ("damage", "enemies" …), leaving records / my spells
+function Win.SetDisplay(kind)
+    opts().winKind = kind
+    state.records, state.mySpells = false, false
+    Win.Refresh()
+end
+
+function Win.ShowRecords()
+    state.records, state.mySpells = true, false
+    Win.Show()
+end
+
 function Win.IsShown() return win ~= nil and win:IsShown() end
 
 ns.on("PLAYER_REGEN_DISABLED", function() state.combatStart = ns.now() end)
@@ -757,7 +842,23 @@ ns.on("PLAYER_REGEN_ENABLED", function()
     Win.Refresh()
 end)
 
+-- Back to the default spot (for when it got dragged off somewhere silly).
+ns.command("reset", "reset – meter window back to its default spot and size, unlocked", function()
+    local s = opts()
+    s.win, s.winLocked = nil, false
+    if win then
+        win:ClearAllPoints()
+        win:SetPoint("RIGHT", UIParent, "RIGHT", -40, -80)
+        win:SetSize(240, 150)
+        Win.ApplyLock()
+    end
+    Win.Show()
+    ns.say("window reset.")
+end)
+
 ns.onReady(function()
+    ns.say("v" .. tostring(ns.version) .. " loaded. |cffffffff/wowco|r opens the meter, |cffffffff/wowco options|r "
+        .. "the settings. " .. ns.Logging.Describe() .. ".")
     local s = ns.db.settings
     s.winKind = s.winKind or "damage"
     s.winScope = s.winScope or "current"

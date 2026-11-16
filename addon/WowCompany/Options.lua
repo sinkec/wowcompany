@@ -54,6 +54,13 @@ end
 function Options.Refresh()
     if not panel then return end
     for _, cb in ipairs(checks) do cb:SetChecked(cb.get() == true) end
+    if panel.logState then
+        local L = ns.Logging
+        local function onoff(v) return v and "|cff4de34dON|r" or "|cffff5242off|r" end
+        panel.logState:SetText("Right now:  combat log " .. onoff(L.CombatOn()) .. "  ·  chat log "
+            .. onoff(L.ChatOn()) .. "  ·  advanced " .. onoff(L.Advanced()))
+        panel.logNow:SetText((L.CombatOn() and L.ChatOn()) and "Stop logging now" or "Start logging now")
+    end
 end
 
 local function build()
@@ -108,6 +115,15 @@ local function build()
     check("Ask to send the loot after a dungeon", "Send now reloads the interface for a second", y - 122, 16,
         function() return s().askSend ~= false end, function(on) slash("ask " .. (on and "on" or "off")) end)
     button("Advanced logging on", 150, 340, y - 20, function() slash("advanced") end)
+    panel.logNow = button("Start logging now", 150, 340, y - 48, function()
+        local on = ns.Logging.CombatOn() and ns.Logging.ChatOn()
+        ns.Logging.Set(not on, true)
+        Options.Refresh()
+    end)
+    panel.logState = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    panel.logState:SetPoint("TOPLEFT", 340, y - 76)
+    panel.logState:SetWidth(260)
+    panel.logState:SetJustifyH("LEFT")
 
     -- other
     y = -410
@@ -118,7 +134,7 @@ local function build()
     check("Help development (diagnostics)", "a technical report at logout – shapes and numbers, no names", y - 44, 16,
         function() return s().diagnostics end, function(on) ns.SetDiagnostics(on) end)
     button("Open the meter", 130, 16, y - 84, function() ns.Window.Show() end)
-    button("Run, records & logging", 170, 152, y - 84, function() ns.UI.Show("now") end)
+    button("Your records", 170, 152, y - 84, function() ns.Window.ShowRecords() end)
     button("Reset window spots", 150, 328, y - 84, function()
         s().win = nil
         slash("reset")
