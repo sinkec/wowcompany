@@ -7,9 +7,16 @@ const env = (k: string, d?: string) => {
 	return v;
 };
 
-const region = () => env('BLIZZARD_REGION', 'eu');
+// Regija iz realma druščine (settings.realm) – akcija jo nastavi z `useRegion` na začetku;
+// sicer okoljska spremenljivka. En izolat izvaja eno funkcijo naenkrat.
+let regionOverride: string | null = null;
+export const useRegion = (r: string | null | undefined) => {
+	regionOverride = r && /^(eu|us)$/.test(r) ? r : null;
+};
+const region = () => regionOverride ?? env('BLIZZARD_REGION', 'eu');
 const locale = () => env('BLIZZARD_LOCALE', 'en_GB');
-export const profileNs = () => env('BLIZZARD_PROFILE_NAMESPACE', `profile-forever-${region()}`);
+export const profileNs = () =>
+	regionOverride ? `profile-forever-${regionOverride}` : env('BLIZZARD_PROFILE_NAMESPACE', `profile-forever-${region()}`);
 export const staticNs = () => env('BLIZZARD_STATIC_NAMESPACE', `static-forever-${region()}`);
 
 // Token velja ~24 h. Hranimo ga v pomnilniku izolata (Convex ga pogosto ponovno uporabi);

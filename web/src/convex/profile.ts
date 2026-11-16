@@ -30,8 +30,9 @@ export const mine = query({
 			.query('players')
 			.withIndex('by_owner', (q) => q.eq('ownerUserId', userId))
 			.take(50);
+		// junaki starega realma so v /archive, tu samo aktivni realm
 		const characters = await Promise.all(
-			players.map(async (p) => {
+			players.filter((p) => !p.archived).map(async (p) => {
 				const s = await ctx.db
 					.query('summaries')
 					.withIndex('by_player', (q) => q.eq('playerId', p._id))

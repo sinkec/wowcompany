@@ -7,6 +7,9 @@
 	import Swords from '@lucide/svelte/icons/swords';
 	import Trophy from '@lucide/svelte/icons/trophy';
 	import Users from '@lucide/svelte/icons/users';
+	import Archive from '@lucide/svelte/icons/archive';
+	import { useQuery } from 'convex-svelte';
+	import { api } from '#convex/_generated/api.js';
 	import UserMenu from '#lib/components/wow/UserMenu.svelte';
 	import { GITHUB_URL } from '#lib/site.js';
 
@@ -35,6 +38,22 @@
 	let { children, data }: LayoutProps = $props();
 
 	createSvelteAuthClient({ authClient, getServerState: () => data.authState });
+
+	// Arhiv starih realmov: povezava samo za člane, ko arhiv obstaja
+	const archives = useQuery(api.realms.list, { now: Date.now() });
+	const nav = $derived(
+		archives.data?.length
+			? [
+					...NAV,
+					{
+						href: '/archive',
+						label: 'Archive',
+						icon: Archive,
+						match: (p: string) => p.startsWith('/archive')
+					}
+				]
+			: NAV
+	);
 </script>
 
 <svelte:head>
@@ -59,7 +78,7 @@
 		</a>
 
 		<nav class="flex items-center gap-1" aria-label="Main">
-			{#each NAV as item (item.href)}
+			{#each nav as item (item.href)}
 				{@const active = item.match(page.url.pathname)}
 				<a
 					href={item.href}

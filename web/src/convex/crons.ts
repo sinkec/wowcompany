@@ -19,4 +19,7 @@ crons.cron('game patch', '15 5 * * *', internal.seasons.checkPatch, {});
 // Uradne WoW novice za naslovnico: 1 HTTP klic na dan.
 crons.cron('wow news', '45 5 * * *', internal.news.refreshBlizzard, {});
 
+// Arhivi starega realma: po 30 dneh izbris (v paketih).
+crons.cron('realm archive purge', '0 4 * * *', internal.realms.purgeExpired, {});
+
 export default crons;

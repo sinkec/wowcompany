@@ -19,24 +19,27 @@ import { DEFAULT_SETTINGS, getSettings } from './lib/settings.js';
 
 /** Številka sezone, v katero spada trenutek `at` (UTC ms). */
 export async function seasonAt(ctx: QueryCtx | MutationCtx, at: number): Promise<number> {
-	const s = await ctx.db
+	// sezone starega realma (arhiv) ne štejejo
+	for await (const s of ctx.db
 		.query('seasons')
 		.withIndex('by_startedAt', (q) => q.lte('startedAt', at))
-		.order('desc')
-		.first();
-	return s?.number ?? 1;
+		.order('desc')) {
+		if (!s.archived) return s.number;
+	}
+	return 1;
 }
 
 /** Vse sezone, najnovejša prva (Season 1 tudi, ko še ni zapisana). */
 export async function listSeasons(ctx: QueryCtx) {
-	const rows = await ctx.db.query('seasons').withIndex('by_number').order('desc').take(100);
+	const all = await ctx.db.query('seasons').withIndex('by_number').order('desc').take(100);
+	const rows = all.filter((s) => !s.archived);
 	const out = rows.map((s) => ({
 		number: s.number,
 		name: s.name,
 		startedAt: s.startedAt,
 		patch: s.patch
 	}));
-	if (!out.some((s) => s.number === 1))
+	if (!all.some((s) => s.number === 1))
 		out.push({ number: 1, name: 'Season 1', startedAt: 0, patch: null });
 	return out;
 }

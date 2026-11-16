@@ -3,7 +3,7 @@ import { internal } from './_generated/api.js';
 import type { Doc, Id } from './_generated/dataModel.js';
 import { internalAction, internalMutation, query, type QueryCtx } from './_generated/server.js';
 import { canSeePrivate } from './lib/access.js';
-import { get as bnetGet, profileNs, slugify } from './lib/blizzard.js';
+import { get as bnetGet, profileNs, slugify, useRegion } from './lib/blizzard.js';
 import { getSettings } from './lib/settings.js';
 import { insertPlayer } from './lib/players.js';
 
@@ -24,6 +24,7 @@ export const addByName = internalAction({
 		{ name, ownerUserId }
 	): Promise<{ playerId: Id<'players'>; slug: string; displayName: string; level: number }> => {
 		const slug = slugify(name);
+		useRegion((await ctx.runQuery(internal.realms.current, {}))?.region);
 		const r = await bnetGet(['profile', 'wow', 'character', slug], profileNs());
 		if (r.status !== 200) throw new Error(`Blizzard ne pozna lika "${name}" (pod lvl 10 ali še ni bil odjavljen?)`);
 		const displayName = `${r.body.name} ${r.body.surname ?? ''}`.trim();

@@ -23,6 +23,8 @@
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import SquareSlash from '@lucide/svelte/icons/square-slash';
 	import Gauge from '@lucide/svelte/icons/gauge';
+	import Globe from '@lucide/svelte/icons/globe';
+	import Archive from '@lucide/svelte/icons/archive';
 	import { onMount } from 'svelte';
 	import { api } from '#convex/_generated/api.js';
 	import type { Id } from '#convex/_generated/dataModel.js';
@@ -217,6 +219,7 @@
 		| 'discord'
 		| 'discord-posts'
 		| 'discord-bot'
+		| 'realm'
 		| 'system';
 	const GROUPS: { title: string; items: { key: View; label: string; icon: typeof Users }[] }[] = [
 		{
@@ -245,7 +248,10 @@
 		},
 		{
 			title: 'System',
-			items: [{ key: 'system', label: 'Polling & budget', icon: Gauge }]
+			items: [
+				{ key: 'realm', label: 'Realm', icon: Globe },
+				{ key: 'system', label: 'Polling & budget', icon: Gauge }
+			]
 		}
 	];
 	const ALL_VIEWS = GROUPS.flatMap((g) => g.items.map((i) => i.key));
@@ -263,6 +269,44 @@
 			(i) => i.key === view
 		)
 	);
+
+	// --- realm (WoW Forever: regija + ruleset); menjava arhivira vse aktivno
+	const realmState = useQuery(api.realms.state, () => (isAdmin ? { now: Date.now() } : 'skip'));
+	let pickRegion = $state('eu');
+	let pickRuleset = $state('PvP');
+	let realmConfirm = $state('');
+	let realmDialog = $state(false);
+	const pickLabel = $derived(`${pickRegion.toUpperCase()} · ${pickRuleset}`);
+	const pickKey = $derived(`${pickRegion}-${pickRuleset.toLowerCase()}`);
+	const realmPreview = useQuery(api.realms.preview, () => (isAdmin && realmDialog ? {} : 'skip'));
+	const comingBack = $derived(realmState.data?.archives.find((a) => a.key === pickKey) ?? null);
+	$effect(() => {
+		// ob prvem nalaganju izbira = trenutni realm
+		const r = realmState.data?.realm;
+		if (r && !realmDialog) {
+			pickRegion = r.region;
+			pickRuleset = r.ruleset;
+		}
+	});
+	async function saveRealm(first: boolean) {
+		const r = await run(
+			client.mutation(api.realms.setRealm, {
+				region: pickRegion,
+				ruleset: pickRuleset,
+				...(first ? {} : { confirm: realmConfirm })
+			})
+		);
+		if (!r) return;
+		realmDialog = false;
+		realmConfirm = '';
+		toast.success(
+			first
+				? `Realm set: ${pickLabel}.`
+				: r.restored
+					? `Back on ${pickLabel}. Everything restored.`
+					: `Moved to ${pickLabel}. The old realm is in the archive for 30 days.`
+		);
+	}
 
 	// --- news
 	const newsAdmin = useQuery(api.news.adminList, () => (isAdmin && view === 'news' ? {} : 'skip'));
@@ -348,6 +392,18 @@
 			</nav>
 
 			<div class="min-w-0 space-y-4">
+				{#if realmState.data && !realmState.data.realm && view !== 'realm'}
+					<button
+						class="flex w-full items-center gap-3 rounded-lg border border-primary/60 bg-primary/10 p-3 text-left text-sm"
+						onclick={() => go('realm')}
+					>
+						<Globe class="size-5 text-primary" />
+						<span
+							><b>Choose your realm first.</b> One realm per company – heroes from other realms are turned
+							away.</span
+						>
+					</button>
+				{/if}
 				{#if viewLabel}
 					<div>
 						<div class="eyebrow">{viewLabel.group}</div>
@@ -505,8 +561,9 @@
 				<!-- VISIBILITY -->
 				{#if view === 'web' || view === 'discord-posts'}<div class="max-w-3xl space-y-3">
 						<p class="section-lead">
-							{view === 'web' ? 'What visitors see.' : 'What Discord gets.'} Filtering happens on the server, so no sneaky devtools peeking. Hero names and profile
-							links are always shown — a page about nobody would be weird.
+							{view === 'web' ? 'What visitors see.' : 'What Discord gets.'} Filtering happens on the
+							server, so no sneaky devtools peeking. Hero names and profile links are always shown — a
+							page about nobody would be weird.
 						</p>
 						<div class="grid gap-4">
 							{#each VIS_COLUMNS.filter((c) => c.target === (view === 'web' ? 'publicFields' : 'discordFields')) as col (col.target)}
@@ -753,9 +810,9 @@
 						<p class="section-lead">
 							{view === 'discord'
 								? 'The webhook posts into one channel: session summaries and dungeon runs.'
-								: 'Slash commands like /roster and /parses.'} Everything here can be set from the
-							browser, even after deploying. Secrets are write-only: once saved, they never come
-							back to any browser — not even yours.
+								: 'Slash commands like /roster and /parses.'} Everything here can be set from the browser,
+							even after deploying. Secrets are write-only: once saved, they never come back to any browser
+							— not even yours.
 						</p>
 						{#if integ.data}
 							{@const st = integ.data}
@@ -1034,6 +1091,117 @@
 							{/each}
 						</ul>
 					</div>{/if}
+				{#if view === 'realm'}
+					<div class="max-w-3xl space-y-4">
+						<p class="section-lead">
+							WoW Forever has no realm list in Blizzard's API: a realm here is a region plus a
+							ruleset. Heroes from another region or ruleset can't join. Switching moves every hero,
+							run and ladder of the current realm into a read-only archive for 30 days (members can
+							browse and download it); coming back within 30 days restores everything.
+						</p>
+						{#if realmState.data}
+							{@const rs = realmState.data}
+							<section class="panel space-y-4">
+								<div>
+									<div class="eyebrow">Current realm</div>
+									<div class="section-title">{rs.realm ? rs.realm.label : 'Not chosen yet'}</div>
+									{#if rs.realm}<p class="section-lead">since {ago(rs.realm.since)}</p>{/if}
+								</div>
+								<div class="flex flex-wrap items-end gap-3">
+									<label class="space-y-1 text-sm">
+										<span class="stat-label block">Region</span>
+										<select
+											bind:value={pickRegion}
+											class="h-9 rounded-md border border-input bg-background/60 px-2"
+										>
+											{#each rs.regions as r (r)}<option value={r}>{r.toUpperCase()}</option>{/each}
+										</select>
+									</label>
+									<label class="space-y-1 text-sm">
+										<span class="stat-label block">Ruleset</span>
+										<select
+											bind:value={pickRuleset}
+											class="h-9 rounded-md border border-input bg-background/60 px-2"
+										>
+											{#each rs.rulesets as r (r)}<option value={r}>{r}</option>{/each}
+										</select>
+									</label>
+									{#if !rs.realm}
+										<Button onclick={() => saveRealm(true)}>Set realm: {pickLabel}</Button>
+									{:else if rs.realm.key !== pickKey}
+										<Button variant="destructive" onclick={() => (realmDialog = true)}
+											>Move to {pickLabel}…</Button
+										>
+									{/if}
+								</div>
+							</section>
+
+							{#if realmDialog && rs.realm}
+								<section class="panel space-y-3 border-destructive/70">
+									<h3 class="card-title text-destructive">
+										Move the company from {rs.realm.label} to {pickLabel}?
+									</h3>
+									{#if realmPreview.data}
+										<p class="text-sm">
+											Into the archive of <b>{rs.realm.label}</b>: <b>{realmPreview.data.heroes}</b>
+											heroes,
+											<b>{realmPreview.data.runs}</b> dungeon runs and their parse ladders. Members can
+											read and download it for 30 days, then it is deleted for good.
+										</p>
+									{:else}
+										<p class="text-sm text-muted-foreground">Counting the bodies…</p>
+									{/if}
+									{#if comingBack}
+										<p class="rounded-md border border-primary/50 bg-primary/10 p-2 text-sm">
+											Welcome back: the archive of {pickLabel} ({comingBack.heroes} heroes, {comingBack.runs}
+											runs,
+											{comingBack.daysLeft} days left) will be restored.
+										</p>
+									{:else}
+										<p class="text-sm">
+											{pickLabel} starts empty with a new season. Heroes have to be added again.
+										</p>
+									{/if}
+									<label class="block space-y-1 text-sm">
+										<span>Type <b>{pickLabel}</b> to confirm</span>
+										<Input bind:value={realmConfirm} placeholder={pickLabel} autocomplete="off" />
+									</label>
+									<div class="flex gap-2">
+										<Button
+											variant="destructive"
+											disabled={realmConfirm.trim().toLowerCase() !== pickLabel.toLowerCase()}
+											onclick={() => saveRealm(false)}>Archive and move</Button
+										>
+										<Button
+											variant="ghost"
+											onclick={() => ((realmDialog = false), (realmConfirm = ''))}>Stay</Button
+										>
+									</div>
+								</section>
+							{/if}
+
+							{#if rs.archives.length}
+								<section class="panel space-y-2">
+									<h3 class="card-title flex items-center gap-2">
+										<Archive class="size-4" /> Archives
+									</h3>
+									{#each rs.archives as a (a.key)}
+										<div class="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+											<span><b>{a.label}</b> · {a.heroes} heroes · {a.runs} runs</span>
+											<span class={a.daysLeft <= 7 ? 'text-destructive' : 'text-muted-foreground'}
+												>deleted in {a.daysLeft} day{a.daysLeft === 1 ? '' : 's'}</span
+											>
+										</div>
+									{/each}
+									<a href="/archive" class="text-sm text-primary hover:underline"
+										>Open the archive →</a
+									>
+								</section>
+							{/if}
+						{/if}
+					</div>
+				{/if}
+
 				{#if view === 'news'}
 					<div class="max-w-3xl space-y-4">
 						<p class="section-lead">

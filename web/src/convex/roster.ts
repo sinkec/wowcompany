@@ -4,7 +4,7 @@ import { internal } from './_generated/api.js';
 import { internalAction, internalMutation, query } from './_generated/server.js';
 import { getViewer } from './lib/access.js';
 import { sameFields } from './lib/same.js';
-import { get as bnetGet, profileNs } from './lib/blizzard.js';
+import { get as bnetGet, profileNs, useRegion } from './lib/blizzard.js';
 
 const member = v.object({ name: v.string(), surname: v.string(), slug: v.string(), level: v.number(), classId: v.number() });
 
@@ -13,6 +13,7 @@ export const refresh = internalAction({
 	handler: async (ctx): Promise<number> => {
 		const guild = process.env.BLIZZARD_GUILD_SLUG;
 		if (!guild) return 0;
+		useRegion((await ctx.runQuery(internal.realms.current, {}))?.region);
 		const r = await bnetGet(['data', 'wow', 'guild', guild, 'roster'], profileNs());
 		if (r.status !== 200) return 0;
 		const members = (r.body.members ?? [])

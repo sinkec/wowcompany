@@ -109,9 +109,12 @@ export default defineSchema({
 		displayName: v.string(),
 		ownerUserId: v.optional(v.string()),
 		addedAt: v.number(),
-		active: v.boolean()
+		active: v.boolean(),
+		/** ključ arhiva (realm, s katerega je druščina odšla) – junak je takrat tudi active=false */
+		archived: v.optional(v.string())
 	})
 		.index('by_slug', ['slug'])
+		.index('by_archived', ['archived'])
 		.index('by_owner', ['ownerUserId']),
 
 	// Uporabniški profil (ime/priimek, glavni junak). Better Auth hrani samo Googlovo ime.
@@ -188,6 +191,8 @@ export default defineSchema({
 		/** kaj gre v Discord (objave + slash ukazi); manjka = vse */
 		discordFields: v.optional(v.array(v.string())),
 		paused: v.boolean(),
+		/** realm druščine (WoW Forever: regija + ruleset); manjka = še ni izbran */
+		realm: v.optional(v.object({ region: v.string(), ruleset: v.string(), since: v.number() })),
 		/** zadnja verzija igre iz Blizzard static namespacea (dnevni cron; za predlog nove sezone) */
 		gamePatch: v.optional(v.string())
 	}).index('by_key', ['key']),
@@ -317,6 +322,8 @@ export default defineSchema({
 		result: runResult,
 		party: v.array(partyMember),
 		recordedBy: v.array(recorder),
+		/** ključ arhiva realma (glej archives) */
+		archived: v.optional(v.string()),
 		/** obstaja runReplay (da strani ni treba brati 50 KB dokumenta za gumb) */
 		hasReplay: v.optional(v.boolean()),
 		awards: v.array(award),
@@ -332,7 +339,8 @@ export default defineSchema({
 		updatedAt: v.number()
 	})
 		.index('by_run_key', ['runKey'])
-		.index('by_started_at', ['startedAt']),
+		.index('by_started_at', ['startedAt'])
+		.index('by_archived_and_started_at', ['archived', 'startedAt']),
 
 	// Analiza runa (en dokument na run, ~5–100 KB; bere se samo na strani runa).
 	runDetails: defineTable({
@@ -352,6 +360,22 @@ export default defineSchema({
 		index: v.number(),
 		players: v.array(bossDetailPlayer)
 	}).index('by_run_and_index', ['runId', 'index']),
+
+	// Arhivi realmov: ko druščina zamenja realm, se junaki, runi in sezone starega realma označijo
+	// s `key` (samo branje za člane, /archive). Vrnitev v 30 dneh jih obnovi, potem jih cron izbriše.
+	archives: defineTable({
+		key: v.string(),
+		region: v.string(),
+		ruleset: v.string(),
+		archivedAt: v.number(),
+		deleteAt: v.number(),
+		heroes: v.number(),
+		runs: v.number(),
+		/** brisanje teče (cron v paketih) */
+		purging: v.optional(v.boolean())
+	})
+		.index('by_key', ['key'])
+		.index('by_deleteAt', ['deleteAt']),
 
 	// Replay runa: pozicije partyja (en dokument na run, ~50 KB) – bere se samo ob odprtem zavihku Replay.
 	runReplay: defineTable({ runId: v.id('runs'), ...replay.fields }).index('by_run', ['runId']),
@@ -474,7 +498,9 @@ export default defineSchema({
 		name: v.string(),
 		startedAt: v.number(),
 		/** verzija igre ob začetku (npr. "1.61.0"), če je znana */
-		patch: v.union(v.string(), v.null())
+		patch: v.union(v.string(), v.null()),
+		/** ključ arhiva realma: sezona starega realma (lestvica ostane berljiva v arhivu) */
+		archived: v.optional(v.string())
 	})
 		.index('by_number', ['number'])
 		.index('by_startedAt', ['startedAt']),

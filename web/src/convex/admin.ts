@@ -8,7 +8,8 @@ import { action, internalMutation, internalQuery, mutation, query, type Mutation
 import { authComponent } from './auth.js';
 import { requireAdmin } from './lib/access.js';
 import { ensurePollChain } from './poll.js';
-import { get as bnetGet, profileNs, slugify } from './lib/blizzard.js';
+import { get as bnetGet, profileNs, slugify, useRegion } from './lib/blizzard.js';
+import { realmLabel, rulesetMatches } from './lib/realms.js';
 import { deletePlayer, insertPlayer } from './lib/players.js';
 import { ALL_FIELDS, DEFAULT_SETTINGS, getSettings } from './lib/settings.js';
 
@@ -171,8 +172,16 @@ export const addPlayer = action({
 		if (!user || !(await ctx.runQuery(internal.admin.isAdmin, { userId: user._id })))
 			return { ok: false, error: 'Guild Master only.' };
 		const slug = slugify(name);
+		const realm = await ctx.runQuery(internal.realms.current, {});
+		useRegion(realm?.region);
 		const r = await bnetGet(['profile', 'wow', 'character', slug], profileNs());
 		if (r.status !== 200) return { ok: false, error: `Blizzard has never heard of "${name}".` };
+		if (!rulesetMatches(r.body.ruleset?.name, realm ?? undefined))
+			return {
+				ok: false,
+				error: `That hero plays on ${r.body.ruleset?.name ?? 'another'} rules – the company is on ${realmLabel(realm!)}.`
+			};
+
 		const displayName = `${r.body.name ?? ''} ${r.body.surname ?? ''}`.trim() || name;
 		const playerId: Id<'players'> = await ctx.runMutation(internal.admin.insertPlayerInternal, { slug, displayName });
 		return { ok: true, playerId, name: displayName, level: Number(r.body.level ?? 0) };

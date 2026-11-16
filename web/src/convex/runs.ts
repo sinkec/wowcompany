@@ -52,9 +52,10 @@ export const list = query({
 	handler: async (ctx, { paginationOpts }) => {
 		const { allowed } = await visibility(ctx);
 		if (!allowed('runs')) return { page: [], isDone: true, continueCursor: '' };
+		// samo aktivni realm (runi starega realma so v /archive)
 		const res = await ctx.db
 			.query('runs')
-			.withIndex('by_started_at')
+			.withIndex('by_archived_and_started_at', (q) => q.eq('archived', undefined))
 			.order('desc')
 			.paginate(paginationOpts);
 		const classOf = await classesFor(ctx, res.page);
@@ -389,11 +390,26 @@ export const topRecords = query({
 	handler: async (ctx, { kind = 'crit', limit = 10 }) => {
 		const { allowed } = await visibility(ctx);
 		if (!allowed('runs') || !allowed('runDetails')) return null;
+		const n = Math.min(25, Math.max(1, limit));
 		const rows = await ctx.db
 			.query('heroRecords')
 			.withIndex('by_kind_and_amount', (q) => q.eq('kind', kind))
 			.order('desc')
-			.take(Math.min(25, Math.max(1, limit)));
-		return rows.map(recordView);
+			.take(n * 2);
+		// junaki v arhivu starega realma ne tekmujejo
+		const live = new Map<string, boolean>();
+		const out = [];
+		for (const r of rows) {
+			if (!live.has(r.slug)) {
+				const p = await ctx.db
+					.query('players')
+					.withIndex('by_slug', (q) => q.eq('slug', r.slug))
+					.unique();
+				live.set(r.slug, !p?.archived);
+			}
+			if (live.get(r.slug)) out.push(r);
+			if (out.length >= n) break;
+		}
+		return out.map(recordView);
 	}
 });

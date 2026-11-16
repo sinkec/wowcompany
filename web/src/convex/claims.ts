@@ -4,7 +4,8 @@ import { internal } from './_generated/api.js';
 import { action, internalMutation, internalQuery, mutation, query, type QueryCtx } from './_generated/server.js';
 import { authComponent } from './auth.js';
 import { getViewer, requireAdmin } from './lib/access.js';
-import { get as bnetGet, profileNs, slugify } from './lib/blizzard.js';
+import { get as bnetGet, profileNs, slugify, useRegion } from './lib/blizzard.js';
+import { realmLabel, rulesetMatches } from './lib/realms.js';
 import { insertPlayer } from './lib/players.js';
 
 const MAX_PENDING_PER_USER = 3;
@@ -70,12 +71,20 @@ export const submit = action({
 		const pre: string | null = await ctx.runQuery(internal.claims.precheck, { userId: user._id, slug });
 		if (pre) return { ok: false, error: pre };
 
+		const realm = await ctx.runQuery(internal.realms.current, {});
+		useRegion(realm?.region);
 		const r = await bnetGet(['profile', 'wow', 'character', slug], profileNs());
 		if (r.status !== 200)
 			return {
 				ok: false,
 				error: `Blizzard has never heard of "${name}". Check the spelling, be level 10+, and log out once so Blizzard notices you exist.`
 			};
+		if (!rulesetMatches(r.body.ruleset?.name, realm ?? undefined))
+			return {
+				ok: false,
+				error: `That hero plays on ${r.body.ruleset?.name ?? 'another'} rules – the company is on ${realmLabel(realm!)}.`
+			};
+
 		const p = r.body;
 		const preview = {
 			level: Number(p.level ?? 0),

@@ -2,7 +2,7 @@
 import type { Id } from '../_generated/dataModel.js';
 import type { MutationCtx } from '../_generated/server.js';
 
-async function pollState(ctx: MutationCtx) {
+export async function pollState(ctx: MutationCtx) {
 	return ctx.db
 		.query('pollState')
 		.withIndex('by_key', (q) => q.eq('key', 'main'))
@@ -21,6 +21,8 @@ export async function insertPlayer(
 	let playerId: Id<'players'>;
 	if (existing) {
 		if (existing.active) return existing._id;
+		if (existing.archived)
+			throw new Error(`${existing.displayName} is in the archive of the old realm. Switch back to restore, or wait until the archive is deleted.`);
 		await ctx.db.patch(existing._id, { active: true, ownerUserId: args.ownerUserId ?? existing.ownerUserId });
 		playerId = existing._id;
 	} else {
@@ -50,8 +52,8 @@ export async function deletePlayer(ctx: MutationCtx, playerId: Id<'players'>) {
 	for await (const h of ctx.db.query('history').withIndex('by_player_at', (q) => q.eq('playerId', playerId))) {
 		await ctx.db.delete(h._id);
 	}
-	for await (const e of ctx.db.query('events')) {
-		if (e.playerId === playerId) await ctx.db.delete(e._id);
+	for await (const e of ctx.db.query('events').withIndex('by_player_id_and_at', (q) => q.eq('playerId', playerId))) {
+		await ctx.db.delete(e._id);
 	}
 	await ctx.db.delete(playerId);
 }

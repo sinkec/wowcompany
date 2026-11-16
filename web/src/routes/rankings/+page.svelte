@@ -7,7 +7,13 @@
 	import { fmtDuration, fmtMoney, fmtNum, fmtRate, fmtWhen } from '#lib/runs.js';
 	import { classColor } from '#lib/wow.js';
 
-	let season = $state<number | undefined>(undefined);
+	import { page } from '$app/state';
+	import { untrack } from 'svelte';
+
+	// ?season=N (npr. iz arhiva starega realma)
+	let season = $state<number | undefined>(
+		untrack(() => Number(page.url.searchParams.get('season')) || undefined)
+	);
 	const q = useQuery(api.runs.rankings, () => (season ? { season } : {}));
 	const d = $derived(q.data);
 	const MEDAL = ['🥇', '🥈', '🥉'];

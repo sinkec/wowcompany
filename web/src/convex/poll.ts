@@ -3,7 +3,7 @@
 import { v } from 'convex/values';
 import { internal } from './_generated/api.js';
 import { internalAction, internalMutation, internalQuery, type MutationCtx } from './_generated/server.js';
-import { classSpecs, get, getCharacterParts, itemIcon, mapLimit, profileNs, talentInfo, type RawCharacter } from './lib/blizzard.js';
+import { classSpecs, get, getCharacterParts, itemIcon, mapLimit, profileNs, talentInfo, useRegion, type RawCharacter } from './lib/blizzard.js';
 import { itemIds, normalize, talentRefs, type Item } from './lib/normalize.js';
 import { getSettings } from './lib/settings.js';
 import { sameFields } from './lib/same.js';
@@ -159,6 +159,7 @@ export const run = internalAction({
 	// token = zagon iz verige (poll.begin); force = ročno (CLI, nov igralec) mimo pavze in verige
 	args: { force: v.optional(v.boolean()), token: v.optional(v.string()) },
 	handler: async (ctx, { force, token }): Promise<RunResult> => {
+		useRegion((await ctx.runQuery(internal.realms.current, {}))?.region);
 		let entries: PollEntry[];
 		if (token) {
 			const e: PollEntry[] | null = await ctx.runMutation(internal.poll.begin, { token });
