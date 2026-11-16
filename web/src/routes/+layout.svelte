@@ -11,6 +11,7 @@
 	import { useQuery } from 'convex-svelte';
 	import { api } from '#convex/_generated/api.js';
 	import UserMenu from '#lib/components/wow/UserMenu.svelte';
+	import SocialLinks from '#lib/components/wow/SocialLinks.svelte';
 	import { GITHUB_URL } from '#lib/site.js';
 
 	const NAV = [
@@ -41,6 +42,7 @@
 
 	// Arhiv starih realmov: povezava samo za člane, ko arhiv obstaja
 	const archives = useQuery(api.realms.list, { now: Date.now() });
+	const site = useQuery(api.site.home, {});
 	const nav = $derived(
 		archives.data?.length
 			? [
@@ -120,6 +122,11 @@
 </main>
 
 <footer class="mx-auto max-w-6xl px-4 pb-10 text-center text-xs text-muted-foreground/70">
+	{#if site.data?.socials.length}
+		<div class="mb-3 flex justify-center">
+			<SocialLinks socials={site.data.socials} variant="icons" />
+		</div>
+	{/if}
 	<p class="mb-1 font-display text-muted-foreground">
 		WowCompany · WoW Forever · EU · est. by people who should be sleeping
 	</p>

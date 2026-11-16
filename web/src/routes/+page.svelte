@@ -23,6 +23,7 @@
 	const roster = useQuery(api.players.list, { since: weekSince() });
 	const feed = useQuery(api.events.recent, { limit: 20 });
 	const news = useQuery(api.news.list, { limit: 6 });
+	const site = useQuery(api.site.home, {});
 	// rekordi iz dungeon runov (Companion): null = skrito za obiskovalca
 	const topCrits = useQuery(api.runs.topRecords, { kind: 'crit' });
 	const topTaken = useQuery(api.runs.topRecords, { kind: 'hitTaken' });
@@ -131,6 +132,9 @@
 			{ label: 'Things murdered', value: totalKills == null ? null : fmt(totalKills) },
 			{ label: 'Times eaten dirt', value: totalDeaths == null ? null : fmt(totalDeaths) }
 		].filter((x): x is { label: string; value: string } => x.value != null)}
+		quips={site.data?.quips ?? []}
+		convos={site.data?.convos ?? []}
+		socials={site.data?.socials ?? []}
 	/>
 
 	<NewsSection news={news.data ?? []} />

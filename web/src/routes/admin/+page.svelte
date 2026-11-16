@@ -24,6 +24,9 @@
 	import SquareSlash from '@lucide/svelte/icons/square-slash';
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import Globe from '@lucide/svelte/icons/globe';
+	import House from '@lucide/svelte/icons/house';
+	import Plus from '@lucide/svelte/icons/plus';
+	import { SOCIAL_KINDS } from '#convex/lib/siteContent.js';
 	import Archive from '@lucide/svelte/icons/archive';
 	import { onMount } from 'svelte';
 	import { api } from '#convex/_generated/api.js';
@@ -215,6 +218,7 @@
 		| 'members'
 		| 'web'
 		| 'news'
+		| 'home'
 		| 'seasons'
 		| 'discord'
 		| 'discord-posts'
@@ -234,6 +238,7 @@
 			title: 'Website',
 			items: [
 				{ key: 'web', label: 'Who sees what', icon: Eye },
+				{ key: 'home', label: 'Home page', icon: House },
 				{ key: 'news', label: 'News', icon: Newspaper },
 				{ key: 'seasons', label: 'Parse seasons', icon: Trophy }
 			]
@@ -306,6 +311,39 @@
 					? `Back on ${pickLabel}. Everything restored.`
 					: `Moved to ${pickLabel}. The old realm is in the archive for 30 days.`
 		);
+	}
+
+	// --- naslovnica: šale junakov (posamične + pogovori treh) in povezave na skupnost
+	const siteAdmin = useQuery(api.site.forAdmin, () => (isAdmin && view === 'home' ? {} : 'skip'));
+	let quipsText = $state('');
+	let convosText = $state('');
+	let socialsDraft = $state<{ kind: string; url: string; label?: string }[]>([]);
+	let siteLoaded = $state(false);
+	$effect(() => {
+		const d = siteAdmin.data;
+		if (d && !siteLoaded) {
+			quipsText = d.quips.join('\n');
+			convosText = d.convos.map((c) => c.join('\n')).join('\n\n');
+			socialsDraft = d.socials.map((x) => ({ ...x }));
+			siteLoaded = true;
+		}
+	});
+	async function saveQuips() {
+		const r = await run(
+			client.mutation(api.site.saveQuips, { quips: quipsText, convos: convosText })
+		);
+		if (r) toast.success(`${r.quips} lines and ${r.convos} conversations. The heroes rehearse.`);
+	}
+	async function saveSocials() {
+		const r = await run(
+			client.mutation(api.site.saveSocials, { socials: $state.snapshot(socialsDraft) })
+		);
+		if (r !== undefined) toast.success(`${r} link${r === 1 ? '' : 's'} saved.`);
+	}
+	function resetQuips() {
+		if (!siteAdmin.data || !confirm('Replace both lists with the built-in jokes?')) return;
+		quipsText = siteAdmin.data.defaults.quips.join('\n');
+		convosText = siteAdmin.data.defaults.convos.map((c) => c.join('\n')).join('\n\n');
 	}
 
 	// --- news
@@ -1199,6 +1237,86 @@
 								</section>
 							{/if}
 						{/if}
+					</div>
+				{/if}
+
+				{#if view === 'home'}
+					<div class="max-w-3xl space-y-4">
+						<section class="panel space-y-3">
+							<div>
+								<h3 class="card-title">Community links</h3>
+								<p class="section-lead">
+									Shown as buttons in the hero and as icons in the footer. https links only.
+								</p>
+							</div>
+							{#each socialsDraft as row, i (i)}
+								<div class="flex flex-wrap gap-2">
+									<select
+										bind:value={row.kind}
+										class="h-9 rounded-md border border-input bg-background/60 px-2 text-sm"
+									>
+										{#each SOCIAL_KINDS as k (k)}<option value={k}>{k}</option>{/each}
+									</select>
+									<Input
+										bind:value={row.url}
+										placeholder="https://discord.gg/…"
+										class="min-w-56 flex-1"
+									/>
+									<Input bind:value={row.label} placeholder="Label (optional)" class="w-44" />
+									<Button
+										size="sm"
+										variant="ghost"
+										onclick={() => (socialsDraft = socialsDraft.filter((_, j) => j !== i))}
+										><Trash class="size-4" /></Button
+									>
+								</div>
+							{/each}
+							<div class="flex flex-wrap gap-2">
+								<Button
+									size="sm"
+									variant="secondary"
+									onclick={() => (socialsDraft = [...socialsDraft, { kind: 'discord', url: '' }])}
+									><Plus class="size-4" /> Add link</Button
+								>
+								<Button size="sm" onclick={saveSocials}>Save links</Button>
+							</div>
+						</section>
+
+						<section class="panel space-y-3">
+							<div>
+								<h3 class="card-title">What the heroes say</h3>
+								<p class="section-lead">
+									Each visit three random heroes appear. Half the time they get three different
+									lines, half the time one conversation – the bubbles pop up in order, like they're
+									talking. Placeholders: <code>{'{me}'}</code> = the speaker, <code>{'{1}'}</code>
+									<code>{'{2}'}</code> <code>{'{3}'}</code> = first, second, third speaker (first name).
+								</p>
+							</div>
+							<label class="block space-y-1 text-sm">
+								<span class="font-medium">Random lines – one per line</span>
+								<textarea
+									bind:value={quipsText}
+									rows="10"
+									class="w-full rounded-md border border-input bg-background/60 px-3 py-2 font-mono text-xs"
+								></textarea>
+							</label>
+							<label class="block space-y-1 text-sm">
+								<span class="font-medium"
+									>Conversations of three – three lines each, an empty line between conversations</span
+								>
+								<textarea
+									bind:value={convosText}
+									rows="12"
+									class="w-full rounded-md border border-input bg-background/60 px-3 py-2 font-mono text-xs"
+								></textarea>
+							</label>
+							<div class="flex flex-wrap gap-2">
+								<Button size="sm" onclick={saveQuips}>Save lines</Button>
+								<Button size="sm" variant="ghost" onclick={resetQuips}
+									>Restore built-in jokes</Button
+								>
+							</div>
+						</section>
 					</div>
 				{/if}
 

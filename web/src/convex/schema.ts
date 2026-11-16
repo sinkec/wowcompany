@@ -361,6 +361,15 @@ export default defineSchema({
 		players: v.array(bossDetailPlayer)
 	}).index('by_run_and_index', ['runId', 'index']),
 
+	// Vsebina naslovnice (lib/siteContent.ts): šale junakov in povezave na skupnost. Svoj dokument,
+	// da settings (bere ga skoraj vsaka poizvedba) ostane majhen.
+	siteContent: defineTable({
+		key: v.literal('main'),
+		quips: v.array(v.string()),
+		convos: v.array(v.array(v.string())),
+		socials: v.array(v.object({ kind: v.string(), url: v.string(), label: v.optional(v.string()) }))
+	}).index('by_key', ['key']),
+
 	// Zemljevid dungeona za replay: posnetek zaslona igrine karte (M), ki ga Guild Master naloži in
 	// poravna s potmi partyja. `align` v jardih zaslonskih koordinat replaya (vzhod desno, sever gor).
 	dungeonMaps: defineTable({

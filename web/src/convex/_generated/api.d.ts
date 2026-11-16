@@ -41,6 +41,7 @@ import type * as lib_realms from "../lib/realms.js";
 import type * as lib_runsView from "../lib/runsView.js";
 import type * as lib_same from "../lib/same.js";
 import type * as lib_settings from "../lib/settings.js";
+import type * as lib_siteContent from "../lib/siteContent.js";
 import type * as news from "../news.js";
 import type * as players from "../players.js";
 import type * as poll from "../poll.js";
@@ -49,6 +50,7 @@ import type * as realms from "../realms.js";
 import type * as roster from "../roster.js";
 import type * as runs from "../runs.js";
 import type * as seasons from "../seasons.js";
+import type * as site from "../site.js";
 
 import type {
   ApiFromModules,
@@ -90,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   "lib/runsView": typeof lib_runsView;
   "lib/same": typeof lib_same;
   "lib/settings": typeof lib_settings;
+  "lib/siteContent": typeof lib_siteContent;
   news: typeof news;
   players: typeof players;
   poll: typeof poll;
@@ -98,6 +101,7 @@ declare const fullApi: ApiFromModules<{
   roster: typeof roster;
   runs: typeof runs;
   seasons: typeof seasons;
+  site: typeof site;
 }>;
 
 /**
