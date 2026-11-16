@@ -226,19 +226,44 @@ local function buildNow(parent)
     end
 end
 
+-- Longest believable fight. Out of combat the game's "current" session can report the time since
+-- the computer started (seen: 71170 minutes, DPS 0.00) – anything longer than this is not a fight.
+local MAX_FIGHT = 3 * 3600
+
+local function sane(sec)
+    local v = ns.plain(sec)
+    return type(v) == "number" and v > 0 and v <= MAX_FIGHT and v or nil
+end
+
 local function refreshNow()
     local duration, anySession, shared = nil, false, false
+    -- out of combat: the last finished fight, read by its id (its own duration); in combat: "current"
+    local last = not ns.inCombat and ns.Meter.Fights(1)[1] or nil
+    local lastId = last and type(last.id) == "number" and last.id or nil
     for i = 1, #cards do
         local card = cards[i]
-        local session = ns.Meter.Read("current", card.def.key)
+        local session = lastId and ns.Meter.Read(nil, card.def.key, lastId) or ns.Meter.Read("current", card.def.key)
         local mine = ns.Meter.Mine(session)
+        local secs
         if session then
             anySession = true
-            if duration == nil then duration = session.durationSeconds end
+            if ns.isSecret(session.durationSeconds) then
+                secs = session.durationSeconds -- mid-fight secret: shown untouched, never compared
+            else
+                secs = sane(session.durationSeconds) or (last and sane(last.duration))
+            end
+            if duration == nil then duration = secs end
         end
         if mine then
             show(card.value, ns.fmt(mine.totalAmount))
-            showRate(card.rate, card.def.unit ~= "" and mine.amountPerSecond or nil, card.def.unit)
+            local rate = mine.amountPerSecond
+            -- when the game's duration was nonsense, its rate is too: recompute from a plain total
+            local broken = session and not ns.isSecret(session.durationSeconds) and not sane(session.durationSeconds)
+            local total = ns.plain(mine.totalAmount)
+            if broken then
+                rate = (type(total) == "number" and type(secs) == "number" and secs > 0) and total / secs or nil
+            end
+            showRate(card.rate, card.def.unit ~= "" and rate or nil, card.def.unit)
         elseif session and type(session.combatSources) == "table" and #session.combatSources > 0
             and ns.Meter.TotalsAreParty() then
             -- dungeon with the party, mid-fight: rows cannot be told apart, show the party's total
@@ -265,8 +290,8 @@ local function refreshNow()
         end
     end
     if not named then
-        local last = ns.Meter.Fights(1)[1]
-        main.nowTitle:SetText(last and last.name or "No fight yet")
+        local newest = last or ns.Meter.Fights(1)[1]
+        main.nowTitle:SetText(newest and newest.name or "No fight yet")
     end
     show(main.nowTime, ns.isSecret(duration) and duration or (duration and ns.fmtTime(duration) or ""))
 

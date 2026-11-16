@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.5.4" end,
+    GetAddOnMetadata = function() return "0.5.5" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -201,7 +201,12 @@ local function session(kind)
 end
 C_DamageMeter = {
     IsDamageMeterAvailable = function() return true, "" end,
-    GetCombatSessionFromType = function(_, kind) return session(kind) end,
+    GetCombatSessionFromType = function(_, kind)
+        local s = session(kind)
+        -- seen in game: out of combat "current" reports the time since the computer started
+        if game.brokenCurrent then s.durationSeconds = 4270212 end
+        return s
+    end,
     GetCombatSessionFromID = function(_, kind) return session(kind) end,
     GetCombatSessionSourceFromType = function()
         local n = function(v) return game.secrets and SECRET or v end
@@ -419,7 +424,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.5%.4|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.5%.5|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -549,6 +554,11 @@ check(textOf("3,000") ~= nil and textOf("5,000") == nil, "meter total counts onl
 ns.UI.Show("now")
 check(textOf("Unknown scuffle") ~= nil, "now: out of combat shows the last fight")
 check(textOf("3,000") ~= nil and textOf("65.20 DPS") ~= nil, "now: own damage and DPS on the card (not the party's 5,000)")
+game.brokenCurrent = true
+ns.UI.Refresh()
+check(textOf("71170:12") == nil and textOf("0:46") ~= nil and textOf("65.20 DPS") ~= nil,
+    "now: out of combat the last fight is read by id – no 71170:12 and 0.00 DPS from a broken 'current'")
+game.brokenCurrent = nil
 check(textOf("Overall  3,000") ~= nil and textOf("DAMAGE") ~= nil, "now: card carries its label and the overall figure")
 check(widgetWith("Last fight") ~= nil, "now: says it is the last fight")
 fire("PLAYER_REGEN_DISABLED")
