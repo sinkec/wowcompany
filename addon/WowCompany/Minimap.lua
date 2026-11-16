@@ -33,10 +33,9 @@ local function build()
     button:RegisterForDrag("LeftButton")
 
     local icon = button:CreateTexture(nil, "BACKGROUND")
-    icon:SetTexture("Interface\\Icons\\INV_Misc_Coin_01")
-    icon:SetSize(19, 19)
+    icon:SetTexture("Interface\\AddOns\\WowCompany\\Media\\LogoSmall") -- our logo, already round
+    icon:SetSize(21, 21)
     icon:SetPoint("CENTER", 0, 1)
-    if icon.SetTexCoord then icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
     local border = button:CreateTexture(nil, "OVERLAY")
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     border:SetSize(52, 52)

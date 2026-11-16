@@ -156,6 +156,24 @@ local function report()
     return out
 end
 
+-- Opt-in (Logging tab → "Help development"): the same report is written on every logout and /reload,
+-- so the next version can be built on what the game really does. Switching it off deletes it.
+ns.on("PLAYER_LOGOUT", function()
+    if ns.db and ns.db.settings.diagnostics then ns.db.probe = report() end
+end)
+
+function ns.SetDiagnostics(on)
+    ns.db.settings.diagnostics = on and true or false
+    if not on then ns.db.probe = nil end
+    ns.say(on and "diagnostics on: a technical report (no names) is saved at logout. Thank you, hero."
+        or "diagnostics off: the report is gone.")
+end
+
+ns.command("diag", "diag on|off – help development with a technical report at logout", function(rest)
+    if rest == "on" or rest == "off" then ns.SetDiagnostics(rest == "on") end
+    ns.say(ns.db.settings.diagnostics and "diagnostics: on." or "diagnostics: off.")
+end)
+
 ns.command("probe", "probe – save a technical report for the Companion's author (then /reload)", function()
     ns.db.probe = report()
     ns.say("probe saved: " .. #sample.combat .. " fights and " .. #sample.loot .. " loot lines sampled. "

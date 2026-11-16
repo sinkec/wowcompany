@@ -1,8 +1,9 @@
 -- The window: Now · Meter · Fights · Records · Logging.
 --
--- Look: a dark parchment panel with the game's own tooltip border, gold headings, class-coloured
--- bars and stat cards – it should read like a part of the WoW interface, not like a web page.
--- Only the game's stock fonts and textures are used (nothing is shipped with the addon).
+-- Look: the classic WoW dialog – gold dialog border on a dark stone background, the header banner
+-- with the title, our round logo as a portrait in the corner, red panel buttons and the stock close
+-- button; cards in tooltip style, class-coloured bars. Only the game's own textures and fonts, plus
+-- the logo (Media/Logo.tga).
 --
 -- Only you and your own party are ever listed (Meter.Visible); strangers are never shown.
 -- Open with /wowco. Drag it anywhere; the pin button locks it in place. The position, the pin and
@@ -15,7 +16,6 @@ ns.UI = UI
 
 -- ------------------------------------------------------------------ theme
 
-local WHITE = "Interface\\Buttons\\WHITE8x8"
 local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 local C = {
     gold = { 1.00, 0.82, 0.00 },
@@ -26,9 +26,10 @@ local C = {
     good = { 0.30, 0.90, 0.40 },
     bad = { 1.00, 0.32, 0.26 },
 }
-local WIDTH, HEIGHT = 440, 300
-local PAD = 12
-local HEADER, FOOTER = 30, 20
+local WIDTH, HEIGHT = 460, 356
+local PAD = 16
+local HEADER, FOOTER = 72, 24 -- header = banner + the row of tabs under it
+local MEDIA = "Interface\\AddOns\\WowCompany\\Media\\"
 local ROWS, ROW_H = 9, 20
 
 local main -- the window, built on first use
@@ -47,25 +48,34 @@ end
 
 local function template() return BackdropTemplateMixin and "BackdropTemplate" or nil end
 
--- The outer frame: the game's tooltip border around a dark fill.
+-- The outer frame: the game's gold dialog border on the dark dialog background.
 local function windowBackdrop(f)
     if not f.SetBackdrop then return end
     f:SetBackdrop({
-        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 14,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Gold-Border",
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 },
     })
-    f:SetBackdropColor(0.05, 0.04, 0.03, 0.94)
-    f:SetBackdropBorderColor(C.brass[1], C.brass[2], C.brass[3], 1)
+    f:SetBackdropColor(1, 1, 1, 0.97)
+    f:SetBackdropBorderColor(1, 1, 1, 1)
 end
 
--- A card or a button: flat fill with a hairline edge.
+-- A card: tooltip style (the game's tooltip border and background).
 local function panel(f, strong)
     if not f.SetBackdrop then return end
-    f:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
-    f:SetBackdropColor(0.13, 0.10, 0.07, strong and 0.95 or 0.75)
-    f:SetBackdropBorderColor(C.brass[1], C.brass[2], C.brass[3], strong and 0.55 or 0.22)
+    f:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    f:SetBackdropColor(0.09, 0.07, 0.05, strong and 0.95 or 0.8)
+    f:SetBackdropBorderColor(C.brass[1], C.brass[2], C.brass[3], strong and 0.9 or 0.6)
 end
 
 local function line(parent, alpha)
@@ -90,23 +100,28 @@ local function tooltip(widget, title, body)
     end)
 end
 
--- A bordered button. `SetChosen(true)` marks the active option of a group.
+-- The game's red panel button (UIPanelButtonTemplate). `SetChosen(true)` marks the active option of
+-- a group: highlight locked on, gold label.
 local function button(parent, label, width, onClick, tipTitle, tipBody)
-    local b = CreateFrame("Button", nil, parent, template())
-    b:SetSize(width, 20)
-    panel(b, true)
-    b.label = text(b, "GameFontHighlightSmall", "CENTER", C.dim)
-    b.label:SetPoint("CENTER")
+    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    b:SetSize(width, 22)
+    local fs = b.GetFontString and b:GetFontString()
+    if type(fs) ~= "table" then fs = type(b.Text) == "table" and b.Text or nil end
+    if not fs then
+        fs = text(b, "GameFontHighlightSmall", "CENTER", C.dim)
+        fs:SetPoint("CENTER")
+    end
+    b.label = fs
+    if b.label.SetFontObject then b.label:SetFontObject("GameFontHighlightSmall") end
     b.label:SetText(label)
     b.chosen = false
     function b:paint(hovering)
         local on = self.chosen
         color(self.label, on and C.gold or (hovering and C.text or C.dim))
-        if self.SetBackdropBorderColor then
-            self:SetBackdropBorderColor(C.brass[1], C.brass[2], C.brass[3], (on or hovering) and 0.95 or 0.4)
-        end
-        if self.SetBackdropColor then
-            self:SetBackdropColor(on and 0.24 or 0.13, on and 0.18 or 0.10, on and 0.08 or 0.07, 0.95)
+        if on and self.LockHighlight then
+            self:LockHighlight()
+        elseif self.UnlockHighlight then
+            self:UnlockHighlight()
         end
     end
     function b:hover(hovering) self:paint(hovering) end
@@ -123,7 +138,7 @@ end
 -- A header tab: plain text with a gold underline when active.
 local function tab(parent, label, width, onClick)
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(width, HEADER - 6)
+    b:SetSize(width, 24)
     b.label = text(b, "GameFontNormal", "CENTER", C.dim)
     b.label:SetPoint("CENTER", 0, 1)
     b.label:SetText(label)
@@ -643,6 +658,21 @@ local function buildLogging(parent)
         ns.Logging.Set(not on, true)
     end, "Combat and chat log", "Switches both logs on or off right now.")
     main.logToggle:SetPoint("BOTTOMLEFT", 0, 0)
+
+    -- opt-in diagnostics for development (Probe.lua)
+    local diag = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+    diag:SetSize(24, 24)
+    diag:SetPoint("BOTTOMLEFT", -4, 26)
+    diag:SetScript("OnClick", function(self)
+        ns.SetDiagnostics(self:GetChecked() and true or false)
+    end)
+    tooltip(diag, "Help development", "Saves a technical report at logout: how the game's meter, loot "
+        .. "messages and party info look on this client. Shapes and numbers only – no names. Off by default; "
+        .. "switching it off deletes the report. Same as /wowco diag on|off.")
+    local diagLabel = text(parent, "GameFontHighlightSmall", "LEFT", C.text)
+    diagLabel:SetPoint("LEFT", diag, "RIGHT", 2, 1)
+    diagLabel:SetText("Help development: share diagnostics (no names)")
+    main.diag = diag
     main.autoToggle = button(parent, "Auto", 96, function()
         ns.db.settings.autoLog = not ns.db.settings.autoLog
         ns.Logging.Check()
@@ -657,6 +687,7 @@ local function buildLogging(parent)
 end
 
 local function refreshLogging()
+    if main.diag and main.diag.SetChecked then main.diag:SetChecked(ns.db.settings.diagnostics == true) end
     local L = ns.Logging
     local values = {
         combat = L.CombatOn(),
@@ -746,44 +777,64 @@ local function build()
     place()
     tinsert(UISpecialFrames, "WowCompanyFrame") -- Escape closes it
 
-    -- header: title, tabs, pin, close
-    local title = text(main, "GameFontNormal", "LEFT", C.gold)
-    title:SetPoint("TOPLEFT", PAD, -10)
+    -- header: the dialog banner with the title, the logo as a round portrait, close and pin
+    local banner = main:CreateTexture(nil, "ARTWORK")
+    banner:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+    banner:SetSize(250, 62)
+    banner:SetPoint("TOP", 0, 13)
+    local title = text(main, "GameFontNormal", "CENTER", C.gold)
+    title:SetPoint("TOP", banner, "TOP", 0, -13)
     title:SetText("WowCompany")
-    local headLine = line(main, 0.4)
-    headLine:SetPoint("TOPLEFT", 6, -HEADER)
-    headLine:SetPoint("TOPRIGHT", -6, -HEADER)
 
-    local close = button(main, "x", 20, function() main:Hide() end, "Close", "/wowco opens it again.")
-    close:SetPoint("TOPRIGHT", -8, -6)
-    main.pin = button(main, "pin", 50, function()
+    local portrait = CreateFrame("Frame", nil, main)
+    portrait:SetSize(54, 54)
+    portrait:SetPoint("TOPLEFT", -14, 14)
+    portrait:SetFrameLevel((main.GetFrameLevel and main:GetFrameLevel() or 1) + 5)
+    local logo = portrait:CreateTexture(nil, "ARTWORK")
+    logo:SetTexture(MEDIA .. "Logo")
+    logo:SetSize(42, 42)
+    logo:SetPoint("CENTER")
+    local ring = portrait:CreateTexture(nil, "OVERLAY")
+    ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+    ring:SetSize(90, 90)
+    ring:SetPoint("TOPLEFT", -3, 3)
+
+    local close = CreateFrame("Button", nil, main, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", -5, -5)
+    close:SetScript("OnClick", function() main:Hide() end)
+    tooltip(close, "Close", "/wowco opens it again.")
+    main.pin = button(main, "pin", 52, function()
         ns.db.settings.pinned = not ns.db.settings.pinned
         applyPin()
     end, "Pin the window", "Pinned: it stays put. Unpinned: drag it anywhere.")
-    main.pin:SetPoint("RIGHT", close, "LEFT", -4, 0)
+    main.pin:SetPoint("RIGHT", close, "LEFT", -2, 0)
     applyPin()
 
+    local headLine = line(main, 0.4)
+    headLine:SetPoint("TOPLEFT", 14, -HEADER)
+    headLine:SetPoint("TOPRIGHT", -14, -HEADER)
+
     main.tabs = {}
-    local x = 96
+    local x = (WIDTH - 250) / 2 -- 5 tabs, 250 px together, centred under the banner
     for _, t in ipairs({ { "now", "Now", 38 }, { "meter", "Meter", 46 }, { "fights", "Fights", 46 },
         { "records", "Records", 58 }, { "logging", "Logging", 54 } }) do
         local b = tab(main, t[2], t[3], function() UI.Show(t[1]) end)
-        b:SetPoint("TOPLEFT", x, -4)
+        b:SetPoint("TOPLEFT", x, -(HEADER - 26))
         x = x + t[3] + 2
         main.tabs[t[1]] = b
     end
 
     -- footer: recording light, where we are, version
     local footLine = line(main, 0.25)
-    footLine:SetPoint("BOTTOMLEFT", 6, FOOTER + 2)
-    footLine:SetPoint("BOTTOMRIGHT", -6, FOOTER + 2)
+    footLine:SetPoint("BOTTOMLEFT", 14, FOOTER + 2)
+    footLine:SetPoint("BOTTOMRIGHT", -14, FOOTER + 2)
     main.recDot = main:CreateTexture(nil, "ARTWORK")
     main.recDot:SetSize(8, 8)
-    main.recDot:SetPoint("BOTTOMLEFT", PAD, 8)
+    main.recDot:SetPoint("BOTTOMLEFT", PAD, 11)
     main.recText = text(main, "GameFontHighlightSmall", "LEFT", C.dim)
     main.recText:SetPoint("LEFT", main.recDot, "RIGHT", 6, 0)
     local ver = text(main, "GameFontHighlightSmall", "RIGHT", C.faint)
-    ver:SetPoint("BOTTOMRIGHT", -PAD, 6)
+    ver:SetPoint("BOTTOMRIGHT", -PAD, 9)
     ver:SetText("v" .. tostring(ns.version))
     main.where = text(main, "GameFontHighlightSmall", "RIGHT", C.brass)
     main.where:SetPoint("RIGHT", ver, "LEFT", -8, 0)

@@ -79,6 +79,7 @@ local DEFAULTS = {
     deferToDetails = false, -- /wowco details on: Details! does the meter, ours steps aside
     askSend = true, -- after a dungeon: ask whether to send the loot now (= reload) – /wowco ask on|off
     chatTab = true, -- keep the "WowCompany" chat tab so loot/rolls reach the chat log – /wowco chat on|off
+    diagnostics = false, -- opt-in: a technical report (no names) on every logout/reload, for development
 }
 
 local function initDB()

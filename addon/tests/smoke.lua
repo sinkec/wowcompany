@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.5.5" end,
+    GetAddOnMetadata = function() return "0.5.6" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -424,7 +424,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.5%.5|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.5%.6|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -559,6 +559,13 @@ ns.UI.Refresh()
 check(textOf("71170:12") == nil and textOf("0:46") ~= nil and textOf("65.20 DPS") ~= nil,
     "now: out of combat the last fight is read by id – no 71170:12 and 0.00 DPS from a broken 'current'")
 game.brokenCurrent = nil
+-- diagnostics: opt-in, written at logout, gone when switched off
+check(WowCompanyDB.settings.diagnostics == false, "diagnostics: off by default")
+SlashCmdList.WOWCOMPANY("diag on")
+fire("PLAYER_LOGOUT")
+check(WowCompanyDB.settings.diagnostics == true and type(WowCompanyDB.probe) == "table", "diagnostics: report saved at logout when on")
+SlashCmdList.WOWCOMPANY("diag off")
+check(WowCompanyDB.probe == nil, "diagnostics: switching off deletes the report")
 check(textOf("Overall  3,000") ~= nil and textOf("DAMAGE") ~= nil, "now: card carries its label and the overall figure")
 check(widgetWith("Last fight") ~= nil, "now: says it is the last fight")
 fire("PLAYER_REGEN_DISABLED")

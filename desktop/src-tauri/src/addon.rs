@@ -260,6 +260,12 @@ const BUNDLED: &[(&str, &str)] = &[
     ("Probe.lua", include_str!("../../../addon/WowCompany/Probe.lua")),
 ];
 
+/// Images of the addon (logo for the window and the minimap button), installed into `Media/`.
+const BUNDLED_MEDIA: &[(&str, &[u8])] = &[
+    ("Logo.tga", include_bytes!("../../../addon/WowCompany/Media/Logo.tga")),
+    ("LogoSmall.tga", include_bytes!("../../../addon/WowCompany/Media/LogoSmall.tga")),
+];
+
 fn toc_version(toc: &str) -> Option<String> {
     toc.lines()
         .find_map(|l| l.strip_prefix("## Version:"))
@@ -296,7 +302,10 @@ pub fn update_needs_restart(logs_dir: &Path) -> bool {
     else {
         return true;
     };
-    toc_files(&old) != toc_files(BUNDLED[0].1)
+    // new images (not there yet) are also only found after a restart, to be safe
+    let media_new = addon_dir(logs_dir)
+        .is_some_and(|d| BUNDLED_MEDIA.iter().any(|(n, _)| !d.join("Media").join(n).is_file()));
+    toc_files(&old) != toc_files(BUNDLED[0].1) || media_new
 }
 
 /// Version of the addon inside this app.
@@ -330,6 +339,11 @@ pub fn install(logs_dir: &Path) -> Result<String, String> {
             continue;
         }
         fs::write(&path, text).map_err(|e| format!("cannot write {name}: {e}"))?;
+    }
+    let media = dir.join("Media");
+    fs::create_dir_all(&media).map_err(|e| format!("cannot create {}: {e}", media.display()))?;
+    for (name, bytes) in BUNDLED_MEDIA {
+        fs::write(media.join(name), bytes).map_err(|e| format!("cannot write Media/{name}: {e}"))?;
     }
     Ok(bundled_version())
 }
@@ -623,6 +637,9 @@ WowCompanyDB = {
         let toc = fs::read_to_string(dir.join("WowCompany.toc")).unwrap();
         for f in toc.lines().filter(|l| l.trim().ends_with(".lua")) {
             assert!(dir.join(f.trim()).is_file(), "{f} missing");
+        }
+        for (name, _) in BUNDLED_MEDIA {
+            assert!(dir.join("Media").join(name).is_file(), "Media/{name} missing");
         }
         // an update keeps the records the app wrote and repairs a damaged file
         fs::write(
