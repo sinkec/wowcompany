@@ -108,6 +108,7 @@ pub fn run() {
             commands::locate_logs,
             commands::save_settings,
             commands::list_runs,
+            commands::get_run,
             commands::retry_run,
             commands::delete_run,
             commands::end_run,

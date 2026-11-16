@@ -176,6 +176,19 @@ mockIPC((cmd) => {
 			return status;
 		case 'list_runs':
 			return rows;
+		case 'get_run':
+			return {
+				...runs[0],
+				progress: {
+					xp: 18450,
+					xpBonus: 2210,
+					copper: 34567,
+					reputation: [{ faction: 'Orgrimmar', amount: 125 }],
+					skills: [{ skill: 'First Aid', from: 112, to: 118 }],
+					levels: [19],
+					castFails: { total: 41, spam: 29, targeting: 7, range: 5 }
+				}
+			};
 		case 'locate_logs':
 			return [
 				{
@@ -199,5 +212,14 @@ if (tab && tab !== 'live') {
 		[...document.querySelectorAll('nav button')]
 			.find((b) => b.textContent?.startsWith(label))
 			?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		// ?report=1: odpri poročilo prvega runa
+		if (q.get('report'))
+			setTimeout(
+				() =>
+					[...document.querySelectorAll('button')]
+						.find((b) => b.textContent?.trim() === 'Report')
+						?.dispatchEvent(new MouseEvent('click', { bubbles: true })),
+				300
+			);
 	}, 300);
 }

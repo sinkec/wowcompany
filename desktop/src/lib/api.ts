@@ -104,6 +104,28 @@ export type RunSummary = {
 	loot: LootDrop[];
 };
 
+/** A stored run as the analyzer wrote it (fields the report reads; the rest is ignored). */
+export type FullRun = Omit<RunSummary, 'segments'> & {
+	segments: (RunSummary['segments'][number] & {
+		players: { slug: string; damage: number; healing: number; damageTaken: number; ilvl?: number }[];
+	})[];
+	rolls?: {
+		item: string;
+		quality: number | null;
+		winner: string | null;
+		entries: { slug: string; choice: string; roll: number | null }[];
+	}[];
+	progress?: {
+		xp: number;
+		xpBonus: number;
+		copper: number;
+		reputation: { faction: string; amount: number }[];
+		skills: { skill: string; from: number; to: number }[];
+		levels: number[];
+		castFails?: { total: number; spam: number; targeting: number; range: number };
+	};
+};
+
 export type Status = {
 	version: string;
 	apiBase: string;
@@ -195,6 +217,8 @@ export const api = {
 	locateLogs: () => invoke<Candidate[]>('locate_logs'),
 	saveSettings: (settings: Settings) => invoke<void>('save_settings', { settings }),
 	listRuns: (limit = 100) => invoke<RunRow[]>('list_runs', { limit }),
+	/** The whole stored run (for the run report). */
+	getRun: (runKey: string) => invoke<FullRun | null>('get_run', { runKey }),
 	retryRun: (runKey: string) => invoke<void>('retry_run', { runKey }),
 	deleteRun: (runKey: string) => invoke<void>('delete_run', { runKey }),
 	endRun: () => invoke<void>('end_run'),

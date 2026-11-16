@@ -93,6 +93,19 @@ pub fn list_runs(core: Core_<'_>, limit: Option<usize>) -> Result<Vec<RunRow>, S
         .map_err(|e| e.to_string())
 }
 
+/// One stored run in full (the run report in the Runs tab); `None` when it is gone.
+#[tauri::command]
+pub fn get_run(core: Core_<'_>, run_key: String) -> Result<Option<serde_json::Value>, String> {
+    let json = core
+        .queue
+        .lock()
+        .expect("queue")
+        .get_json(&run_key)
+        .map_err(|e| e.to_string())?;
+    json.map(|j| serde_json::from_str(&j).map_err(|e| e.to_string()))
+        .transpose()
+}
+
 #[tauri::command]
 pub fn retry_run(core: Core_<'_>, run_key: String) -> Result<(), String> {
     core.queue

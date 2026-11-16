@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { api, errText, fmtDuration, type RunRow, type Status } from './api';
+	import RunReport from './RunReport.svelte';
 
 	let { status }: { status: Status } = $props();
 	let rows = $state<RunRow[]>([]);
 	let error = $state<string | null>(null);
 	let loadedVersion = -1;
+	let open = $state<string | null>(null);
 
 	async function load() {
 		try {
@@ -37,7 +39,9 @@
 
 {#if error}<p class="mb-3 text-sm text-destructive">{error}</p>{/if}
 
-{#if !rows.length}
+{#if open}
+	<RunReport runKey={open} onclose={() => (open = null)} />
+{:else if !rows.length}
 	<div class="wow-frame mx-auto max-w-xl rounded-lg p-8 text-center text-muted-foreground">
 		No runs yet. Every dungeon you finish with your party lands here — and on the portal, where
 		everyone can laugh at your deaths.
@@ -48,7 +52,10 @@
 			<li class="wow-frame flex items-center gap-4 rounded-lg p-3">
 				<div class="min-w-0 flex-1">
 					<div class="flex items-center gap-2">
-						<span class="font-semibold text-primary">{r.zone}</span>
+						<button
+							class="font-semibold text-primary hover:underline"
+							onclick={() => (open = r.runKey)}>{r.zone}</button
+						>
 						<span class="badge {STATUS[r.status].cls}">{STATUS[r.status].label}</span>
 					</div>
 					<div class="text-xs text-muted-foreground">
@@ -64,6 +71,7 @@
 					{/if}
 				</div>
 				<div class="flex shrink-0 gap-2">
+					<button class="btn btn-primary" onclick={() => (open = r.runKey)}>Report</button>
 					{#if r.url}
 						<button class="btn btn-outline" onclick={() => api.openUrl(r.url!)}
 							>Open on portal</button
