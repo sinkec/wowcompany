@@ -10,6 +10,10 @@ export type Settings = {
 	deleteLogsOnExit: boolean;
 	/** automatic cleanup keeps logs younger than this (0 = delete once the runs are on the portal) */
 	keepLogsDays: number;
+	/** install a new Companion version without asking */
+	autoUpdate: boolean;
+	/** copy a newer bundled addon into the game folder right away */
+	autoUpdateAddon: boolean;
 };
 
 export type LootDrop = {
@@ -140,6 +144,8 @@ export type Status = {
 		installedVersion: string | null;
 		/** version shipped inside this app */
 		bundledVersion: string;
+		/** just copied a newer addon into the game folder (restart = new files, /reload is not enough) */
+		updated: { from: string; to: string; restart: boolean; at: number } | null;
 	};
 	/** Personal bests of the log owner's characters (whole log, open world included). */
 	records: { schema: number; characters: PersonalCharacter[] };

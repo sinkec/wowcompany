@@ -232,6 +232,18 @@ pub struct AddonStatus {
     pub installed_version: Option<String>,
     /// Version of the addon shipped inside this app.
     pub bundled_version: String,
+    /// The addon was just updated in the game folder (from, to, game restart needed rather than
+    /// `/reload`). The game itself cannot be told: it reads addon files only on load.
+    pub updated: Option<AddonUpdated>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddonUpdated {
+    pub from: String,
+    pub to: String,
+    pub restart: bool,
+    pub at: i64,
 }
 
 #[derive(Default)]
@@ -241,6 +253,7 @@ struct AddonState {
     installed: bool,
     installed_version: Option<String>,
     leaders_added: u32,
+    updated: Option<AddonUpdated>,
 }
 
 pub struct Core {
@@ -359,6 +372,30 @@ impl Core {
         Ok(version)
     }
 
+    /// The addon in the game folder is older than the one inside this app (e.g. right after the
+    /// app updated itself): copy the new one over, when the player allows it in Settings.
+    fn auto_update_addon(&self, logs_dir: &Path) {
+        if !self.settings.lock().expect("settings").auto_update_addon {
+            return;
+        }
+        let Some(old) = addon::installed_version(logs_dir) else {
+            return;
+        };
+        let new = addon::bundled_version();
+        if !addon::is_newer(&new, &old) {
+            return;
+        }
+        let restart = addon::update_needs_restart(logs_dir);
+        if addon::install(logs_dir).is_ok() {
+            self.addon.lock().expect("addon lock").updated = Some(AddonUpdated {
+                from: old,
+                to: new,
+                restart,
+                at: wall_ms(),
+            });
+        }
+    }
+
     pub fn addon_status(&self) -> AddonStatus {
         let a = self.addon.lock().expect("addon lock");
         AddonStatus {
@@ -370,6 +407,7 @@ impl Core {
             leaders_added: a.leaders_added,
             installed_version: a.installed_version.clone(),
             bundled_version: addon::bundled_version(),
+            updated: a.updated.clone(),
         }
     }
 
@@ -382,6 +420,9 @@ impl Core {
         let mtime = file
             .as_ref()
             .and_then(|f| std::fs::metadata(f).and_then(|m| m.modified()).ok());
+        if installed {
+            self.auto_update_addon(logs_dir);
+        }
         let changed = {
             let mut a = self.addon.lock().expect("addon lock");
             a.installed = installed;

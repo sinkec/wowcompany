@@ -236,6 +236,34 @@
 	</section>
 
 	<section class="wow-frame space-y-3 rounded-lg p-5">
+		<h2 class="text-lg font-bold text-primary">Updates</h2>
+		<label class="flex items-center gap-3 text-sm">
+			<input
+				type="checkbox"
+				bind:checked={draft.autoUpdate}
+				onchange={() => save({ ...status.settings, autoUpdate: draft.autoUpdate })}
+				class="size-4 accent-[var(--primary)]"
+			/>
+			Install new Companion versions without asking
+		</label>
+		<label class="flex items-center gap-3 text-sm">
+			<input
+				type="checkbox"
+				bind:checked={draft.autoUpdateAddon}
+				onchange={() => save({ ...status.settings, autoUpdateAddon: draft.autoUpdateAddon })}
+				class="size-4 accent-[var(--primary)]"
+			/>
+			Keep the WowCompany addon in the game up to date
+		</label>
+		<p class="text-xs text-muted-foreground">
+			The app checks GitHub for a new version when it starts and every 6 hours (signed releases
+			only). Never during a run. The game reads addon files only when it loads, so after an addon
+			update type <code>/reload</code> – or restart WoW when the update brings new files; the app tells
+			you which.
+		</p>
+	</section>
+
+	<section class="wow-frame space-y-3 rounded-lg p-5">
 		<h2 class="text-lg font-bold text-primary">Account</h2>
 		{#if status.auth.linked}
 			<p class="text-sm">

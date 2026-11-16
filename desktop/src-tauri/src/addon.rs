@@ -267,6 +267,38 @@ fn toc_version(toc: &str) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
+/// `a` is a newer version than `b` (`0.5.10` > `0.5.9`; anything beats `?`).
+pub fn is_newer(a: &str, b: &str) -> bool {
+    let parts = |v: &str| -> Vec<u64> { v.split('.').map(|p| p.trim().parse().unwrap_or(0)).collect() };
+    let (x, y) = (parts(a), parts(b));
+    for i in 0..x.len().max(y.len()) {
+        let (p, q) = (x.get(i).copied().unwrap_or(0), y.get(i).copied().unwrap_or(0));
+        if p != q {
+            return p > q;
+        }
+    }
+    false
+}
+
+/// Lua files the `.toc` lists. WoW reads the list only when the game starts: a new file in an
+/// update needs a game restart, changed code alone is picked up by `/reload`.
+fn toc_files(toc: &str) -> Vec<String> {
+    toc.lines()
+        .map(str::trim)
+        .filter(|l| l.ends_with(".lua"))
+        .map(str::to_string)
+        .collect()
+}
+
+/// Would the installed addon need a game restart (not just `/reload`) to load the bundled one?
+pub fn update_needs_restart(logs_dir: &Path) -> bool {
+    let Some(old) = addon_dir(logs_dir).and_then(|d| fs::read_to_string(d.join("WowCompany.toc")).ok())
+    else {
+        return true;
+    };
+    toc_files(&old) != toc_files(BUNDLED[0].1)
+}
+
 /// Version of the addon inside this app.
 pub fn bundled_version() -> String {
     toc_version(BUNDLED[0].1).unwrap_or_default()
@@ -564,6 +596,15 @@ WowCompanyDB = {
         let mut again = run("Wailing Caverns", 43, 1_794_690_200, 1_794_691_700);
         assert_eq!(apply(&e, &mut again), (true, true));
         assert_eq!(apply(&e, &mut again), (false, false));
+    }
+
+    #[test]
+    fn versions_compare_by_number() {
+        assert!(is_newer("0.5.10", "0.5.9"));
+        assert!(is_newer("0.6", "0.5.9"));
+        assert!(is_newer("0.5.3", "?"));
+        assert!(!is_newer("0.5.3", "0.5.3"));
+        assert!(!is_newer("0.5.2", "0.5.3"));
     }
 
     #[test]

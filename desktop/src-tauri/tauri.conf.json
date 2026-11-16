@@ -36,6 +36,18 @@
 			"icons/128x128@2x.png",
 			"icons/icon.icns",
 			"icons/icon.ico"
-		]
+		],
+		"createUpdaterArtifacts": true
+	},
+	"plugins": {
+		"updater": {
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENDOEI0MTU3MThGMkZGNTgKUldSWS8vSVlWMEdMekY3N0ZoQmZwdlN3U2lsdTdWNkg2TkhZWmx6M2VCZnJwZ09NMUtDWGtJNFMK",
+			"endpoints": [
+				"https://github.com/sinkec/wowcompany/releases/latest/download/latest.json"
+			],
+			"windows": {
+				"installMode": "passive"
+			}
+		}
 	}
 }

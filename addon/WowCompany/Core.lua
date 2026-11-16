@@ -143,6 +143,13 @@ ns.on("ADDON_LOADED", function(addon)
         local ok, err = pcall(ready[i])
         if not ok then ns.say("startup error: " .. tostring(err)) end
     end
+    -- The Companion updates these files while the game runs; the game picks them up on /reload or
+    -- the next login. Say so once, so nobody wonders why the addon suddenly does new tricks.
+    local seen = ns.db.state.seenVersion
+    if ns.version ~= "?" and seen ~= ns.version then
+        if seen then ns.say("updated " .. tostring(seen) .. " → " .. ns.version .. " by the Companion. Shiny.") end
+        ns.db.state.seenVersion = ns.version
+    end
 end)
 
 -- In a fight right now? (plain events, no combat log needed)

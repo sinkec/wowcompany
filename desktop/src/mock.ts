@@ -17,7 +17,9 @@ const status: Status = {
 		minPlayers: 2,
 		deviceName: 'battlestation (Linux)',
 		deleteLogsOnExit: true,
-		keepLogsDays: 0
+		keepLogsDays: 0,
+		autoUpdate: false,
+		autoUpdateAddon: true
 	},
 	auth: {
 		linked: q.get('linked') !== '0',
@@ -61,7 +63,8 @@ const status: Status = {
 		chars: [{ name: 'Tankus Maximus', level: 18, class: 'WARRIOR', crit: 2.12, itemLevel: 11.75 }],
 		leadersAdded: 1,
 		installedVersion: q.get('addon') === '0' ? null : q.get('addon') === 'old' ? '0.3.0' : '0.4.0',
-		bundledVersion: '0.4.0'
+		bundledVersion: '0.4.0',
+		updated: null
 	},
 	records: {
 		schema: 1,

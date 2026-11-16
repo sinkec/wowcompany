@@ -28,6 +28,10 @@ pub struct Settings {
     /// Automatic cleanup keeps logs younger than this many days (0 = delete as soon as the runs are
     /// on the portal). For people who upload logs elsewhere too, or want them for later.
     pub keep_logs_days: u32,
+    /// Install a new Companion version without asking (false = ask first; checking is always on).
+    pub auto_update: bool,
+    /// Update the addon in the game folder as soon as this app carries a newer one.
+    pub auto_update_addon: bool,
 }
 
 impl Default for Settings {
@@ -40,6 +44,8 @@ impl Default for Settings {
             device_name: default_device_name(),
             delete_logs_on_exit: true,
             keep_logs_days: 0,
+            auto_update: false,
+            auto_update_addon: true,
         }
     }
 }

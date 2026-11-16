@@ -7,6 +7,7 @@
 	import Live from './lib/Live.svelte';
 	import Runs from './lib/Runs.svelte';
 	import SettingsView from './lib/Settings.svelte';
+	import UpdateBanner from './lib/UpdateBanner.svelte';
 
 	let status = $state<Status | null>(null);
 	let error = $state<string | null>(null);
@@ -65,6 +66,7 @@
 			</nav>
 		{/if}
 	</header>
+	{#if status}<UpdateBanner {status} />{/if}
 
 	<main class="wow-scroll flex-1 overflow-y-auto p-5">
 		{#if error}
