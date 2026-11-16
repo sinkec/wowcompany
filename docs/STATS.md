@@ -410,3 +410,25 @@ Izdaje: S0 brez izdaje · S2+S3 → **Companion v0.2.0** (z addonom 0.5) · S4+S
 - WCL How to Navigate Through Logs: https://www.archon.gg/classic-fresh/articles/help/how-to-navigate-through-logs
 - Karazhan zone 1047: https://fresh.warcraftlogs.com/zone/rankings/1047
 - Strani za Forever loge: https://undying.app/logs (pregled), https://forever.wowcoach.gg/ (death review, recapi), foreverlogs.gg
+
+## 11. Details! na WoW Forever – kaj sem se naučil (16. 11. 2026, verzija 20261109)
+Licenca "All rights reserved": samo branje in učenje, nobene kopirane kode; naš addon ga nikoli ne bere.
+- Forever naloži `Details_Camelot.toc` → `core/parser_nocleu.lua` (brez combat loga). Details! večinoma **preobleče
+  igrin vgrajeni meter** (overlay/swap) in prikaže njegove številke: `totalAmount`, `amountPerSecond`, `durationSeconds`.
+- Sam izračuna samo: **"my spells"** (vrstica na urok lokalnega igralca, pet/guardian z imenom bitja) in **napoje +
+  healthstone** (zdravljenje iz urokov z ID-ji napojev/healthstonov, samo po boju – med bojem je vse secret).
+- Dejstva o igrinem API-ju: vir v seji ima tudi `specIconID, deathRecapID, deathTimeSeconds, sourceCreatureID,
+  classification`; `GetSessionDurationSeconds(0)` = Overall, `(1)` = Current; secret preveri z `issecretvalue`.
+- Katalog statistik Details! (klasični, s combat logom): Damage (done, DPS, taken, friendly fire, frags, enemies,
+  auras & voidzones, by spell), Heal (done, HPS, overheal, taken, enemy heal, prevented, absorbed, potions),
+  Energy (mana, rage, energy, runic, resources, alternate), Misc (CC breaks, ress, interrupts, dispels, deaths,
+  defensive cooldowns, buff uptime, debuff uptime). Čas: "effective" (čas boja skupine) ali "active" (čas igralca).
+
+### Primerjava z nami (Companion bere cel combat log → zmore več kot Details! na Forever)
+| Statistika | Mi | Opomba |
+|---|---|---|
+| DPS/HPS runa | škoda / **celoten čas runa** (hoja, AFK, tek do trupla) | Details: effective/active čas → naš run DPS je prenizek |
+| DPS bossa (Parses) | škoda / trajanje boja | enako kot igrin meter ✓ |
+| Friendly fire, CC breaks, enemy heal, potions/healthstone, energija po vrsti | ✗ | manjka |
+| Damage by spell (vsa skupina) | ✗ na portalu | podatki že so (uroki po igralcu) |
+| Overheal, absorbs, interrupts, dispels, deaths, ress, buff/debuff uptime, frags, enemies | ✓ | |
