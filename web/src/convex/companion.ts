@@ -28,6 +28,7 @@ import {
 } from './lib/companion.js';
 import {
 	personalUpload,
+	replay,
 	runSummary,
 	type BossDetailPlayer,
 	type RunSummary
@@ -327,6 +328,44 @@ async function sameRunWithOtherKey(ctx: MutationCtx, s: RunSummary) {
 		}) ?? null
 	);
 }
+
+/**
+ * CLI: replay za run, ki je bil naložen s starejšim Companionom (scripts/replay-backfill.ts pošlje
+ * rezultat analize lokalnega loga). Poišče run po ključu ali po času/dungeonu/partyju; obstoječ replay pusti.
+ */
+export const attachReplay = internalMutation({
+	args: {
+		runKey: v.string(),
+		instanceId: v.number(),
+		startedAt: v.number(),
+		slugs: v.array(v.string()),
+		replay
+	},
+	handler: async (ctx, a) => {
+		const run =
+			(await ctx.db
+				.query('runs')
+				.withIndex('by_run_key', (q) => q.eq('runKey', a.runKey))
+				.first()) ??
+			(await sameRunWithOtherKey(ctx, {
+				startedAt: a.startedAt,
+				zone: { instanceId: a.instanceId },
+				players: a.slugs.map((slug) => ({ slug }))
+			} as unknown as RunSummary));
+		if (!run) return { ok: false as const, why: 'run not on the portal' };
+		const party = new Set(run.party.map((p) => p.slug));
+		const players = a.replay.players.filter((p) => party.has(p.slug));
+		if (!players.length) return { ok: false as const, why: 'nobody of the party in the replay' };
+		const old = await ctx.db
+			.query('runReplay')
+			.withIndex('by_run', (q) => q.eq('runId', run._id))
+			.unique();
+		if (old) return { ok: true as const, runId: run._id, already: true };
+		await ctx.db.insert('runReplay', { runId: run._id, bucketMs: a.replay.bucketMs, players });
+		await ctx.db.patch('runs', run._id, { hasReplay: true });
+		return { ok: true as const, runId: run._id, already: false };
+	}
+});
 
 /** Company Parses tega runa: najprej pobriše stare (boljši posnetek istega runa jih zamenja). */
 async function writeParses(
