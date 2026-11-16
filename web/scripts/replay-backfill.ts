@@ -20,7 +20,11 @@ type Run = {
 	replay?: unknown;
 };
 for (const log of logs) {
-	const runs = JSON.parse(await $`${wowrun} ${log} --compact`.quiet().text()) as Run[];
+	// log je v lokalnem času (kot Companion: UTC = lokalno − zamik tega računalnika)
+	const offset = String(-new Date().getTimezoneOffset());
+	const runs = JSON.parse(
+		await $`${wowrun} ${log} --compact --utc-offset-min ${offset}`.quiet().text()
+	) as Run[];
 	for (const r of runs) {
 		if (!r.replay) {
 			console.log(`${r.zone.name}: no positions in this log`);

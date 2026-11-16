@@ -27,9 +27,15 @@
   `runReplay`, zastavica `runs.hasReplay`), zemljevid iz poti, bossi, smrti, trak s play/pavza/hitrost, `?t=` sekunde.
   Koordinate: x = sever, y = zahod (preverjeno na Northwatch). Nekateri Forever dungeoni imajo uiMapID 0.
 
-**Za izdajo 0.1.12 (uporabnik):** GitHub skrivnosti `TAURI_SIGNING_PRIVATE_KEY` in `..._PASSWORD` (iz `~/.tauri`),
-push `main` (najprej strežnik – sprejme `replay`), nato oznaka `companion-v0.1.12`. Ročna namestitev 0.1.12 je zadnja:
-od tu naprej se Companion posodablja sam.
+- **Realmi** (`web/src/convex/realms.ts`, `lib/realms.ts`): realm = regija + ruleset (Forever API nima realmov).
+  Guild Master ga izbere v *System → Realm*; junaki z drugim rulesetom so zavrnjeni. Menjava: aktivni junaki
+  (`active=false`, `archived=<key>`), runi (`runs.archived`, paketno `moveRuns`) in sezone gredo v `archives` za 30 dni,
+  začne se nova sezona; vrnitev obnovi. Člani: stran **/archive** (prenos JSON). Cron `realm archive purge` briše.
+  CLI: `realms:setRealmCli`. Preizkušeno na dev (tja, nazaj, izbris).
+- **Replay za stare rune:** `bun scripts/replay-backfill.ts --prod ../wowlog/WoWCombatLog-*.txt` (poganja uporabnik –
+  zapis v prod je za Claude blokiran).
+
+**Izdano:** Companion 0.1.12 (latest.json podpisan, samoposodobitev deluje), nameščen pri uporabniku 16. 11. ob 10:26.
 
 **Naslednji koraki:** preveri pravi dungeon z 0.1.12 (replay, poročilo, samoposodobitev na 0.1.13), Discord objavo,
 `/wowco probe`; po želji ročno umerjen zemljevid dungeona (slika + meje iz `C_Map` v addonu).
