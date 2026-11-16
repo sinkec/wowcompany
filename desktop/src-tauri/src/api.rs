@@ -169,9 +169,18 @@ impl Api {
             Ok((status, text, _)) => Upload::Rejected(Self::error_text(status, &text)),
         }
     }
+    /// Addon diagnostics report (`POST /companion/diagnostics`). `Ok` carries no data.
+    pub fn upload_diagnostics(&self, token: &str, json: &str) -> Upload {
+        self.upload_records_like("/companion/diagnostics", token, json)
+    }
+
     /// Personal records of the log owner (`POST /companion/records`). `Ok` carries no data.
     pub fn upload_records(&self, token: &str, json: &str) -> Upload {
-        match self.post("/companion/records", Some(token), json) {
+        self.upload_records_like("/companion/records", token, json)
+    }
+
+    fn upload_records_like(&self, path: &str, token: &str, json: &str) -> Upload {
+        match self.post(path, Some(token), json) {
             Err(e) => Upload::Retry {
                 after_ms: None,
                 error: e,

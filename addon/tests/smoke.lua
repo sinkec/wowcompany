@@ -564,8 +564,12 @@ check(WowCompanyDB.settings.diagnostics == false, "diagnostics: off by default")
 SlashCmdList.WOWCOMPANY("diag on")
 fire("PLAYER_LOGOUT")
 check(WowCompanyDB.settings.diagnostics == true and type(WowCompanyDB.probe) == "table", "diagnostics: report saved at logout when on")
+check(type(WowCompanyDB.diag) == "string" and WowCompanyDB.diag:find("^v1|DIAG|%d+|0%.5%.%d+|{") ~= nil,
+    "diagnostics: one DIAG line with JSON for the Companion")
+check(ns.toJson({ a = 'say "hi"\n', b = { 1, 2 }, c = 0 / 0 }) == '{"a":"say \\"hi\\"\\u000a","b":[1,2],"c":null}',
+    "diagnostics: JSON escapes quotes and control characters")
 SlashCmdList.WOWCOMPANY("diag off")
-check(WowCompanyDB.probe == nil, "diagnostics: switching off deletes the report")
+check(WowCompanyDB.probe == nil and WowCompanyDB.diag == nil, "diagnostics: switching off deletes the report")
 check(textOf("Overall  3,000") ~= nil and textOf("DAMAGE") ~= nil, "now: card carries its label and the overall figure")
 check(widgetWith("Last fight") ~= nil, "now: says it is the last fight")
 fire("PLAYER_REGEN_DISABLED")

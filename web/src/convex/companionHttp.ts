@@ -189,3 +189,32 @@ export const uploadRecords = httpAction(async (ctx, req) => {
 		return errorResponse(e);
 	}
 });
+
+/** POST /companion/diagnostics – poročilo addona (opt-in), ki ga pošlje Companion. */
+export const uploadDiagnostics = httpAction(async (ctx, req) => {
+	const auth = req.headers.get('authorization') ?? '';
+	const m = /^Bearer (wcc_[A-Za-z0-9_-]{20,})$/.exec(auth);
+	if (!m) return json({ error: 'missing or malformed device token', code: 'unauthorized' }, 401);
+	const body = await readJson(req, 128 * 1024);
+	if (body instanceof Response) return body;
+	if (
+		!isObj(body) ||
+		typeof body.report !== 'string' ||
+		typeof body.at !== 'number' ||
+		typeof body.addonVersion !== 'string' ||
+		typeof body.appVersion !== 'string'
+	)
+		return json({ error: 'need report, at, addonVersion, appVersion' }, 400);
+	try {
+		const r = await ctx.runMutation(internal.diagnostics.ingest, {
+			tokenHash: await sha256hex(m[1]),
+			addonVersion: body.addonVersion,
+			appVersion: body.appVersion,
+			at: body.at,
+			report: body.report
+		});
+		return json(r, 200);
+	} catch (e) {
+		return errorResponse(e);
+	}
+});

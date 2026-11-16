@@ -156,15 +156,53 @@ local function report()
     return out
 end
 
+-- JSON for the Companion (it reads SavedVariables as text and sends the report to the portal).
+local function json(v, depth)
+    depth = depth or 0
+    local t = type(v)
+    if t == "string" then
+        return '"' .. v:gsub('[%c"\\]', function(c)
+            if c == '"' then return '\\"' elseif c == "\\" then return "\\\\" end
+            return string.format("\\u%04x", string.byte(c))
+        end) .. '"'
+    elseif t == "number" then
+        if v ~= v or v == math.huge or v == -math.huge then return "null" end
+        return string.format("%.14g", v)
+    elseif t == "boolean" then
+        return tostring(v)
+    elseif t == "table" and depth < 8 then
+        local n = #v
+        local parts = {}
+        if n > 0 then
+            for i = 1, n do parts[i] = json(v[i], depth + 1) end
+            return "[" .. table.concat(parts, ",") .. "]"
+        end
+        for k, val in pairs(v) do
+            table.insert(parts, json(tostring(k)) .. ":" .. json(val, depth + 1))
+        end
+        table.sort(parts)
+        return "{" .. table.concat(parts, ",") .. "}"
+    end
+    return "null"
+end
+ns.toJson = json
+
 -- Opt-in (Logging tab → "Help development"): the same report is written on every logout and /reload,
 -- so the next version can be built on what the game really does. Switching it off deletes it.
+-- `diag` = one line the Companion picks up: v1|DIAG|<epoch s>|<addon version>|<json>
+local MAX_DIAG = 90000
 ns.on("PLAYER_LOGOUT", function()
-    if ns.db and ns.db.settings.diagnostics then ns.db.probe = report() end
+    if not (ns.db and ns.db.settings.diagnostics) then return end
+    local r = report()
+    ns.db.probe = r
+    local body = json(r)
+    if #body > MAX_DIAG then body = json({ tooBig = #body, version = ns.version }) end
+    ns.db.diag = "v1|DIAG|" .. tostring(ns.now()) .. "|" .. tostring(ns.version) .. "|" .. body
 end)
 
 function ns.SetDiagnostics(on)
     ns.db.settings.diagnostics = on and true or false
-    if not on then ns.db.probe = nil end
+    if not on then ns.db.probe, ns.db.diag = nil, nil end
     ns.say(on and "diagnostics on: a technical report (no names) is saved at logout. Thank you, hero."
         or "diagnostics off: the report is gone.")
 end

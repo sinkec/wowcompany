@@ -370,6 +370,21 @@ export default defineSchema({
 		socials: v.array(v.object({ kind: v.string(), url: v.string(), label: v.optional(v.string()) }))
 	}).index('by_key', ['key']),
 
+	// Diagnostika addona (opt-in v addonu, pošlje Companion): tehnično poročilo brez imen, za razvoj.
+	// Največ 3 na napravo (starejša se izbrišejo). Vidi samo Guild Master (System → Diagnostics).
+	diagnostics: defineTable({
+		deviceId: v.id('devices'),
+		userId: v.string(),
+		addonVersion: v.string(),
+		appVersion: v.string(),
+		at: v.number(),
+		receivedAt: v.number(),
+		/** JSON besedilo poročila (≤ 100 KB) */
+		report: v.string()
+	})
+		.index('by_device_and_at', ['deviceId', 'at'])
+		.index('by_receivedAt', ['receivedAt']),
+
 	// Zemljevid dungeona za replay: posnetek zaslona igrine karte (M), ki ga Guild Master naloži in
 	// poravna s potmi partyja. `align` v jardih zaslonskih koordinat replaya (vzhod desno, sever gor).
 	dungeonMaps: defineTable({

@@ -271,6 +271,8 @@ pub struct Core {
     addon: Mutex<AddonState>,
     /// Bumped whenever the local run list changes (UI refreshes the Runs tab).
     pub runs_version: AtomicU64,
+    /// `at` of the last addon diagnostics report sent to the portal (saved in `diag-sent`).
+    diag_sent: Mutex<i64>,
     /// Bumped to cancel a running link poller.
     link_gen: AtomicU64,
     wake_uploader: AtomicBool,
@@ -302,6 +304,12 @@ impl Core {
             personal_path,
             addon: Mutex::new(AddonState::default()),
             runs_version: AtomicU64::new(0),
+            diag_sent: Mutex::new(
+                std::fs::read_to_string(config_dir.join("diag-sent"))
+                    .ok()
+                    .and_then(|s| s.trim().parse().ok())
+                    .unwrap_or(0),
+            ),
             link_gen: AtomicU64::new(0),
             wake_uploader: AtomicBool::new(false),
             cmd_tx: Mutex::new(None),
@@ -783,6 +791,26 @@ impl Core {
                 self.runs_version.fetch_add(1, Ordering::SeqCst);
                 if blocked {
                     break;
+                }
+            }
+
+            // addon diagnostics (opt-in in the addon): each new report goes to the portal once
+            let diag = self.addon.lock().expect("addon lock").export.diag.clone();
+            if let Some(d) = diag.filter(|d| d.at > *self.diag_sent.lock().expect("diag lock")) {
+                let body = serde_json::json!({
+                    "addonVersion": d.version,
+                    "appVersion": env!("CARGO_PKG_VERSION"),
+                    "at": d.at,
+                    "report": d.json,
+                })
+                .to_string();
+                match api.upload_diagnostics(&token, &body) {
+                    // sent, or the portal does not want it (too big, old server): do not ask again
+                    Upload::Ok { .. } | Upload::Rejected(_) => {
+                        *self.diag_sent.lock().expect("diag lock") = d.at;
+                        let _ = std::fs::write(self.config_dir.join("diag-sent"), d.at.to_string());
+                    }
+                    Upload::Retry { .. } | Upload::Unauthorized(_) => {}
                 }
             }
 

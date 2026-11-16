@@ -66,6 +66,18 @@ pub struct AddonExport {
     pub runs: Vec<AddonRun>,
     pub chars: Vec<AddonChar>,
     pub loot: Vec<AddonLoot>,
+    /// Opt-in diagnostics report ("Help development" in the addon), sent to the portal once.
+    #[serde(skip)]
+    pub diag: Option<AddonDiag>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct AddonDiag {
+    /// When the addon wrote it (UTC ms).
+    pub at: i64,
+    pub version: String,
+    /// The report as JSON text.
+    pub json: String,
 }
 
 /// The text between the quotes of a Lua string literal at the start of `s` (after the opening
@@ -114,13 +126,25 @@ fn secs_to_ms(field: &str) -> Option<i64> {
 pub fn parse_export(text: &str) -> AddonExport {
     let mut out = AddonExport::default();
     for raw in text.lines() {
-        let Some(rest) = raw.trim_start().strip_prefix('"') else {
+        // an element of the export list (`"v1|…",`) or a single field (`["diag"] = "v1|DIAG|…",`)
+        let Some(pos) = raw.find("\"v1|") else {
             continue;
         };
-        if !rest.starts_with("v1|") {
+        let rest = &raw[pos + 1..];
+        let Some(line) = lua_string(rest) else { continue };
+        if line.starts_with("v1|DIAG|") {
+            let f: Vec<&str> = line.splitn(5, '|').collect();
+            if let (Some(at), Some(version), Some(json)) =
+                (f.get(2).and_then(|s| secs_to_ms(s)), f.get(3), f.get(4))
+            {
+                out.diag = Some(AddonDiag {
+                    at,
+                    version: version.to_string(),
+                    json: json.to_string(),
+                });
+            }
             continue;
         }
-        let Some(line) = lua_string(rest) else { continue };
         let f: Vec<&str> = line.split('|').collect();
         match f.get(1).copied() {
             Some("META") if f.len() >= 4 => {
@@ -610,6 +634,22 @@ WowCompanyDB = {
         let mut again = run("Wailing Caverns", 43, 1_794_690_200, 1_794_691_700);
         assert_eq!(apply(&e, &mut again), (true, true));
         assert_eq!(apply(&e, &mut again), (false, false));
+    }
+
+    #[test]
+    fn reads_the_diagnostics_line() {
+        let sv = r#"WowCompanyDB = {
+["diag"] = "v1|DIAG|1794800000|0.5.6|{\"meter\":{\"secret\":true},\"note\":\"a|b\"}",
+["export"] = {
+"v1|META|0.5.6|1794800000",
+},
+}"#;
+        let e = parse_export(sv);
+        let d = e.diag.expect("diag");
+        assert_eq!(d.at, 1_794_800_000_000);
+        assert_eq!(d.version, "0.5.6");
+        assert_eq!(d.json, r#"{"meter":{"secret":true},"note":"a|b"}"#);
+        assert_eq!(e.version.as_deref(), Some("0.5.6"));
     }
 
     #[test]

@@ -24,6 +24,7 @@
 	import SquareSlash from '@lucide/svelte/icons/square-slash';
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import Globe from '@lucide/svelte/icons/globe';
+	import Stethoscope from '@lucide/svelte/icons/stethoscope';
 	import House from '@lucide/svelte/icons/house';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { SOCIAL_KINDS, parseConvos, parseQuips } from '#convex/lib/siteContent.js';
@@ -235,6 +236,7 @@
 		| 'discord-posts'
 		| 'discord-bot'
 		| 'realm'
+		| 'diagnostics'
 		| 'system';
 	const GROUPS: { title: string; items: { key: View; label: string; icon: typeof Users }[] }[] = [
 		{
@@ -266,7 +268,8 @@
 			title: 'System',
 			items: [
 				{ key: 'realm', label: 'Realm', icon: Globe },
-				{ key: 'system', label: 'Polling & budget', icon: Gauge }
+				{ key: 'system', label: 'Polling & budget', icon: Gauge },
+				{ key: 'diagnostics', label: 'Diagnostics', icon: Stethoscope }
 			]
 		}
 	];
@@ -358,6 +361,31 @@
 		if (!siteAdmin.data || !confirm('Replace both lists with the built-in jokes?')) return;
 		quipsText = siteAdmin.data.defaults.quips.join('\n');
 		convosText = siteAdmin.data.defaults.convos.map((c) => c.join('\n')).join('\n\n');
+	}
+
+	// --- diagnostika addona (opt-in, pošlje Companion)
+	const diagList = useQuery(api.diagnostics.list, () =>
+		isAdmin && view === 'diagnostics' ? {} : 'skip'
+	);
+	let diagOpen = $state<Id<'diagnostics'> | null>(null);
+	const diagReport = useQuery(api.diagnostics.get, () =>
+		isAdmin && diagOpen ? { id: diagOpen } : 'skip'
+	);
+	const pretty = (j: string | null | undefined) => {
+		if (!j) return '';
+		try {
+			return JSON.stringify(JSON.parse(j), null, 2);
+		} catch {
+			return j;
+		}
+	};
+	function downloadDiag(name: string) {
+		const blob = new Blob([pretty(diagReport.data)], { type: 'application/json' });
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(blob);
+		a.download = `wowcompany-diagnostics-${name}.json`;
+		a.click();
+		URL.revokeObjectURL(a.href);
 	}
 
 	// --- news
@@ -1339,6 +1367,56 @@
 								>
 							</div>
 						</section>
+					</div>
+				{/if}
+
+				{#if view === 'diagnostics'}
+					<div class="max-w-4xl space-y-4">
+						<p class="section-lead">
+							Technical reports from the addon, for development: what the game's meter, loot
+							messages and party info look like on this client. Only from players who ticked "Help
+							development" in the addon (Logging tab). Shapes and numbers, no names. The last 3 per
+							device are kept.
+						</p>
+						<ul class="panel divide-y divide-border/40 !p-0">
+							{#each diagList.data ?? [] as d (d.id)}
+								<li>
+									<button
+										class="flex w-full flex-wrap items-baseline justify-between gap-2 p-3 text-left text-sm hover:bg-accent/30 {diagOpen ===
+										d.id
+											? 'bg-accent/40'
+											: ''}"
+										onclick={() => (diagOpen = diagOpen === d.id ? null : d.id)}
+									>
+										<span><b>{d.user}</b> · {d.device}</span>
+										<span class="text-xs text-muted-foreground">
+											addon {d.addonVersion} · app {d.appVersion} · {ago(d.at)} · {Math.round(
+												d.size / 1024
+											)} KB
+										</span>
+									</button>
+								</li>
+							{:else}
+								<li class="p-4 text-sm text-muted-foreground italic">
+									No reports yet. Nobody volunteered. Typical.
+								</li>
+							{/each}
+						</ul>
+						{#if diagOpen && diagReport.data}
+							<section class="panel space-y-2">
+								<div class="flex justify-end">
+									<Button
+										size="sm"
+										variant="secondary"
+										onclick={() => downloadDiag(String(diagOpen))}>Download JSON</Button
+									>
+								</div>
+								<pre
+									class="wow-scroll max-h-[32rem] overflow-auto rounded-md bg-background/60 p-3 text-[11px] leading-snug">{pretty(
+										diagReport.data
+									)}</pre>
+							</section>
+						{/if}
 					</div>
 				{/if}
 
