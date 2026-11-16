@@ -1,5 +1,5 @@
 // Vsebina naslovnice: šale v heroju in povezave na skupnost (lib/siteContent.ts).
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server.js';
 import { requireAdmin } from './lib/access.js';
 import {
@@ -63,9 +63,9 @@ export const saveQuips = mutation({
 		await requireAdmin(ctx);
 		const quips = parseQuips(a.quips);
 		const { convos, error } = parseConvos(a.convos);
-		if (error) throw new Error(error);
+		if (error) throw new ConvexError(error);
 		if (quips.length < 3 && convos.length === 0)
-			throw new Error(
+			throw new ConvexError(
 				'Keep at least 3 lines or one conversation – the heroes need something to say.'
 			);
 		await upsert(ctx, { quips, convos });

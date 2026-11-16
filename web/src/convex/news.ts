@@ -1,6 +1,6 @@
 // Novice za naslovnico. Uradne WoW novice pridejo z dnevnim cronom (1 HTTP klic na dan, brez
 // Blizzard API kvote), objave druščine iz dogodkov (patch, sezona) in ročno iz Guild Master's Office.
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 import {
 	action,
 	internalAction,
@@ -94,9 +94,9 @@ export const post = mutation({
 	handler: async (ctx, { title, summary, url }) => {
 		await requireAdmin(ctx);
 		const t = title.trim();
-		if (t.length < 3) throw new Error('A headline, please. Three letters at least.');
+		if (t.length < 3) throw new ConvexError('A headline, please. Three letters at least.');
 		const u = url?.trim();
-		if (u && !/^https:\/\//.test(u)) throw new Error('Links must start with https://');
+		if (u && !/^https:\/\//.test(u)) throw new ConvexError('Links must start with https://');
 		return addCompanyNews(ctx, `post-${Date.now()}`, t, summary.trim(), u || undefined);
 	}
 });
@@ -171,7 +171,7 @@ export const refreshNow = action({
 	handler: async (ctx): Promise<{ ok: boolean; found: number; added: number }> => {
 		const user = await authComponent.safeGetAuthUser(ctx);
 		if (!user || !(await ctx.runQuery(internal.admin.isAdmin, { userId: user._id })))
-			throw new Error('Guild Master only.');
+			throw new ConvexError('Guild Master only.');
 		const { ok, items } = await fetchNews();
 		const added = items.length
 			? await ctx.runMutation(internal.news.saveBlizzard, { items })

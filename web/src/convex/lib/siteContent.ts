@@ -95,7 +95,7 @@ export function parseConvos(text: string): {
 	if (bad >= 0)
 		return {
 			convos: [],
-			error: `Conversation ${bad + 1} has ${blocks[bad].length} lines – every conversation needs exactly 3.`
+			error: `Conversation ${bad + 1} ("${blocks[bad][0].slice(0, 40)}…") has ${blocks[bad].length} lines – every conversation needs exactly 3. Put an empty line between conversations.`
 		};
 	return { convos: blocks.slice(0, MAX_CONVOS) as [string, string, string][], error: null };
 }

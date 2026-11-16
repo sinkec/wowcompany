@@ -1,6 +1,6 @@
 // Zemljevidi dungeonov za replay (glej schema: dungeonMaps). Slika gre v Convex file storage
 // (brskalnik jo pred nalaganjem pomanjša v WebP ~150 KB – brezplačna kvota za prenos).
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server.js';
 import { requireAdmin } from './lib/access.js';
 import { visibility } from './runs.js';
@@ -44,7 +44,7 @@ export const save = mutation({
 		const meta = await ctx.db.system.get('_storage', a.storageId);
 		if (!meta || meta.size > 3_000_000 || !/^image\//.test(meta.contentType ?? '')) {
 			await ctx.storage.delete(a.storageId);
-			throw new Error('Images only, up to 3 MB.');
+			throw new ConvexError('Images only, up to 3 MB.');
 		}
 		const old = await ctx.db
 			.query('dungeonMaps')
@@ -67,7 +67,7 @@ export const setAlign = mutation({
 			.query('dungeonMaps')
 			.withIndex('by_instance', (q) => q.eq('instanceId', instanceId))
 			.unique();
-		if (!m) throw new Error('No map for this dungeon yet.');
+		if (!m) throw new ConvexError('No map for this dungeon yet.');
 		await ctx.db.patch('dungeonMaps', m._id, { align, updatedAt: Date.now() });
 		return null;
 	}

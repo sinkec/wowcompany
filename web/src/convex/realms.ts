@@ -1,7 +1,7 @@
 // Realm druščine in arhivi (docs/README.md). Menjava realma: junaki, runi in sezone starega realma
 // dobijo oznako arhiva (samo branje za člane), začne se nova sezona. Vrnitev v ARCHIVE_DAYS dneh vse
 // obnovi; potem dnevni cron arhiv izbriše v paketih.
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 import {
 	internalMutation,
 	internalQuery,
@@ -131,7 +131,7 @@ async function moveRealm(
 ) {
 	{
 		const next = { region, ruleset };
-		if (!validRealm(next)) throw new Error('Unknown realm.');
+		if (!validRealm(next)) throw new ConvexError('Unknown realm.');
 		const now = Date.now();
 		const doc = await settingsDoc(ctx);
 		const old = doc.realm;
@@ -152,7 +152,7 @@ async function moveRealm(
 		}
 
 		if ((confirm ?? '').trim().toLowerCase() !== realmLabel(next).toLowerCase())
-			throw new Error(`Type "${realmLabel(next)}" to confirm.`);
+			throw new ConvexError(`Type "${realmLabel(next)}" to confirm.`);
 
 		// 1) vse aktivno v arhiv starega realma
 		const oldKey = realmKey(old);

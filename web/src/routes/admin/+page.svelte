@@ -26,7 +26,7 @@
 	import Globe from '@lucide/svelte/icons/globe';
 	import House from '@lucide/svelte/icons/house';
 	import Plus from '@lucide/svelte/icons/plus';
-	import { SOCIAL_KINDS } from '#convex/lib/siteContent.js';
+	import { SOCIAL_KINDS, parseConvos, parseQuips } from '#convex/lib/siteContent.js';
 	import Archive from '@lucide/svelte/icons/archive';
 	import { onMount } from 'svelte';
 	import { api } from '#convex/_generated/api.js';
@@ -55,8 +55,19 @@
 			if (ok) toast.success(ok);
 			return r;
 		} catch (e) {
-			toast.error((e as Error).message);
+			toast.error(errText(e));
 		}
+	}
+	/** Besedilo napake brez Convexovega ovoja (ConvexError nosi sporočilo v `data`). */
+	function errText(e: unknown) {
+		const data = (e as { data?: unknown }).data;
+		if (typeof data === 'string') return data;
+		return ((e as Error).message ?? 'Something broke.')
+			.replace(/^\[CONVEX[^\]]*\]\s*/, '')
+			.replace(/^\[Request ID: [^\]]*\]\s*/, '')
+			.replace(/^Server Error\s*/, '')
+			.replace(/^Uncaught (ConvexError|Error):\s*/, '')
+			.replace(/\s+at .*$/s, '');
 	}
 
 	const decide = (claimId: Id<'claims'>, accept: boolean, name: string) =>
@@ -328,6 +339,9 @@
 			siteLoaded = true;
 		}
 	});
+	// sproti: kateri pogovor nima treh vrstic (preden gre na strežnik)
+	const convoCheck = $derived(parseConvos(convosText).error);
+	const quipCount = $derived(parseQuips(quipsText).length);
 	async function saveQuips() {
 		const r = await run(
 			client.mutation(api.site.saveQuips, { quips: quipsText, convos: convosText })
@@ -1311,7 +1325,15 @@
 								></textarea>
 							</label>
 							<div class="flex flex-wrap gap-2">
-								<Button size="sm" onclick={saveQuips}>Save lines</Button>
+								<Button size="sm" onclick={saveQuips} disabled={!!convoCheck}>Save lines</Button>
+								<span
+									class="self-center text-xs {convoCheck
+										? 'text-destructive'
+										: 'text-muted-foreground'}"
+								>
+									{convoCheck ??
+										`${quipCount} lines · ${parseConvos(convosText).convos.length} conversations`}
+								</span>
 								<Button size="sm" variant="ghost" onclick={resetQuips}
 									>Restore built-in jokes</Button
 								>
