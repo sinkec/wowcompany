@@ -986,6 +986,8 @@ function UI.Reset()
     applyPin()
 end
 
+ns.command("panel", "panel – the big window: run, records, logging", function() UI.Toggle() end)
+
 ns.command("reset", "reset – window back to the top of the screen, unpinned", function()
     UI.Reset()
     ns.say("window reset.")
@@ -993,7 +995,13 @@ end)
 
 ns.onReady(function()
     -- open on login unless it was closed last time (first run: open, so you can see it works)
-    if ns.db.settings.open ~= false then UI.Show() end
+    -- 0.6: the small meter window is the default; the big panel opens only when asked for
+    -- (once: forget that it was open in older versions)
+    local st = ns.db.settings
+    if not st.panelV6 then
+        st.panelV6, st.open = true, false
+    end
+    if st.open == true then UI.Show() end
     ns.say("v" .. tostring(ns.version) .. " loaded. |cffffffff/wowco|r opens the meter. "
         .. ns.Logging.Describe() .. ".")
 end)

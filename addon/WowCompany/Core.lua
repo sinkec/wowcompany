@@ -183,7 +183,8 @@ SlashCmdList["WOWCOMPANY"] = function(msg)
     msg = string.lower(msg or "")
     local name, rest = string.match(msg, "^(%S+)%s*(.*)$")
     if not name then
-        if ns.UI and ns.UI.Toggle then ns.UI.Toggle() end
+        -- the small meter window; "/wowco panel" opens the big one (run, records, logging)
+        if ns.Window and ns.Window.Toggle then ns.Window.Toggle() end
         return
     end
     local cmd = commands[name]

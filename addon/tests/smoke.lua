@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.5.9" end,
+    GetAddOnMetadata = function() return "0.6.0" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -256,7 +256,8 @@ check(ns.db == nil, "ignores other addons loading")
 fire("ADDON_LOADED", "WowCompany")
 check(type(WowCompanyDB) == "table" and WowCompanyDB.settings.autoLog == true, "saved variables get defaults")
 check(said("loaded"), "greets on load")
-check(WowCompanyFrame and WowCompanyFrame:IsShown(), "first run: the window opens by itself")
+check(WowCompanyMeter ~= nil and WowCompanyMeter:IsShown() and not (WowCompanyFrame and WowCompanyFrame:IsShown()), "first run: the meter window opens by itself, the big panel does not")
+slash("panel") -- the rest of the tests use the big panel
 check(WowCompanyFrame.point[1] == "TOP", "default position is the top of the screen")
 
 -- formatting helpers
@@ -333,10 +334,30 @@ check(ns.Meter.Read("current", "damage").totalAmount == 5000, "reads the current
 check(ns.Meter.Read("nonsense", "damage") == nil, "unknown scope gives nothing")
 
 -- window: every tab, plain and secret values
+local function textOf(label)
+    for i = 1, #frames do
+        if frames[i].text == label then return frames[i] end
+    end
+end
+
+-- /wowco = the small meter window (Window.lua), /wowco panel = the big one
+check(WowCompanyMeter ~= nil and WowCompanyMeter:IsShown(), "meter window opens on load")
 slash("")
-check(not WowCompanyFrame:IsShown() and WowCompanyDB.settings.open == false, "/wowco closes the open window and remembers it")
+check(not WowCompanyMeter:IsShown() and WowCompanyDB.settings.winOpen == false, "/wowco closes the meter and remembers it")
 slash("")
-check(WowCompanyFrame:IsShown() and WowCompanyDB.settings.open == true, "/wowco opens it again")
+check(WowCompanyMeter:IsShown() and WowCompanyDB.settings.winOpen == true, "/wowco opens it again")
+check(textOf("1. Grobos Stinkfoot") ~= nil and textOf("3.00K") ~= nil, "meter: party rows with short numbers")
+for _, k in ipairs({ "damage", "healing", "taken", "interrupts", "dispels", "absorbs", "avoidable", "enemies", "deaths" }) do
+    WowCompanyDB.settings.winKind = k
+    check(pcall(ns.Window.Refresh), "meter window display " .. k)
+end
+WowCompanyDB.settings.winKind = "damage"
+check(pcall(ns.Window.OpenBreakdown, "Player-1-0000000A", "Grobos Stinkfoot", "MAGE"), "meter: spell breakdown opens")
+check(pcall(WowCompanyMeter.scripts.OnUpdate, WowCompanyMeter, 1), "meter: refresh tick")
+ns.Window.CloseBreakdown()
+if WowCompanyFrame:IsShown() then slash("panel") end
+slash("panel")
+check(WowCompanyFrame:IsShown() and WowCompanyDB.settings.open == true, "/wowco panel opens the big window")
 
 -- drag, pin, reset
 local win = WowCompanyFrame
@@ -424,7 +445,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.5%.9|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.6%.0|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -475,9 +496,9 @@ slash("log off")
 -- minimap button
 check(WowCompanyMinimapButton ~= nil and WowCompanyMinimapButton:IsShown(), "minimap button is there")
 local mm = WowCompanyMinimapButton
-local wasOpen = WowCompanyFrame:IsShown()
+local wasOpen = WowCompanyMeter:IsShown()
 mm.scripts.OnClick(mm, "LeftButton")
-check(WowCompanyFrame:IsShown() ~= wasOpen, "minimap: left click toggles the window")
+check(WowCompanyMeter:IsShown() ~= wasOpen, "minimap: click toggles the meter window")
 mm.scripts.OnClick(mm, "LeftButton")
 mm.scripts.OnClick(mm, "RightButton")
 check(game.combatLog == true and game.chatLog == true, "minimap: right click starts logging")
@@ -530,17 +551,16 @@ for i = 1, #frames do
     local enter, leave = frames[i].scripts.OnEnter, frames[i].scripts.OnLeave
     if enter and leave then
         local okE, okL = pcall(enter, frames[i]), pcall(leave, frames[i])
-        if okE and okL then hovered = hovered + 1 else hovered = -1000 end
+        if okE and okL then hovered = hovered + 1 else
+            hovered = -1000
+            local _, e = pcall(enter, frames[i])
+            io.stderr:write("hover failed: " .. tostring(e) .. "\n")
+        end
     end
 end
 check(hovered > 10, "hovering every button and tab works (" .. hovered .. " widgets)")
 
 -- the Now page: your own numbers of the current fight
-local function textOf(label)
-    for i = 1, #frames do
-        if frames[i].text == label then return frames[i] end
-    end
-end
 local function widgetWith(pattern)
     for i = 1, #frames do
         local t = rawget(frames[i], "text")
@@ -578,7 +598,7 @@ fire("PLAYER_REGEN_DISABLED")
 fire("PLAYER_REGEN_ENABLED")
 fire("PLAYER_LOGOUT")
 check(WowCompanyDB.settings.diagnostics == true and type(WowCompanyDB.probe) == "table", "diagnostics: report saved at logout when on")
-check(type(WowCompanyDB.diag) == "string" and WowCompanyDB.diag:find("^v1|DIAG|%d+|0%.5%.%d+|{") ~= nil,
+check(type(WowCompanyDB.diag) == "string" and WowCompanyDB.diag:find("^v1|DIAG|%d+|0%.%d+%.%d+|{") ~= nil,
     "diagnostics: one DIAG line with JSON for the Companion")
 check(ns.toJson({ a = 'say "hi"\n', b = { 1, 2 }, c = 0 / 0 }) == '{"a":"say \\"hi\\"\\u000a","b":[1,2],"c":null}',
     "diagnostics: JSON escapes quotes and control characters")
@@ -611,8 +631,8 @@ for _, kind in ipairs(ns.Meter.KINDS) do
 end
 local onUpdate = WowCompanyFrame.scripts.OnUpdate
 check(pcall(onUpdate, WowCompanyFrame, 0.6), "live refresh tick")
-slash("")
-check(not WowCompanyFrame:IsShown(), "/wowco closes it")
+slash("panel")
+check(not WowCompanyFrame:IsShown(), "/wowco panel closes it")
 game.secrets = false
 
 -- probe: samples and report
@@ -674,7 +694,8 @@ st.meterKind = "damage"
 ns.UI.Refresh()
 local mine
 for i = 1, #frames do
-    if rawget(frames[i], "guid") == "Player-1-0000000A" then mine = frames[i] end
+    -- the big window's row (it remembers srcName), not the meter window's bar
+    if rawget(frames[i], "guid") == "Player-1-0000000A" and rawget(frames[i], "srcName") then mine = frames[i] end
 end
 check(mine ~= nil, "breakdown: your row is clickable")
 mine.scripts.OnMouseUp(mine)

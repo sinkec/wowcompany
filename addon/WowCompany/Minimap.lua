@@ -48,7 +48,12 @@ local function build()
             ns.Logging.Set(not on, true)
             ns.say(ns.Logging.Describe())
         else
-            ns.UI.Toggle()
+            -- shift-click: the big panel (run, records, logging); click: the meter window
+            if type(IsShiftKeyDown) == "function" and IsShiftKeyDown() then
+                ns.UI.Toggle()
+            else
+                ns.Window.Toggle()
+            end
         end
     end)
     button:SetScript("OnDragStart", function(self) self:SetScript("OnUpdate", follow) end)
@@ -57,7 +62,8 @@ local function build()
         if type(GameTooltip) ~= "table" then return end
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:SetText("WowCompany", 1, 0.82, 0)
-        GameTooltip:AddLine("Left click: open the window", 1, 1, 1)
+        GameTooltip:AddLine("Click: the meter", 1, 1, 1)
+        GameTooltip:AddLine("Shift-click: run, records & logging", 1, 1, 1)
         GameTooltip:AddLine("Right click: logging on / off", 1, 1, 1)
         GameTooltip:AddLine("Drag: move around the minimap", 0.7, 0.7, 0.7)
         GameTooltip:Show()

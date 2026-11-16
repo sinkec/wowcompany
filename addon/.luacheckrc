@@ -13,6 +13,7 @@ globals = {
 }
 -- game API the addon reads (verified in WoW Forever by the self-test, see ADDON.md §4.1)
 read_globals = {
+    "IsShiftKeyDown", "LE_PARTY_CATEGORY_INSTANCE",
     "BackdropTemplateMixin",
     "BreakUpLargeNumbers",
     "C_AddOns",
