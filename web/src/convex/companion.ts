@@ -421,6 +421,19 @@ async function writeProgress(ctx: MutationCtx, runId: Id<'runs'>, s: RunSummary)
 	else await ctx.db.insert('runProgress', row);
 }
 
+/** Podrobnosti predmetov iz igre: en dokument na predmet, novejši zapis zamenja starega. */
+async function writeItemDetails(ctx: MutationCtx, s: RunSummary) {
+	for (const it of s.items ?? []) {
+		const old = await ctx.db
+			.query('itemDetails')
+			.withIndex('by_itemId', (q) => q.eq('itemId', it.itemId))
+			.unique();
+		const doc = { ...it, at: Date.now() };
+		if (old) await ctx.db.replace('itemDetails', old._id, doc);
+		else await ctx.db.insert('itemDetails', doc);
+	}
+}
+
 /** Replay v svojo tabelo (en dokument). Novejši/boljši posnetek ga zamenja; brez replaya ostane star. */
 async function writeReplay(ctx: MutationCtx, runId: Id<'runs'>, s: RunSummary, replace: boolean) {
 	if (!s.replay?.players.length) return;
@@ -516,7 +529,9 @@ export const ingestRun = internalMutation({
 			deaths: s.deaths,
 			timeline: s.timeline,
 			loot,
-			...(rolls.length ? { rolls } : {})
+			...(rolls.length ? { rolls } : {}),
+			...(s.combatMs ? { combatMs: s.combatMs } : {}),
+			...(s.enemyHeals?.length ? { enemyHeals: s.enemyHeals } : {})
 		};
 		const runFields = {
 			schema: s.schema,
@@ -550,6 +565,7 @@ export const ingestRun = internalMutation({
 			await writeParses(ctx, runId, s, party);
 			await writeProgress(ctx, runId, s);
 			await writeReplay(ctx, runId, s, true);
+			await writeItemDetails(ctx, s);
 			// Discord: enkrat, čez 5 min (drugi snemalec, dopolnitev iz addona); postRun preveri vidnost
 			await ctx.scheduler.runAfter(5 * 60_000, internal.discord.postRun, { runId });
 			await ctx.scheduler.runAfter(0, internal.companion.enrichItems, { runId });
@@ -608,6 +624,7 @@ export const ingestRun = internalMutation({
 		await writeProgress(ctx, existing._id, s);
 		// replay: boljši posnetek ga zamenja, sicer samo, če ga še ni
 		await writeReplay(ctx, existing._id, s, better);
+		await writeItemDetails(ctx, s);
 		return { runId: existing._id, created: false, recorderAdded: added, replaced: better };
 	}
 });

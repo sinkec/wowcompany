@@ -89,10 +89,29 @@ export const get = query({
 						.take(10)
 				).map(({ _id: _i, _creationTime: _c, runId: _r, ...g }) => g)
 			: [];
+		// podrobnosti predmetov iz igre (tooltip) za loot in rolle tega runa
+		const ids = new Set<number>();
+		if (allowed('runLoot') && details) {
+			for (const l of details.loot ?? []) if (l.itemId) ids.add(l.itemId);
+			for (const r of details.rolls ?? []) if (r.itemId) ids.add(r.itemId);
+		}
+		// seznam (ne objekt s ključi-številkami: Convex ključe omejuje)
+		const itemDetails: Omit<Doc<'itemDetails'>, '_id' | '_creationTime' | 'at'>[] = [];
+		for (const id of [...ids].slice(0, 200)) {
+			const d = await ctx.db
+				.query('itemDetails')
+				.withIndex('by_itemId', (q) => q.eq('itemId', id))
+				.unique();
+			if (d) {
+				const { _id: _i, _creationTime: _c, at: _a, ...rest } = d;
+				itemDetails.push(rest);
+			}
+		}
 		return {
 			locked: false as const,
 			run: {
 				...runDetail(run as RunDocLike, details as DetailsLike | null, classOf, allowed),
+				itemDetails,
 				progress,
 				hasReplay: (run.hasReplay ?? false) && allowed('runDetails'),
 				// nagrade za neuspele caste (vsak snemalec ima v logu samo svoje)

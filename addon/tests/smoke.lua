@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.6.1" end,
+    GetAddOnMetadata = function() return "0.6.2" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -199,6 +199,26 @@ local function session(kind)
     end
     return s
 end
+INVTYPE_2HWEAPON = "Two-Hand"
+C_Item = {
+    GetItemInfo = function(id)
+        if id ~= 2084 then return nil end
+        return "Darksteel Bastard Sword", "|Hitem:2084|h", 3, 30, 25, "Weapon", "Two-Handed Swords", 1,
+            "INVTYPE_2HWEAPON", 135321, 7137, 2, 8, 2
+    end,
+    RequestLoadItemDataByID = function() end,
+}
+C_TooltipInfo = {
+    GetItemByID = function()
+        return { lines = {
+            { leftText = "|cff0070ddDarksteel Bastard Sword|r" },
+            { leftText = "Binds when equipped" },
+            { leftText = "Two-Hand", rightText = "Sword" },
+            { leftText = "24 - 36 Damage", rightText = "Speed 3.20" },
+            { leftText = "|cff00ff00+8 Strength|r" },
+        } }
+    end,
+}
 C_DamageMeter = {
     IsDamageMeterAvailable = function() return true, "" end,
     GetCombatSessionFromType = function(_, kind)
@@ -449,7 +469,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.6%.1|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.6%.2|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -491,6 +511,10 @@ game.instanceType = "party"
 fire("ZONE_CHANGED_NEW_AREA")
 fire("CHAT_MSG_LOOT", "Fizzle Boom receives loot: |cff0070dd|Hitem:2084::::|h[Darksteel Bastard Sword]|h|r.")
 local lootLine = exported("^v1|LOOT|")
+local itemLine = exported("^v1|ITEM|2084|")
+check(itemLine == "v1|ITEM|2084|30|25|Two-Hand|Weapon|Two-Handed Swords|7137|Binds when equipped|"
+    .. "Binds when equipped~Two-Hand  Sword~24 - 36 Damage  Speed 3.20~+8 Strength",
+    "export: ITEM line with the game's own details, colour codes stripped (" .. tostring(itemLine) .. ")")
 check(lootLine ~= nil and string.find(lootLine, "|2084|3|1|Darksteel Bastard Sword$") ~= nil
     and not string.find(lootLine, "Fizzle", 1, true), "export: LOOT line has the item, never the looter (" .. tostring(lootLine) .. ")")
 game.instanceType = "none"

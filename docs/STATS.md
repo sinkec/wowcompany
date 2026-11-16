@@ -432,3 +432,13 @@ Licenca "All rights reserved": samo branje in učenje, nobene kopirane kode; na�
 | Friendly fire, CC breaks, enemy heal, potions/healthstone, energija po vrsti | ✗ | manjka |
 | Damage by spell (vsa skupina) | ✗ na portalu | podatki že so (uroki po igralcu) |
 | Overheal, absorbs, interrupts, dispels, deaths, ress, buff/debuff uptime, frags, enemies | ✓ | |
+
+### 11.1 Narejeno (16. 11. 2026, Companion 0.1.15, addon 0.6.2)
+- **DPS/HPS** delita s **časom boja skupine** (`RunSummary.combatMs`: škoda med partyjem in sovražniki, vrzeli ≤ 3,5 s –
+  kot Details! "effective time"); prej cel run. Bossi (Parses) nespremenjeni.
+- Novo na igralca: `potions`, `potionHealing` (ime vsebuje Potion/Healthstone), `friendlyFire`, `ccBreaks`
+  (SPELL_AURA_BROKEN(_SPELL), vir = kdo je prekinil), `power` po vrsti; na run: `enemyHeals` (top 5 mobov).
+- **Predmeti:** addon prebere `C_Item.GetItemInfo` + `C_TooltipInfo.GetItemByID` → `v1|ITEM|…` → Companion `items`
+  → tabela `itemDetails` → tooltip na portalu (skupni `ItemTooltip.svelte` z opremo junaka) in v poročilu Companiona.
+- Portal: Big Numbers (Potion addict, Friendly fire, Sheep breaker, Mana sponge, Damage by spell, Mobs that healed),
+  glava runa "… actually fighting".

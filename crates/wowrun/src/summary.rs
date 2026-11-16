@@ -47,6 +47,43 @@ pub struct RunSummary {
     /// Where the party stood, every `bucket_ms` (advanced log x/y/uiMapID) – the portal's replay.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replay: Option<Replay>,
+    /// Party combat time: somebody of the party did something with gaps of at most 3.5 s
+    /// (Details!' "effective time") – the time base for `dps`/`hps`. Walking, AFK and corpse runs out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat_ms: Option<i64>,
+    /// Healing done by enemies (mob name → effective healing), biggest first, at most 5.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub enemy_heals: Vec<NamedAmount>,
+    /// Details of the looted/rolled items from the game client (WowCompany addon 0.6.2+).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub items: Vec<ItemDetail>,
+}
+
+/// What the game itself says about an item (WoW Forever numbers, not the web API's).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemDetail {
+    pub item_id: u32,
+    pub ilvl: Option<i64>,
+    pub req_level: Option<i64>,
+    /// "Two-Hand", "Chest" …
+    pub slot: Option<String>,
+    /// "Weapon", "Armor" …
+    pub kind: Option<String>,
+    /// "Two-Handed Swords", "Cloth" …
+    pub subkind: Option<String>,
+    /// Vendor price in copper.
+    pub sell: Option<i64>,
+    pub bind: Option<String>,
+    /// Tooltip lines below the name (damage, stats, effects).
+    pub lines: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NamedAmount {
+    pub name: String,
+    pub amount: i64,
 }
 
 /// Positions for the replay map. World coordinates in tenths of a yard: `x` grows to the north,
@@ -306,9 +343,10 @@ pub struct PlayerSummary {
     pub dispels: u32,
     /// Time spent doing something (gaps ≤ 3.5 s between own actions).
     pub active_ms: i64,
-    /// Damage per second over the whole run.
+    /// Damage per second over the party's combat time (`RunSummary.combat_ms`; the whole run in
+    /// runs recorded before Companion 0.1.15).
     pub dps: f64,
-    /// Effective healing per second over the whole run.
+    /// Effective healing per second, same time base as `dps`.
     pub hps: f64,
     /// Crit rate of damage hits, 0–100.
     pub crit_pct: f64,
@@ -326,6 +364,46 @@ pub struct PlayerSummary {
     /// Biggest single events of the run, at most one per kind (schema 3).
     #[serde(default)]
     pub records: Vec<RunRecord>,
+    /// Potions and healthstones used (casts whose name says so) and the healing they did.
+    #[serde(default)]
+    pub potions: u32,
+    #[serde(default)]
+    pub potion_healing: i64,
+    /// Damage done to the own party (players and their pets), self-damage excluded.
+    #[serde(default)]
+    pub friendly_fire: i64,
+    /// Crowd control on enemies broken by this player's damage (sheep, sap …).
+    #[serde(default)]
+    pub cc_breaks: u32,
+    /// Power received, by kind (Mana, Rage, Energy …).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub power: Vec<PowerGain>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PowerGain {
+    pub kind: String,
+    pub amount: i64,
+}
+
+/// Name of a combat-log power type.
+pub fn power_name(t: i64) -> String {
+    match t {
+        0 => "Mana".into(),
+        1 => "Rage".into(),
+        2 => "Focus".into(),
+        3 => "Energy".into(),
+        4 => "Combo Points".into(),
+        6 => "Runic Power".into(),
+        _ => format!("Power {t}"),
+    }
+}
+
+/// Potions and healthstones by spell name (the log has no item ids for them).
+pub fn is_potion(spell: &str) -> bool {
+    let s = spell.to_ascii_lowercase();
+    s.contains("potion") || s.contains("healthstone")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -738,6 +816,9 @@ mod size_tests {
             rolls: vec![],
             progress: None,
             replay: None,
+            combat_ms: None,
+            enemy_heals: vec![],
+            items: vec![],
             loot: (0..2000)
                 .map(|i| LootDrop {
                     slug: Some("hero-0".into()),

@@ -130,7 +130,13 @@ export const playerSummary = v.object({
 	/** shema 4: casti (tudi uroki brez škode) in oprema ob zadnjem bossu (COMBATANT_INFO) */
 	casts: v.optional(v.array(castStat)),
 	gear: v.optional(v.array(gearItem)),
-	combat: v.optional(combatLogStats)
+	combat: v.optional(combatLogStats),
+	/** Companion 0.1.15+: napoji/healthstone, friendly fire, CC breaks, energija po vrsti */
+	potions: v.optional(v.number()),
+	potionHealing: v.optional(v.number()),
+	friendlyFire: v.optional(v.number()),
+	ccBreaks: v.optional(v.number()),
+	power: v.optional(v.array(v.object({ kind: v.string(), amount: v.number() })))
 });
 
 export const segment = v.object({
@@ -322,6 +328,20 @@ export const replayTrack = v.object({
 export const replay = v.object({ bucketMs: v.number(), players: v.array(replayTrack) });
 export type Replay = Infer<typeof replay>;
 
+/** Podrobnosti predmeta iz igre (addon 0.6.2+, prek Companiona): pravi Forever podatki. */
+export const itemDetail = v.object({
+	itemId: v.number(),
+	ilvl: nullableNumber,
+	reqLevel: nullableNumber,
+	slot: nullableString,
+	kind: nullableString,
+	subkind: nullableString,
+	sell: nullableNumber,
+	bind: nullableString,
+	lines: v.array(v.string())
+});
+export type ItemDetail = Infer<typeof itemDetail>;
+
 /** Kar pošlje aplikacija (POST /companion/runs). */
 export const runSummary = v.object({
 	schema: v.union(v.literal(1), v.literal(2), v.literal(3), v.literal(4)),
@@ -345,7 +365,11 @@ export const runSummary = v.object({
 	/** pridobitve snemalca (Companion v0.1.11+) */
 	progress: v.optional(runProgress),
 	/** pozicije za replay (Companion v0.1.12+) – shrani se v svojo tabelo runReplay */
-	replay: v.optional(replay)
+	replay: v.optional(replay),
+	/** čas boja skupine (Companion 0.1.15+) – osnova za DPS/HPS */
+	combatMs: v.optional(v.number()),
+	enemyHeals: v.optional(v.array(v.object({ name: v.string(), amount: v.number() }))),
+	items: v.optional(v.array(itemDetail))
 });
 
 export const award = v.object({

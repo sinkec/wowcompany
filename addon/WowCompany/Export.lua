@@ -113,6 +113,14 @@ function Export.Rebuild()
             tostring(l.count or 1), clean(l.name),
         }, "|"))
     end
+    -- v1|ITEM|id|ilvl|req|slot|type|subtype|sell|bind|line~line~…
+    local num = function(v) return type(v) == "number" and tostring(v) or "" end
+    for id, it in pairs(type(ns.db.items) == "table" and ns.db.items or {}) do
+        table.insert(lines, table.concat({
+            "v1", "ITEM", tostring(id), num(it.ilvl), num(it.reqLevel), clean(it.slot), clean(it.kind),
+            clean(it.subkind), num(it.sell), clean(it.bind), table.concat(it.lines or {}, "~"),
+        }, "|"))
+    end
     local char = charLine()
     if char then table.insert(lines, char) end
     ns.db.export = lines
@@ -158,6 +166,71 @@ ns.onReady(function()
     ns.db.loot = type(ns.db.loot) == "table" and ns.db.loot or {}
 end)
 
+-- ------------------------------------------------------------------ item details (for the portal's tooltips)
+-- The Blizzard web API has no WoW Forever items (and its retail/classic numbers differ), so the
+-- real details come from the game: item level, required level, slot, type, binding, sell price and
+-- the tooltip lines. One entry per item id; the Companion attaches them to the run.
+
+local MAX_ITEMS = 300
+local BIND = { [1] = "Binds when picked up", [2] = "Binds when equipped", [3] = "Binds when used", [4] = "Quest item" }
+
+local function plainText(t)
+    t = ns.plain(t)
+    if type(t) ~= "string" then return nil end
+    t = t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""):gsub("|A.-|a", "")
+    t = t:gsub("[|~\r\n]", " "):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    return t ~= "" and t:sub(1, 140) or nil
+end
+
+local pending = {}
+
+function Export.ItemDetails(itemId)
+    if not ns.db or type(itemId) ~= "number" then return end
+    ns.db.items = type(ns.db.items) == "table" and ns.db.items or {}
+    if ns.db.items[itemId] then return end
+    if type(C_Item) ~= "table" or type(C_Item.GetItemInfo) ~= "function" then return end
+    local ok, name, _, _, ilvl, reqLevel, kind, subkind, _, equipLoc, _, sell, _, _, bindType =
+        pcall(C_Item.GetItemInfo, itemId)
+    if not ok or ns.plain(name) == nil then
+        -- not in the client's cache yet: ask for it, GET_ITEM_INFO_RECEIVED brings it
+        pending[itemId] = true
+        if type(C_Item.RequestLoadItemDataByID) == "function" then pcall(C_Item.RequestLoadItemDataByID, itemId) end
+        return
+    end
+    pending[itemId] = nil
+    local lines = {}
+    if type(C_TooltipInfo) == "table" and type(C_TooltipInfo.GetItemByID) == "function" then
+        local okT, info = pcall(C_TooltipInfo.GetItemByID, itemId)
+        if okT and type(info) == "table" and type(info.lines) == "table" then
+            for i = 2, math.min(#info.lines, 26) do -- line 1 is the name
+                local l = info.lines[i]
+                local left, right = plainText(l and l.leftText), plainText(l and l.rightText)
+                if left or right then
+                    table.insert(lines, (left or "") .. (right and ("  " .. right) or ""))
+                end
+            end
+        end
+    end
+    local slot = ns.plain(equipLoc)
+    slot = (type(slot) == "string" and slot ~= "" and type(_G[slot]) == "string") and _G[slot] or nil
+    local count = 0
+    for _ in pairs(ns.db.items) do count = count + 1 end
+    if count >= MAX_ITEMS then ns.db.items = {} end
+    ns.db.items[itemId] = {
+        ilvl = ns.plain(ilvl), reqLevel = ns.plain(reqLevel), slot = slot,
+        kind = plainText(kind), subkind = plainText(subkind), sell = ns.plain(sell),
+        bind = BIND[ns.plain(bindType) or 0], lines = lines,
+    }
+end
+
+ns.on("GET_ITEM_INFO_RECEIVED", function(itemId)
+    itemId = ns.plain(itemId)
+    if pending[itemId] then
+        Export.ItemDetails(itemId)
+        Export.Rebuild()
+    end
+end)
+
 -- Loot seen in a dungeon run: which item (id, quality), never who.
 ns.on("CHAT_MSG_LOOT", function(msg)
     if not ns.db or not ns.Meter.Run() then return end
@@ -167,6 +240,7 @@ ns.on("CHAT_MSG_LOOT", function(msg)
     ns.db.loot = type(ns.db.loot) == "table" and ns.db.loot or {}
     table.insert(ns.db.loot, item)
     while #ns.db.loot > MAX_LOOT do table.remove(ns.db.loot, 1) end
+    Export.ItemDetails(item.itemId)
     Export.Rebuild()
 end)
 

@@ -14,6 +14,7 @@
 	import RunTimeline from '#lib/components/wow/RunTimeline.svelte';
 	import { classColor, iconFallback } from '#lib/wow.js';
 	import RunReplay from '#lib/components/wow/RunReplay.svelte';
+	import ItemLink from '#lib/components/wow/ItemLink.svelte';
 	import {
 		ACTIVE_QUIP,
 		END_REASON,
@@ -35,6 +36,63 @@
 	const q = useQuery(api.runs.get, () => ({ id }));
 	const run = $derived(q.data && !q.data.locked ? q.data.run : null);
 
+	// navade partyja (Companion 0.1.15+): napoji, friendly fire, CC breaks, mana
+	const habits = $derived.by(() => {
+		const ps = run?.players ?? [];
+		const top = (f: (p: (typeof ps)[number]) => number) =>
+			[...ps].filter((p) => f(p) > 0).sort((a, b) => f(b) - f(a))[0];
+		const out: { title: string; value: string; slug: string; note: string }[] = [];
+		const pot = top((p) => p.potions ?? 0);
+		if (pot)
+			out.push({
+				title: 'Potion addict',
+				value: String(pot.potions),
+				slug: pot.slug,
+				note: `potions & healthstones, ${fmtNum(pot.potionHealing ?? 0)} healed`
+			});
+		const ff = top((p) => p.friendlyFire ?? 0);
+		if (ff)
+			out.push({
+				title: 'Friendly fire',
+				value: fmtNum(ff.friendlyFire ?? 0),
+				slug: ff.slug,
+				note: 'damage to the own party. Oops.'
+			});
+		const cc = top((p) => p.ccBreaks ?? 0);
+		if (cc)
+			out.push({
+				title: 'Sheep breaker',
+				value: String(cc.ccBreaks),
+				slug: cc.slug,
+				note: 'crowd control broken by hitting it'
+			});
+		const mana = (p: (typeof ps)[number]) =>
+			(p.power ?? []).find((x) => x.kind === 'Mana')?.amount ?? 0;
+		const mp = top(mana);
+		if (mp)
+			out.push({
+				title: 'Mana sponge',
+				value: fmtNum(mana(mp)),
+				slug: mp.slug,
+				note: 'mana received'
+			});
+		return out;
+	});
+	// škoda po urokih za ves party (iz top urokov vsakega igralca)
+	const spellBoard = $derived(
+		(run?.players ?? [])
+			.flatMap((p) =>
+				(p.topDamage ?? []).map((sp) => ({
+					key: `${p.slug}:${sp.id}:${sp.pet}`,
+					name: sp.name + (sp.pet ? ' (pet)' : ''),
+					slug: p.slug,
+					amount: sp.amount
+				}))
+			)
+			.sort((a, b) => b.amount - a.amount)
+			.slice(0, 12)
+	);
+	const itemDetail = $derived(new Map((run?.itemDetails ?? []).map((d) => [d.itemId, d])));
 	const names = $derived(Object.fromEntries((run?.party ?? []).map((p) => [p.slug, p.name])));
 	const classes = $derived(Object.fromEntries((run?.party ?? []).map((p) => [p.slug, p.classId])));
 	const tracked = $derived(new Set((run?.party ?? []).filter((p) => p.tracked).map((p) => p.slug)));
@@ -213,6 +271,14 @@
 						{fmtDuration(run.durationMs)}
 					</div>
 					<p class="text-xs text-muted-foreground italic">{durationQuip(run.durationMs)}</p>
+					{#if run.combatMs}
+						<p
+							class="text-xs text-muted-foreground"
+							title="DPS and HPS use this time, like Details!"
+						>
+							{fmtDuration(run.combatMs)} actually fighting
+						</p>
+					{/if}
 				</div>
 			</div>
 
@@ -870,9 +936,7 @@
 							{/each}
 						</div>
 						{#if rolls.length}
-							<h3 class="eyebrow pt-2 text-primary">
-								Need, greed &amp; broken friendships
-							</h3>
+							<h3 class="eyebrow pt-2 text-primary">Need, greed &amp; broken friendships</h3>
 							{#if dice.length > 1}
 								<div class="flex flex-wrap gap-2 text-sm">
 									{#each dice as d, i (d.slug)}
@@ -913,7 +977,11 @@
 													>{fmtDuration(Math.max(0, r.atMs))}</td
 												>
 												<td class="px-3 py-1.5">
-													<span style="color: {lootColor(r.quality)}">[{r.item}]</span>
+													<ItemLink
+														name={r.item}
+														color={lootColor(r.quality)}
+														detail={r.itemId ? itemDetail.get(r.itemId) : null}
+													/>
 													{#if !r.winner}<div class="text-xs text-muted-foreground">
 															Nobody wanted it. Not even the vendor.
 														</div>{/if}
@@ -946,9 +1014,7 @@
 									</tbody>
 								</table>
 							</div>
-							<h3 class="eyebrow pt-2 text-primary">
-								Everything looted
-							</h3>
+							<h3 class="eyebrow pt-2 text-primary">Everything looted</h3>
 						{/if}
 						<div class="wow-frame overflow-hidden rounded-lg">
 							<table class="w-full text-sm">
@@ -966,7 +1032,11 @@
 												>{fmtDuration(Math.max(0, l.atMs))}</td
 											>
 											<td class="px-3 py-1.5">
-												<span style="color: {lootColor(l.quality)}">[{l.item}]</span>
+												<ItemLink
+													name={l.item}
+													color={lootColor(l.quality)}
+													detail={l.itemId ? itemDetail.get(l.itemId) : null}
+												/>
 												{#if l.count > 1}<span class="text-muted-foreground"> ×{l.count}</span>{/if}
 											</td>
 											<td class="px-3 py-1.5">
@@ -997,6 +1067,63 @@
 
 				<!-- BIG NUMBERS -->
 				<Tabs.Content value="numbers" class="mt-4 space-y-4">
+					{#if habits.length || spellBoard.length || (run.enemyHeals ?? []).length}
+						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+							{#each habits as h (h.title)}
+								<div class="wow-frame rounded-lg p-4">
+									<div class="eyebrow">{h.title}</div>
+									<div class="mt-1 text-2xl font-bold text-primary tabular-nums">{h.value}</div>
+									<div class="mt-1 text-sm">
+										<span
+											class="font-semibold"
+											style="color: {classColor(classes[h.slug] ?? undefined)}"
+											>{names[h.slug] ?? h.slug}</span
+										>
+										<span class="text-muted-foreground">· {h.note}</span>
+									</div>
+								</div>
+							{/each}
+						</div>
+						<div class="grid gap-3 lg:grid-cols-2">
+							{#if spellBoard.length}
+								<section class="wow-frame rounded-lg p-4">
+									<h3 class="card-title">Damage by spell (whole party)</h3>
+									<ul class="mt-2 space-y-1 text-sm">
+										{#each spellBoard as sp (sp.key)}
+											<li class="flex items-baseline justify-between gap-2">
+												<span class="truncate"
+													>{sp.name}
+													<span
+														class="text-xs"
+														style="color: {classColor(classes[sp.slug] ?? undefined)}"
+														>{names[sp.slug] ?? sp.slug}</span
+													></span
+												>
+												<span class="tabular-nums">{fmtNum(sp.amount)}</span>
+											</li>
+										{/each}
+									</ul>
+								</section>
+							{/if}
+							{#if (run.enemyHeals ?? []).length}
+								<section class="wow-frame rounded-lg p-4">
+									<h3 class="card-title">Mobs that healed themselves</h3>
+									<p class="section-lead">
+										Kill the healer first. Every time. Apparently not this time.
+									</p>
+									<ul class="mt-2 space-y-1 text-sm">
+										{#each run.enemyHeals ?? [] as e (e.name)}
+											<li class="flex justify-between gap-2">
+												<span>{e.name}</span><span class="text-[#1eff00] tabular-nums"
+													>+{fmtNum(e.amount)}</span
+												>
+											</li>
+										{/each}
+									</ul>
+								</section>
+							{/if}
+						</div>
+					{/if}
 					{#if !records.length}
 						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
 							No big numbers on file. This run was recorded by an older Companion — update the app

@@ -56,6 +56,8 @@ export type DetailsLike = {
 	};
 	loot?: LootDrop[];
 	rolls?: LootRoll[];
+	combatMs?: number;
+	enemyHeals?: { name: string; amount: number }[];
 };
 
 /** Ime iz partyja za slug (snemalec je vedno v partyju; rezerva = slug). */
@@ -123,7 +125,10 @@ export function runDetail(
 		deaths: deaths ? details!.deaths : null,
 		loot: allowed('runLoot') && details ? (details.loot ?? []) : null,
 		/** need/greed rolli – isto polje vidnosti kot loot */
-		rolls: allowed('runLoot') && details ? (details.rolls ?? []) : null
+		rolls: allowed('runLoot') && details ? (details.rolls ?? []) : null,
+		/** čas boja skupine (null = run pred Companion 0.1.15: DPS je čez cel run) */
+		combatMs: nums ? (details!.combatMs ?? null) : null,
+		enemyHeals: nums ? (details!.enemyHeals ?? []) : null
 	};
 }
 

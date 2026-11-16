@@ -259,6 +259,12 @@ struct PlayerAcc {
     recap: VecDeque<RecapRaw>,
     /// kind → biggest event so far (`at_ms` holds the absolute timestamp until `summarize`).
     records: BTreeMap<RecordKind, RunRecord>,
+    potions: u32,
+    potion_healing: i64,
+    friendly_fire: i64,
+    cc_breaks: u32,
+    /// power type → amount received
+    power: BTreeMap<i64, i64>,
 }
 
 impl PlayerAcc {
@@ -322,6 +328,11 @@ pub struct RunAcc {
     progress: Option<RunProgress>,
     /// Replay: per player guid, the last position seen in each `REPLAY_BUCKET_MS` bucket.
     positions: HashMap<String, ReplayTrack>,
+    /// Party combat time (Details!' "effective time"): any party member acting, gaps ≤ active_gap_ms.
+    party_last: Option<i64>,
+    party_active_ms: i64,
+    /// Healing done by enemies: mob name → effective amount.
+    enemy_heal: HashMap<String, i64>,
     /// Open aura intervals: (credited player guid, spell id, debuff on enemies).
     auras: HashMap<(String, u32, bool), AuraTrack>,
     /// Leader from the chat log (see `Detector::push_group`): `Some(None)` = the log writer.
@@ -363,6 +374,9 @@ impl RunAcc {
             auras: HashMap::new(),
             progress: None,
             positions: HashMap::new(),
+            party_last: None,
+            party_active_ms: 0,
+            enemy_heal: HashMap::new(),
             chat_leader: None,
         }
     }
@@ -588,6 +602,18 @@ impl RunAcc {
     fn bucket(&self, ts: i64, cfg: &Config) -> usize {
         let start = self.started_at.unwrap_or(ts);
         ((ts - start).max(0) / cfg.bucket_ms) as usize
+    }
+
+    /// Party combat time: damage between the party and enemies, gaps ≤ active_gap_ms (buffing,
+    /// eating and topping up out of combat do not count).
+    fn party_tick(&mut self, ts: i64, cfg: &Config) {
+        if let Some(last) = self.party_last {
+            let gap = ts - last;
+            if (0..=cfg.active_gap_ms).contains(&gap) {
+                self.party_active_ms += gap;
+            }
+        }
+        self.party_last = Some(ts.max(self.party_last.unwrap_or(ts)));
     }
 
     fn touch(&mut self, guid: &str, ts: i64, cfg: &Config) {
@@ -858,6 +884,18 @@ impl RunAcc {
                 }
                 let b = self.bucket(ts, cfg);
                 let dest_group = self.is_group_side(&rec.dest);
+                let source_group = self.is_group_side(&rec.source);
+                if source_group != dest_group && !rec.source.is_none() && !rec.dest.is_none() {
+                    self.party_tick(ts, cfg);
+                }
+                // friendly fire: a party member (or pet) hurting someone of the party, not themselves
+                if dest_group
+                    && let Some((guid, _)) = self.actor(&rec.source)
+                    && rec.source.guid != rec.dest.guid
+                    && self.actor(&rec.dest).is_none_or(|(owner, _)| owner != guid)
+                {
+                    self.players.get_mut(&guid).expect("actor exists").friendly_fire += damage.amount;
+                }
                 if let Some((guid, pet)) = self.actor(&rec.source).filter(|_| !dest_group) {
                     let (id, name) = match spell {
                         Some(s) => (s.id, s.name.clone()),
@@ -1007,9 +1045,22 @@ impl RunAcc {
                     self.combat(&guid, |c| c.me.heals_received += effective);
                 }
                 let b = self.bucket(ts, cfg);
+                // enemies healing enemies (a mob that keeps healing up is worth knowing about)
+                if effective > 0
+                    && !rec.source.is_none()
+                    && !rec.source.is_player()
+                    && !self.is_group_side(&rec.source)
+                    && !self.is_group_side(&rec.dest)
+                    && let Some(name) = rec.source.name.clone()
+                {
+                    *self.enemy_heal.entry(display_name(&name)).or_default() += effective;
+                }
                 if let Some((guid, pet)) = self.actor(&rec.source) {
                     let target = self.public_name(&rec.dest);
                     let p = self.players.get_mut(&guid).expect("actor exists");
+                    if !pet && is_potion(&spell.name) {
+                        p.potion_healing += effective;
+                    }
                     let kind = if heal.critical {
                         RecordKind::CritHeal
                     } else {
@@ -1095,6 +1146,9 @@ impl RunAcc {
             } => {
                 if let Some((guid, pet)) = self.actor(&rec.source) {
                     let p = self.players.get_mut(&guid).expect("actor exists");
+                    if !pet && is_potion(&spell.name) {
+                        p.potions += 1;
+                    }
                     p.casts
                         .entry((spell.id, pet))
                         .or_insert_with(|| (spell.name.clone(), 0))
@@ -1132,10 +1186,15 @@ impl RunAcc {
                     });
                 }
             }
-            Kind::Energize { amount, .. } => {
+            Kind::Energize { amount, power_type, .. } => {
+                let gained = amount.max(0.0).round() as i64;
                 if let Some((guid, _)) = self.actor(&rec.source) {
-                    let gained = amount.max(0.0).round() as i64;
                     self.combat(&guid, |c| c.mine.power_gains += gained);
+                }
+                if rec.dest.is_player()
+                    && let Some(p) = self.players.get_mut(&rec.dest.guid)
+                {
+                    *p.power.entry(*power_type).or_default() += gained;
                 }
             }
             Kind::ExtraAttacks { amount, .. } => {
@@ -1176,6 +1235,14 @@ impl RunAcc {
                 ..
             } => {
                 use wowlog::{AuraChange, AuraType};
+                // CC broken by damage: in SPELL_AURA_BROKEN(_SPELL) the source is whoever broke it
+                if matches!(change, AuraChange::Broken | AuraChange::BrokenSpell)
+                    && *aura_type == AuraType::Debuff
+                    && !self.is_group_side(&rec.dest)
+                    && let Some((guid, _)) = self.actor(&rec.source)
+                {
+                    self.players.get_mut(&guid).expect("actor exists").cc_breaks += 1;
+                }
                 let up = match change {
                     AuraChange::Applied | AuraChange::Refresh | AuraChange::AppliedDose => Some(true),
                     AuraChange::Removed | AuraChange::Broken | AuraChange::BrokenSpell => Some(false),
@@ -1277,6 +1344,9 @@ impl RunAcc {
         let start = self.started_at.unwrap_or(end);
         let duration = (end - start).max(1);
         let secs = duration as f64 / 1000.0;
+        // DPS/HPS over the party's combat time, not the whole visit (walking, AFK, corpse runs)
+        let combat_ms = self.party_active_ms.min(duration);
+        let combat_secs = if combat_ms >= 1000 { combat_ms as f64 / 1000.0 } else { secs };
         let buckets = ((duration + cfg.bucket_ms - 1) / cfg.bucket_ms).max(1) as usize;
 
         let mut segments: Vec<Segment> = Vec::new();
@@ -1374,8 +1444,8 @@ impl RunAcc {
                 interrupts: p.interrupts,
                 dispels: p.dispels,
                 active_ms: p.active_ms,
-                dps: round1(p.damage as f64 / secs),
-                hps: round1(p.healing as f64 / secs),
+                dps: round1(p.damage as f64 / combat_secs),
+                hps: round1(p.healing as f64 / combat_secs),
                 crit_pct: if p.hits > 0 {
                     round1(p.crits as f64 * 100.0 / p.hits as f64)
                 } else {
@@ -1392,6 +1462,19 @@ impl RunAcc {
                     .map(|r| RunRecord {
                         at_ms: r.at_ms - start,
                         ..r.clone()
+                    })
+                    .collect(),
+                potions: p.potions,
+                potion_healing: p.potion_healing,
+                friendly_fire: p.friendly_fire,
+                cc_breaks: p.cc_breaks,
+                power: p
+                    .power
+                    .iter()
+                    .filter(|(_, a)| **a > 0)
+                    .map(|(t, a)| PowerGain {
+                        kind: power_name(*t),
+                        amount: *a,
                     })
                     .collect(),
             })
@@ -1484,6 +1567,21 @@ impl RunAcc {
                 .as_ref()
                 .and_then(|who| self.chat_player(who.as_ref()))
                 .map(|p| p.name.clone()),
+            combat_ms: (combat_ms > 0).then_some(combat_ms),
+            items: vec![],
+            enemy_heals: {
+                let mut v: Vec<NamedAmount> = self
+                    .enemy_heal
+                    .iter()
+                    .map(|(name, amount)| NamedAmount {
+                        name: name.clone(),
+                        amount: *amount,
+                    })
+                    .collect();
+                v.sort_by(|a, b| b.amount.cmp(&a.amount).then(a.name.cmp(&b.name)));
+                v.truncate(5);
+                v
+            },
             replay: {
                 let mut players: Vec<ReplayTrack> = self
                     .positions

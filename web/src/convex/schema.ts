@@ -14,6 +14,7 @@ import {
 	recordKind,
 	recorder,
 	replay,
+	itemDetail,
 	runResult,
 	segment,
 	timeline,
@@ -350,8 +351,13 @@ export default defineSchema({
 		deaths: v.array(death),
 		timeline,
 		loot: v.optional(v.array(lootDrop)),
-		rolls: v.optional(v.array(lootRoll))
+		rolls: v.optional(v.array(lootRoll)),
+		combatMs: v.optional(v.number()),
+		enemyHeals: v.optional(v.array(v.object({ name: v.string(), amount: v.number() })))
 	}).index('by_run', ['runId']),
+
+	// Podrobnosti predmetov iz igre (addon → Companion): item level, slot, stati … za tooltip na portalu.
+	itemDetails: defineTable({ ...itemDetail.fields, at: v.number() }).index('by_itemId', ['itemId']),
 
 	// Razčlenitev po boss boju (uroki, casti, tarče, uptime) – en dokument na boss; stran runa ga
 	// prebere šele ob kliku na igralca, zato runDetails ostane majhen (DB I/O).

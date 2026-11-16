@@ -64,6 +64,8 @@ export function runScore(
 
 /** Točk na igralca v replayu (2 h pri 2 s; Companion pošlje največ 3600). */
 export const MAX_REPLAY_POINTS = 4000;
+/** Predmetov s podrobnostmi na run. */
+export const MAX_ITEMS = 300;
 
 /** Vsebinske omejitve, ki jih validator ne pokrije. Vrne opis napake ali null. */
 export function checkRun(s: RunSummary, now: number): string | null {
@@ -107,6 +109,19 @@ export function checkRun(s: RunSummary, now: number): string | null {
 		)
 	)
 		return 'bad roll entry';
+	const items = s.items ?? [];
+	if (
+		items.length > MAX_ITEMS ||
+		items.some(
+			(it) =>
+				!Number.isInteger(it.itemId) ||
+				it.itemId <= 0 ||
+				it.lines.length > 30 ||
+				it.lines.some((l) => l.length > 150) ||
+				[it.slot, it.kind, it.subkind, it.bind].some((x) => x !== null && x.length > 60)
+		)
+	)
+		return 'bad item details';
 	const rp = s.replay;
 	if (rp) {
 		if (!(rp.bucketMs >= 500 && rp.bucketMs <= 60_000) || rp.players.length > MAX_PLAYERS)

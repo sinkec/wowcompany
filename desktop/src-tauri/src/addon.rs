@@ -69,6 +69,9 @@ pub struct AddonExport {
     /// Opt-in diagnostics report ("Help development" in the addon), sent to the portal once.
     #[serde(skip)]
     pub diag: Option<AddonDiag>,
+    /// Item details by item id (`v1|ITEM|…`).
+    #[serde(skip)]
+    pub items: std::collections::BTreeMap<u32, wowrun::summary::ItemDetail>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -173,6 +176,31 @@ pub fn parse_export(text: &str) -> AddonExport {
                     name: f[6..].join("|").trim().to_string(),
                 });
             }
+            Some("ITEM") if f.len() >= 11 => {
+                let Ok(item_id) = f[2].trim().parse::<u32>() else { continue };
+                let txt = |s: &str| Some(s.trim().to_string()).filter(|s| !s.is_empty());
+                out.items.insert(
+                    item_id,
+                    wowrun::summary::ItemDetail {
+                        item_id,
+                        ilvl: f[3].trim().parse().ok(),
+                        req_level: f[4].trim().parse().ok(),
+                        slot: txt(f[5]),
+                        kind: txt(f[6]),
+                        subkind: txt(f[7]),
+                        sell: f[8].trim().parse().ok(),
+                        bind: txt(f[9]),
+                        lines: f[10..]
+                            .join("|")
+                            .split('~')
+                            .map(str::trim)
+                            .filter(|l| !l.is_empty())
+                            .take(30)
+                            .map(|l| l.chars().take(150).collect())
+                            .collect(),
+                    },
+                );
+            }
             Some("CHAR") if f.len() >= 10 => out.chars.push(AddonChar {
                 name: f[2].trim().to_string(),
                 level: f[3].trim().parse().unwrap_or(0),
@@ -259,7 +287,19 @@ pub fn apply(export: &AddonExport, run: &mut RunSummary) -> (bool, bool) {
         // the rolled items get the id/quality the loot just learned
         run.link_rolls_to_loot();
     }
-    (leader_added || loot, leader_added)
+    // the game's own item details for what dropped (and was rolled on)
+    let ids: std::collections::BTreeSet<u32> = run
+        .loot
+        .iter()
+        .filter_map(|l| l.item_id)
+        .chain(run.rolls.iter().filter_map(|r| r.item_id))
+        .collect();
+    let items: Vec<_> = ids.iter().filter_map(|id| export.items.get(id).cloned()).collect();
+    let items_added = items.len() > run.items.len();
+    if items_added {
+        run.items = items;
+    }
+    (leader_added || loot || items_added, leader_added)
 }
 
 // ------------------------------------------------------------------ installing the addon
@@ -636,6 +676,34 @@ WowCompanyDB = {
         let mut again = run("Wailing Caverns", 43, 1_794_690_200, 1_794_691_700);
         assert_eq!(apply(&e, &mut again), (true, true));
         assert_eq!(apply(&e, &mut again), (false, false));
+    }
+
+    #[test]
+    fn reads_item_details_and_attaches_them_to_the_loot() {
+        let sv = r#"WowCompanyDB = {
+["export"] = {
+"v1|ITEM|2084|30|25|Two-Hand|Weapon|Two-Handed Swords|7137|Binds when equipped|Binds when equipped~24 - 36 Damage  Speed 3.20~+8 Strength",
+},
+}"#;
+        let e = parse_export(sv);
+        let it = e.items.get(&2084).expect("item");
+        assert_eq!(it.ilvl, Some(30));
+        assert_eq!(it.slot.as_deref(), Some("Two-Hand"));
+        assert_eq!(it.lines, vec!["Binds when equipped", "24 - 36 Damage  Speed 3.20", "+8 Strength"]);
+        let mut run = run("Wailing Caverns", 43, 1_794_690_200, 1_794_691_700);
+        run.loot = vec![wowrun::LootDrop {
+            slug: None,
+            looter: "Someone".into(),
+            item: "Darksteel Bastard Sword".into(),
+            item_id: Some(2084),
+            quality: Some(3),
+            count: 1,
+            at_ms: 1000,
+        }];
+        let (changed, _) = apply(&e, &mut run);
+        assert!(changed);
+        assert_eq!(run.items.len(), 1);
+        assert_eq!(run.items[0].sell, Some(7137));
     }
 
     #[test]

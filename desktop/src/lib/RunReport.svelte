@@ -20,6 +20,20 @@
 		(slug && run?.players.find((p) => p.slug === slug)?.name) || slug || 'nobody';
 	const top = (f: (p: FullRun['players'][number]) => number) =>
 		[...(run?.players ?? [])].sort((a, b) => f(b) - f(a))[0];
+	// podrobnosti predmetov iz igre (addon 0.6.2+) – kot naslov ob hoverju
+	const items = $derived(new Map((run?.items ?? []).map((i) => [i.itemId, i])));
+	const itemTip = (id: number | null) => {
+		const d = id ? items.get(id) : undefined;
+		if (!d) return undefined;
+		return [
+			d.ilvl ? `Item Level ${d.ilvl}` : '',
+			[d.slot, d.subkind].filter(Boolean).join(' · '),
+			...d.lines.filter((l) => l !== d.bind),
+			d.reqLevel && d.reqLevel > 1 ? `Requires Level ${d.reqLevel}` : ''
+		]
+			.filter(Boolean)
+			.join('\n');
+	};
 	const bosses = $derived((run?.segments ?? []).filter((s) => s.kind === 'boss'));
 	const at = (ms: number) => fmtDuration(Math.max(0, ms));
 	const gold = (c: number) =>
@@ -49,6 +63,14 @@
 				? { title: 'Floor inspector', who: corpse.name, why: `${corpse.deaths} death${corpse.deaths > 1 ? 's' : ''}` }
 				: { title: 'Nobody died', who: 'the whole party', why: 'suspicious' }
 		);
+		const pot = top((p) => p.potions ?? 0);
+		if (pot?.potions)
+			out.push({ title: 'Potion addict', who: pot.name, why: `${pot.potions} potions/healthstones` });
+		const ff = top((p) => p.friendlyFire ?? 0);
+		if (ff?.friendlyFire)
+			out.push({ title: 'Friendly fire', who: ff.name, why: `${fmtNum(ff.friendlyFire)} on the party` });
+		const cc = top((p) => p.ccBreaks ?? 0);
+		if (cc?.ccBreaks) out.push({ title: 'Sheep breaker', who: cc.name, why: `${cc.ccBreaks} CC broken` });
 		const kicker = top((p) => p.interrupts);
 		if (kicker?.interrupts)
 			out.push({ title: 'Kick master', who: kicker.name, why: `${kicker.interrupts} interrupt${kicker.interrupts > 1 ? "s" : ""}` });
@@ -71,12 +93,13 @@
 				{run.result.bossesKilled}{run.result.bossesTotal ? `/${run.result.bossesTotal}` : ''}
 				{#if run.result.cleared}· <b class="text-success">cleared</b>{/if}
 				{#if run.result.wipes}· {run.result.wipes} wipe{run.result.wipes > 1 ? 's' : ''}{/if}
+				{#if run.combatMs}· {fmtDuration(run.combatMs)} fighting{/if}
 				· {run.deaths.length} death{run.deaths.length === 1 ? '' : 's'}
 			</p>
 		</header>
 
 		{#if awards.length}
-			<div class="grid grid-cols-2 gap-2 md:grid-cols-5">
+			<div class="grid grid-cols-2 gap-2 md:grid-cols-4">
 				{#each awards as a (a.title)}
 					<div class="wow-frame rounded-lg p-3">
 						<div class="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
@@ -171,7 +194,10 @@
 					<ul class="max-h-56 space-y-1 overflow-y-auto text-sm">
 						{#each run.loot as l, i (i)}
 							<li class="flex justify-between gap-2">
-								<span style="color: {qualityColor(l.quality)}"
+								<span
+									style="color: {qualityColor(l.quality)}"
+									title={itemTip(l.itemId)}
+									class={l.itemId && items.has(l.itemId) ? 'cursor-help' : ''}
 									>[{l.item}]{#if l.count > 1} ×{l.count}{/if}</span
 								>
 								<span class="truncate text-muted-foreground">{l.looter}</span>

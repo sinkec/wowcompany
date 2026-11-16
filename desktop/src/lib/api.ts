@@ -69,6 +69,12 @@ export type PlayerSummary = {
 	topHealing: SpellStat[];
 	/** Biggest single events of the run, one per kind (schema 3). */
 	records?: RunRecord[];
+	/** Companion 0.1.15+ */
+	potions?: number;
+	potionHealing?: number;
+	friendlyFire?: number;
+	ccBreaks?: number;
+	power?: { kind: string; amount: number }[];
 };
 
 export type RunRecord = {
@@ -114,6 +120,18 @@ export type FullRun = Omit<RunSummary, 'segments'> & {
 		quality: number | null;
 		winner: string | null;
 		entries: { slug: string; choice: string; roll: number | null }[];
+	}[];
+	/** party combat time (DPS/HPS use it) */
+	combatMs?: number;
+	enemyHeals?: { name: string; amount: number }[];
+	items?: {
+		itemId: number;
+		ilvl: number | null;
+		reqLevel: number | null;
+		slot: string | null;
+		subkind: string | null;
+		bind: string | null;
+		lines: string[];
 	}[];
 	progress?: {
 		xp: number;
