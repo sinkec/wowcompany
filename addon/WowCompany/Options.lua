@@ -77,8 +77,11 @@ local function build()
     check("Show the meter window", "/wowco opens and closes it", y - 20, 16,
         function() return ns.Window and ns.Window.IsShown() end,
         function(on) if on then ns.Window.Show() elseif ns.Window.IsShown() then ns.Window.Toggle() end end)
-    check("Lock position and size", nil, y - 54, 16,
-        function() return s().winLocked end, function(on) s().winLocked = on end)
+    check("Lock position and size", "Esc does not close it while locked", y - 54, 16,
+        function() return s().winLocked end, function(on)
+            s().winLocked = on
+            if ns.Window then ns.Window.ApplyLock() end
+        end)
     check("Show percent", nil, y - 78, 16,
         function() return s().winPercent ~= false end, function(on) s().winPercent = on end)
     local sizes = { { "Small bars", 14 }, { "Normal bars", 17 }, { "Large bars", 21 } }

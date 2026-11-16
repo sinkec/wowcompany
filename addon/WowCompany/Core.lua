@@ -66,6 +66,15 @@ function ns.fmtTime(sec)
     return string.format("%d:%02d", math.floor(sec / 60), sec % 60)
 end
 
+-- Escape closes the frame (the game's UISpecialFrames list) – or not, for a locked/pinned window.
+function ns.EscCloses(frameName, on)
+    if type(UISpecialFrames) ~= "table" then return end
+    for i = #UISpecialFrames, 1, -1 do
+        if UISpecialFrames[i] == frameName then table.remove(UISpecialFrames, i) end
+    end
+    if on then table.insert(UISpecialFrames, frameName) end
+end
+
 function ns.now() return (type(GetServerTime) == "function" and GetServerTime()) or time() end
 
 -- ------------------------------------------------------------------ saved variables

@@ -757,6 +757,7 @@ local function applyPin()
     main:SetMovable(not pinned)
     main.pin.label:SetText(pinned and "pinned" or "pin")
     main.pin:SetChosen(pinned)
+    ns.EscCloses("WowCompanyFrame", not pinned) -- pinned: Escape leaves it alone
 end
 
 local function page()
@@ -786,7 +787,6 @@ local function build()
     main:SetScript("OnShow", function() ns.db.settings.open = true end)
     main:SetScript("OnHide", function() ns.db.settings.open = false end)
     place()
-    tinsert(UISpecialFrames, "WowCompanyFrame") -- Escape closes it
 
     -- header: the dialog banner with the title, the logo as a round portrait, close and pin
     local banner = main:CreateTexture(nil, "ARTWORK")

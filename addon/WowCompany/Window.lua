@@ -286,7 +286,10 @@ local function optionsMenu(anchor)
         { text = "Run, records & logging…", func = function() ns.UI.Show("now") end },
         { text = "Settings…", func = function() ns.Options.Open() end },
         { separator = true },
-        { text = "Lock window", checked = s.winLocked == true, func = function() s.winLocked = not s.winLocked end },
+        { text = "Lock window (Esc leaves it open)", checked = s.winLocked == true, func = function()
+            s.winLocked = not s.winLocked
+            Win.ApplyLock()
+        end },
         { text = "Show percent", checked = s.winPercent ~= false, func = function()
             s.winPercent = s.winPercent == false
         end },
@@ -726,8 +729,13 @@ local function build()
             Win.Refresh()
         end
     end)
-    tinsert(UISpecialFrames, "WowCompanyMeter")
+    Win.ApplyLock()
     Win.Layout()
+end
+
+-- locked: no moving or resizing, and Escape does not close it
+function Win.ApplyLock()
+    ns.EscCloses("WowCompanyMeter", not opts().winLocked)
 end
 
 function Win.Show()

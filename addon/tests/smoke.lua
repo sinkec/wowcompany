@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.6.2" end,
+    GetAddOnMetadata = function() return "0.6.3" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -279,6 +279,16 @@ check(said("loaded"), "greets on load")
 check(WowCompanyMeter ~= nil and WowCompanyMeter:IsShown() and not (WowCompanyFrame and WowCompanyFrame:IsShown()), "first run: the meter window opens by itself, the big panel does not")
 check(WowCompanyOptions ~= nil, "options: the settings page is built at load")
 check(pcall(ns.Options.Open) and pcall(ns.Options.Refresh), "options: /wowco options opens it")
+local function escCloses(name)
+    for _, n in ipairs(UISpecialFrames) do if n == name then return true end end
+    return false
+end
+check(escCloses("WowCompanyMeter"), "Esc closes the meter while it is not locked")
+WowCompanyDB.settings.winLocked = true
+ns.Window.ApplyLock()
+check(not escCloses("WowCompanyMeter"), "locked meter: Esc leaves it open")
+WowCompanyDB.settings.winLocked = false
+ns.Window.ApplyLock()
 check(pcall(WowCompany_OnCompartmentClick) and not WowCompanyMeter:IsShown(), "addon compartment toggles the meter")
 WowCompany_OnCompartmentClick()
 slash("panel") -- the rest of the tests use the big panel
@@ -469,7 +479,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.6%.2|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.6%.3|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
