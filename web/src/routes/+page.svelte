@@ -117,7 +117,6 @@
 	<HomeHero
 		backdrop={news.data?.find((n) => n.image)?.image ?? null}
 		heroes={[...withData]
-			.sort((a, b) => (b.summary?.level ?? 0) - (a.summary?.level ?? 0))
 			.map((c) => ({
 				slug: c.slug,
 				name: c.displayName,

@@ -9,7 +9,11 @@
 	import Shield from '@lucide/svelte/icons/shield';
 	import Star from '@lucide/svelte/icons/star';
 	import UserCog from '@lucide/svelte/icons/user-cog';
-	import UserRound from '@lucide/svelte/icons/user-round';
+	import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
+	import CircleCheck from '@lucide/svelte/icons/circle-check';
+	import Circle from '@lucide/svelte/icons/circle';
+	import Swords from '@lucide/svelte/icons/swords';
+	import Trophy from '@lucide/svelte/icons/trophy';
 	import { api } from '#convex/_generated/api.js';
 	import type { Id } from '#convex/_generated/dataModel.js';
 	import { authClient } from '#lib/auth-client.js';
@@ -17,29 +21,56 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import DevicesList from '#lib/components/wow/DevicesList.svelte';
-	import { ago, classColor } from '#lib/wow.js';
+	import { ago, classColor, renderFromAvatar } from '#lib/wow.js';
 
 	const auth = useAuth();
 	const client = useConvexClient();
 	const q = useQuery(api.profile.mine, () => (auth.isAuthenticated ? {} : 'skip'));
 	const me = $derived(q.data);
 
+	// Kaj sodi skupaj: pregled (kje sem, kaj manjka) → junaki (main, alti, peticije) →
+	// Companion (naprave, aplikacija, addon) → račun (ime, Google, odjava).
 	const SECTIONS = [
-		{ key: 'profile', label: 'Profile', icon: UserRound, hint: 'Name & main hero' },
-		{ key: 'characters', label: 'Characters', icon: Shield, hint: 'Your main and the alt army' },
+		{ key: 'overview', label: 'Overview', icon: LayoutDashboard, hint: 'Where you stand' },
+		{ key: 'characters', label: 'Heroes', icon: Shield, hint: 'Main, alts & petitions' },
 		{
 			key: 'devices',
-			label: 'Companion devices',
+			label: 'Companion & addon',
 			icon: MonitorSmartphone,
 			hint: 'PCs that snitch your runs'
 		},
-		{ key: 'account', label: 'Account', icon: UserCog, hint: 'Email, role, the exit' }
+		{ key: 'account', label: 'Account', icon: UserCog, hint: 'Name, email, the exit' }
 	] as const;
 	type Key = (typeof SECTIONS)[number]['key'];
 	const tab = $derived<Key>(
-		(SECTIONS.find((s) => s.key === page.url.searchParams.get('tab'))?.key ?? 'profile') as Key
+		(SECTIONS.find((s) => s.key === page.url.searchParams.get('tab'))?.key ?? 'overview') as Key
 	);
-	const go = (k: Key) => goto(`/settings${k === 'profile' ? '' : `?tab=${k}`}`, { replace: true });
+	const go = (k: Key) => goto(`/settings${k === 'overview' ? '' : `?tab=${k}`}`, { replace: true });
+
+	// ---------------- overview
+	const devices = useQuery(api.companion.myDevices, () => (auth.isAuthenticated ? {} : 'skip'));
+	const main = $derived(
+		me?.characters.find((c) => c.slug === me.profile.mainSlug) ?? me?.characters[0] ?? null
+	);
+	const steps = $derived(
+		me
+			? [
+					{ done: me.profile.saved, label: 'Tell us your name', tab: 'account' as Key },
+					{
+						done: me.characters.length > 0,
+						label: 'Add your first hero',
+						tab: 'characters' as Key
+					},
+					{ done: !!me.profile.mainSlug, label: 'Pick your main', tab: 'characters' as Key },
+					{
+						done: (devices.data?.length ?? 0) > 0,
+						label: 'Link the Companion app (it installs the addon too)',
+						tab: 'devices' as Key
+					}
+				]
+			: []
+	);
+	const stepsLeft = $derived(steps.filter((x) => !x.done).length);
 
 	// ---------------- profile
 	let firstName = $state('');
@@ -192,36 +223,91 @@
 			</nav>
 
 			<div class="min-w-0 space-y-6">
-				{#if tab === 'profile'}
-					<form onsubmit={saveName} class="wow-frame space-y-4 rounded-lg p-5">
+				{#if tab === 'overview'}
+					<section class="panel relative isolate overflow-hidden">
+						{#if main && renderFromAvatar(main.avatar)}
+							<img
+								src={renderFromAvatar(main.avatar)}
+								alt=""
+								class="pointer-events-none absolute -right-24 -bottom-24 -z-10 hidden h-[26rem] max-w-none opacity-80 sm:block"
+							/>
+						{/if}
+						<div class="eyebrow">Welcome back</div>
+						<h2 class="section-title">{`${me.profile.firstName}`.trim() || me.email}</h2>
+						{#if main}
+							<p class="mt-1 text-sm">
+								Main:
+								<a
+									href="/c/{main.slug}"
+									class="font-semibold hover:underline"
+									style="color: {classColor(main.classId ?? undefined)}">{main.name}</a
+								>
+								{#if main.level}<span class="text-muted-foreground"
+										>· level {main.level} {main.race} {main.className}</span
+									>{/if}
+							</p>
+						{/if}
+						<dl class="mt-4 flex flex-wrap gap-x-8 gap-y-3">
+							<div>
+								<dt class="stat-label">Heroes</dt>
+								<dd class="stat-value">{me.characters.length}</dd>
+							</div>
+							<div>
+								<dt class="stat-label">Highest level</dt>
+								<dd class="stat-value">
+									{Math.max(0, ...me.characters.map((c) => c.level ?? 0)) || '–'}
+								</dd>
+							</div>
+							<div>
+								<dt class="stat-label">Companion PCs</dt>
+								<dd class="stat-value">{devices.data?.length ?? '–'}</dd>
+							</div>
+							<div>
+								<dt class="stat-label">Rank</dt>
+								<dd class="stat-value text-base">{me.role ? ROLE[me.role] : 'Stranger'}</dd>
+							</div>
+						</dl>
+						<div class="mt-5 flex flex-wrap gap-2">
+							{#if main}<Button href="/c/{main.slug}" size="sm">My hero page</Button>{/if}
+							<Button href="/runs" size="sm" variant="secondary"
+								><Swords class="size-4" /> Dungeon runs</Button
+							>
+							<Button href="/rankings" size="sm" variant="secondary"
+								><Trophy class="size-4" /> Rankings</Button
+							>
+						</div>
+					</section>
+
+					<section class="panel space-y-3">
 						<div>
-							<h2 class="section-title">What do we call you?</h2>
-							<p class="text-sm text-muted-foreground">
-								Your real-ish name, shown in the menu and to the Guild Master. Your heroes keep
-								their own names.
+							<h2 class="card-title">
+								{stepsLeft ? `Getting set up · ${stepsLeft} to go` : 'All set. Go play.'}
+							</h2>
+							<p class="section-lead">
+								{stepsLeft
+									? 'A few chores and the portal knows everything about your shame.'
+									: 'Everything is linked. Your deaths will be reported promptly.'}
 							</p>
 						</div>
-						<div class="grid gap-4 sm:grid-cols-2">
-							<label class="space-y-1.5 text-sm">
-								<span class="font-medium">First name</span>
-								<Input bind:value={firstName} maxlength={40} autocomplete="given-name" required />
-							</label>
-							<label class="space-y-1.5 text-sm">
-								<span class="font-medium">Last name</span>
-								<Input bind:value={lastName} maxlength={40} autocomplete="family-name" />
-							</label>
-						</div>
-						<div class="flex flex-wrap items-center gap-3">
-							<Button type="submit" disabled={!nameDirty || savingName || !firstName.trim()}>
-								{#if savingName}<Loader class="size-4 animate-spin" />{/if} Save name
-							</Button>
-							<span class="text-xs text-muted-foreground">
-								Shown as <b class="text-foreground">{`${firstName} ${lastName}`.trim() || '…'}</b>
-								{#if !me.profile.saved}· currently using your Google name{/if}
-							</span>
-						</div>
-					</form>
-
+						<ul class="space-y-1">
+							{#each steps as st (st.label)}
+								<li>
+									<button
+										onclick={() => go(st.tab)}
+										class="flex min-h-10 w-full items-center gap-3 rounded-md px-2 text-left text-sm transition-colors hover:bg-accent/40"
+									>
+										{#if st.done}<CircleCheck class="size-5 text-[#1eff00]" />{:else}<Circle
+												class="size-5 text-muted-foreground"
+											/>{/if}
+										<span class={st.done ? 'text-muted-foreground line-through' : ''}
+											>{st.label}</span
+										>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					</section>
+				{:else if tab === 'characters'}
 					<section class="wow-frame space-y-3 rounded-lg p-5">
 						<div>
 							<h2 class="section-title">Main hero</h2>
@@ -234,7 +320,7 @@
 							<p class="text-sm text-muted-foreground italic">
 								No heroes yet. <button
 									class="text-primary hover:underline"
-									onclick={() => go('characters')}>Add one</button
+									onclick={() => document.getElementById('add-alt')?.focus()}>Add one</button
 								>.
 							</p>
 						{:else}
@@ -255,7 +341,6 @@
 							</div>
 						{/if}
 					</section>
-				{:else if tab === 'characters'}
 					<section class="space-y-3">
 						<div class="flex flex-wrap items-end justify-between gap-2">
 							<div>
@@ -328,6 +413,7 @@
 						</div>
 						<div class="flex flex-wrap gap-2">
 							<Input
+								id="add-alt"
 								bind:value={altName}
 								placeholder="Firstname Surname"
 								class="max-w-sm"
@@ -377,6 +463,34 @@
 						<DevicesList />
 					</section>
 				{:else}
+					<form onsubmit={saveName} class="wow-frame space-y-4 rounded-lg p-5">
+						<div>
+							<h2 class="section-title">What do we call you?</h2>
+							<p class="text-sm text-muted-foreground">
+								Your real-ish name, shown in the menu and to the Guild Master. Your heroes keep
+								their own names.
+							</p>
+						</div>
+						<div class="grid gap-4 sm:grid-cols-2">
+							<label class="space-y-1.5 text-sm">
+								<span class="font-medium">First name</span>
+								<Input bind:value={firstName} maxlength={40} autocomplete="given-name" required />
+							</label>
+							<label class="space-y-1.5 text-sm">
+								<span class="font-medium">Last name</span>
+								<Input bind:value={lastName} maxlength={40} autocomplete="family-name" />
+							</label>
+						</div>
+						<div class="flex flex-wrap items-center gap-3">
+							<Button type="submit" disabled={!nameDirty || savingName || !firstName.trim()}>
+								{#if savingName}<Loader class="size-4 animate-spin" />{/if} Save name
+							</Button>
+							<span class="text-xs text-muted-foreground">
+								Shown as <b class="text-foreground">{`${firstName} ${lastName}`.trim() || '…'}</b>
+								{#if !me.profile.saved}· currently using your Google name{/if}
+							</span>
+						</div>
+					</form>
 					<section class="wow-frame space-y-4 rounded-lg p-5">
 						<h2 class="section-title">Account</h2>
 						<dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[10rem_1fr]">

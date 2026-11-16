@@ -6,7 +6,13 @@
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import { classColor, renderFromAvatar } from '#lib/wow.js';
 
-	type Hero = { slug: string; name: string; level: number | null; classId: number | null; avatar: string | null };
+	type Hero = {
+		slug: string;
+		name: string;
+		level: number | null;
+		classId: number | null;
+		avatar: string | null;
+	};
 	let {
 		backdrop,
 		heroes,
@@ -17,12 +23,51 @@
 		stats: { label: string; value: string }[];
 	} = $props();
 
-	const shown = $derived(
-		heroes
+	// Vsak obisk: trije naključni junaki in vsak svoj (različen) šaljiv komentar.
+	const QUIPS = [
+		'Professional floor inspector',
+		'Has never once read the quest text',
+		'Pulls first, apologizes never',
+		'Blames the healer. Is the healer.',
+		'Still looking for the Ironforge mailbox',
+		'Rolls Need on cloth. As a warrior.',
+		'Dies in the fire, files a bug report',
+		'AFK since the last patch',
+		'Their hearthstone has frequent flyer miles',
+		'Carries 40 grey items "just in case"',
+		'Moves like a turret, hits like a wet noodle',
+		"Thinks 'LoS' is a dungeon",
+		'Fell off the same bridge three times',
+		'Asked "is this the way to Molten Core?" in Goldshire',
+		'Brings snacks, forgets the reagents',
+		'Respecs more often than they bathe',
+		'Paid the repair bill with tears',
+		'Tank? No. Taunt? Also no.',
+		'The mobs fear them. The vendors love them.',
+		'Will trade feelings for gold'
+	];
+	const shuffle = <T,>(xs: T[]) => {
+		const a = [...xs];
+		for (let i = a.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[a[i], a[j]] = [a[j], a[i]];
+		}
+		return a;
+	};
+	let picked = $state<(Hero & { render: string; quip: string })[]>([]);
+	$effect(() => {
+		// izbere enkrat, ko pridejo podatki (ne ob vsakem osveževanju rosterja)
+		if (picked.length) return;
+		const pool = heroes
 			.map((h) => ({ ...h, render: renderFromAvatar(h.avatar) }))
-			.filter((h) => h.render)
+			.filter((h): h is Hero & { render: string } => !!h.render);
+		if (!pool.length) return;
+		const quips = shuffle(QUIPS);
+		picked = shuffle(pool)
 			.slice(0, 3)
-	);
+			.map((h, i) => ({ ...h, quip: quips[i] }));
+	});
+	const shown = $derived(picked);
 	let broken = $state<Record<string, boolean>>({});
 </script>
 
@@ -41,10 +86,12 @@
 		<div
 			class="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/20"
 		></div>
-		<div class="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent"></div>
+		<div
+			class="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent"
+		></div>
 	</div>
 
-	<div class="grid min-h-[26rem] items-end gap-6 p-6 sm:p-10 lg:grid-cols-[1.35fr_1fr]">
+	<div class="grid min-h-[26rem] items-end gap-6 p-6 pb-12 sm:p-10 sm:pb-16 lg:grid-cols-[1.35fr_1fr]">
 		<div class="space-y-5 self-center">
 			<p class="eyebrow text-primary/90">WoW Forever · EU · a company of friends</p>
 			<h1
@@ -87,13 +134,16 @@
 
 		<!-- junaki -->
 		{#if shown.length}
-			<div class="relative hidden h-[24rem] items-end justify-center overflow-visible lg:flex" aria-hidden="true">
+			<div
+				class="relative hidden h-[24rem] items-end justify-center overflow-visible lg:flex"
+				aria-hidden="true"
+			>
 				{#each shown as h, i (h.slug)}
 					{#if !broken[h.slug]}
 						<a
 							href="/c/{h.slug}"
 							tabindex="-1"
-							class="group relative -mx-6 h-[24rem] w-44 shrink-0 transition duration-500 hover:z-10 hover:-translate-y-2 {i ===
+							class="group relative -mx-1 h-[24rem] w-44 shrink-0 transition duration-500 hover:z-10 hover:-translate-y-2 {i ===
 							0
 								? 'z-[5] order-2'
 								: i === 1
@@ -108,11 +158,15 @@
 								onerror={() => (broken[h.slug] = true)}
 							/>
 							<span
-								class="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-border/60 bg-background/80 px-3 py-0.5 text-xs font-semibold whitespace-nowrap backdrop-blur"
+								class="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border/60 bg-background/80 px-3 py-0.5 text-xs font-semibold whitespace-nowrap backdrop-blur"
 								style="color: {classColor(h.classId ?? undefined)}"
 							>
 								{h.name}{#if h.level}<span class="ml-1 text-muted-foreground">{h.level}</span>{/if}
 							</span>
+							<span
+								class="absolute -bottom-7 left-1/2 w-40 -translate-x-1/2 text-center text-[11px] leading-tight text-foreground/75 italic"
+								>“{h.quip}”</span
+							>
 						</a>
 					{/if}
 				{/each}
