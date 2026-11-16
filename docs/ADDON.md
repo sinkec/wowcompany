@@ -345,3 +345,14 @@ Addon: `luac -p` na vseh `.lua` (sintaksa) – delovanja v igri lokalno ni mogo�
 - **Ujemanje časa** addon (strežniški čas) ↔ combat log (lokalni čas) – preveriti na pravem runu.
 - **Zasebnost:** SavedVariables vsebuje samo, kar addon sam zapiše; nikoli vsebine chata.
 - **Pravila igre:** addon samo bere dogodke in kaže UI (kot merilniki damage-a); nič avtomatizacije igranja.
+
+### 4.2 Diagnostika iz igre (16. 11. 2026, poročilo »Help development«, addon 0.5.6)
+- **Med bojem** je v `C_DamageMeter` vse *secret* (imena, GUID, zneski, trajanje, na sekundo) – razen razreda.
+  **Po boju** je vse navadno. → seštevanje in primerjave samo po boju (tako že dela Summary.lua).
+- `GetCombatSessionSourceFrom*` → `combatSpells[]`: `spellID, totalAmount, amountPerSecond, overkillAmount,
+  isAvoidable, isDeadly, creatureName, combatSpellDetails{unitName, unitClassFilename, classification, isMob,
+  isPet, amount}`. Pri prejeti škodi `combatSpellDetails` pove, kateri mob (ime, tip) – osnova za "kdo me je tepel".
+- `GetSessionDurationSeconds(sessionType)` – sprejme TIP seje (Current = 19 s po boju), ne ID boja.
+- Seja "Overall" traja od prijave (npr. ~6,5 h) → `amountPerSecond` je tam razredčen, ni DPS boja.
+- `CHAT_MSG_LOOT` ima povezavo predmeta (itemId, barva kakovosti `nIQ2`).
+- Izven skupine `UnitIsGroupLeader` vrže napako (pcall).

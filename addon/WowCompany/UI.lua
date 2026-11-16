@@ -250,12 +250,14 @@ local function sane(sec)
     return type(v) == "number" and v > 0 and v <= MAX_FIGHT and v or nil
 end
 
--- The game's own call for a fight's length (the session table can leave it out for past fights).
-local function sessionSeconds(id)
-    if not id or type(C_DamageMeter) ~= "table" or type(C_DamageMeter.GetSessionDurationSeconds) ~= "function" then
+-- The game's own call for a fight's length. It takes a session TYPE (diagnostics 16. 11.: "Current"
+-- right after a fight = 19 s), not a fight id – out of combat "Current" is the fight that just ended.
+local function sessionSeconds()
+    if type(C_DamageMeter) ~= "table" or type(C_DamageMeter.GetSessionDurationSeconds) ~= "function"
+        or type(Enum) ~= "table" or type(Enum.DamageMeterSessionType) ~= "table" then
         return nil
     end
-    local ok, v = pcall(C_DamageMeter.GetSessionDurationSeconds, id)
+    local ok, v = pcall(C_DamageMeter.GetSessionDurationSeconds, Enum.DamageMeterSessionType.Current)
     return ok and sane(v) or nil
 end
 
@@ -274,7 +276,7 @@ local function refreshNow()
             if ns.isSecret(session.durationSeconds) then
                 secs = session.durationSeconds -- mid-fight secret: shown untouched, never compared
             else
-                secs = sane(session.durationSeconds) or (last and sane(last.duration)) or sessionSeconds(lastId)
+                secs = sane(session.durationSeconds) or (last and sane(last.duration)) or sessionSeconds()
             end
             if duration == nil then duration = secs end
         end
