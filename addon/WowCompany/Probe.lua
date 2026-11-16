@@ -193,6 +193,8 @@ ns.toJson = json
 local MAX_DIAG = 90000
 ns.on("PLAYER_LOGOUT", function()
     if not (ns.db and ns.db.settings.diagnostics) then return end
+    -- nothing happened since the game loaded (a quick /reload): keep the last report, send nothing new
+    if #sample.combat == 0 and #sample.loot == 0 then return end
     local r = report()
     ns.db.probe = r
     local body = json(r)

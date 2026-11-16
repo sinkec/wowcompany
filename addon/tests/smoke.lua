@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.5.8" end,
+    GetAddOnMetadata = function() return "0.5.9" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -424,7 +424,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.5%.8|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.5%.9|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -574,6 +574,8 @@ C_DamageMeter.GetCombatSessionFromID, C_DamageMeter.GetAvailableCombatSessions =
 -- diagnostics: opt-in, written at logout, gone when switched off
 check(WowCompanyDB.settings.diagnostics == false, "diagnostics: off by default")
 SlashCmdList.WOWCOMPANY("diag on")
+fire("PLAYER_REGEN_DISABLED")
+fire("PLAYER_REGEN_ENABLED")
 fire("PLAYER_LOGOUT")
 check(WowCompanyDB.settings.diagnostics == true and type(WowCompanyDB.probe) == "table", "diagnostics: report saved at logout when on")
 check(type(WowCompanyDB.diag) == "string" and WowCompanyDB.diag:find("^v1|DIAG|%d+|0%.5%.%d+|{") ~= nil,
