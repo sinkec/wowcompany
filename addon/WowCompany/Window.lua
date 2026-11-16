@@ -284,6 +284,7 @@ local function optionsMenu(anchor)
     showMenu(anchor, {
         { text = "WowCompany", title = true },
         { text = "Run, records & logging…", func = function() ns.UI.Show("now") end },
+        { text = "Settings…", func = function() ns.Options.Open() end },
         { separator = true },
         { text = "Lock window", checked = s.winLocked == true, func = function() s.winLocked = not s.winLocked end },
         { text = "Show percent", checked = s.winPercent ~= false, func = function()

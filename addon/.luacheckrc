@@ -3,6 +3,7 @@ std = "lua51"
 max_line_length = 120
 -- the addon's own globals (SavedVariables, slash commands)
 globals = {
+    "WowCompany_OnCompartmentClick",
     "WowCompanyDB",
     "WowCompanyCompanionData",
     "SLASH_WOWCOMPANY1",
@@ -13,6 +14,7 @@ globals = {
 }
 -- game API the addon reads (verified in WoW Forever by the self-test, see ADDON.md §4.1)
 read_globals = {
+    "Settings", "InterfaceOptions_AddCategory", "InterfaceOptionsFrame_OpenToCategory",
     "IsShiftKeyDown", "LE_PARTY_CATEGORY_INSTANCE",
     "BackdropTemplateMixin",
     "BreakUpLargeNumbers",
