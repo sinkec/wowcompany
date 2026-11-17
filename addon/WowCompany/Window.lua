@@ -647,7 +647,7 @@ function Win.Refresh()
         local hidden = session and type(session.combatSources) == "table" and #session.combatSources > 0
         win.empty:SetText(deferred and "Details! is doing the counting.\n/wowco details off brings ours back."
             or state.records and ("No records yet. Keep the Companion running and make\n"
-                .. "something bleed – they arrive at your next login.")
+                .. "something bleed – they show up after /reload or the next login.")
             or not ns.Meter.Available() and "No damage meter here."
             or hidden and "Hidden mid-fight." or "Nothing yet. Go hit something.")
         win.empty:Show()
@@ -860,7 +860,26 @@ ns.command("reset", "reset – meter window back to its default spot and size, u
     ns.say("window reset.")
 end)
 
+-- New records from the Companion (CompanionData.lua is read only at login / reload): say them once.
+local function announceRecords()
+    local mine = ns.Export.Records()
+    if not mine then return end
+    local seen = ns.db.state.recordsSeenAt or 0
+    local newest = seen
+    for _, def in ipairs(RECORDS) do
+        for _, r in ipairs(mine.records or {}) do
+            if type(r) == "table" and r.kind == def.kind and type(r.at) == "number" and r.at > seen then
+                ns.say(string.format("|cffffd100New record!|r %s %s – %s%s", def.label, ns.fmt(r.amount),
+                    tostring(r.spell or "?"), r.unit and (" " .. def.prep .. " " .. tostring(r.unit)) or ""))
+                if r.at > newest then newest = r.at end
+            end
+        end
+    end
+    ns.db.state.recordsSeenAt = newest
+end
+
 ns.onReady(function()
+    pcall(announceRecords)
     ns.say("v" .. tostring(ns.version) .. " loaded. |cffffffff/wowco|r opens the meter, |cffffffff/wowco options|r "
         .. "the settings. " .. ns.Logging.Describe() .. ".")
     local s = ns.db.settings
