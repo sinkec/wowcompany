@@ -6,16 +6,17 @@
 	import HomeHero from '#lib/components/wow/HomeHero.svelte';
 	import NewsSection from '#lib/components/wow/NewsSection.svelte';
 	import UpcomingEvents from '#lib/components/wow/UpcomingEvents.svelte';
-	import RunCard from '#lib/components/wow/RunCard.svelte';
+	import RunRow from '#lib/components/wow/RunRow.svelte';
+	import HomePanel from '#lib/components/wow/HomePanel.svelte';
 	import { hourNow } from '#lib/calendar.js';
 	import { fmt, weekSince } from '#lib/wow.js';
 
 	const roster = useQuery(api.players.list, { since: weekSince() });
 	const news = useQuery(api.news.list, { limit: 6 });
 	const site = useQuery(api.site.home, {});
-	const upcoming = useQuery(api.calendar.upcoming, { from: hourNow(), limit: 5 });
+	const upcoming = useQuery(api.calendar.upcoming, { from: hourNow(), limit: 12 });
 	const access = useQuery(api.runs.access, {});
-	const runs = usePaginatedQuery(api.runs.list, {}, { initialNumItems: 3 });
+	const runs = usePaginatedQuery(api.runs.list, {}, { initialNumItems: 10 });
 
 	const players = $derived(roster.data?.players ?? []);
 	const withData = $derived(players.filter((p) => p.summary));
@@ -65,21 +66,33 @@
 		socials={site.data?.socials ?? []}
 	/>
 
-	<div class="grid gap-8 {showRuns ? 'lg:grid-cols-2' : ''}">
-		<UpcomingEvents events={upcoming.data ?? []} loading={upcoming.isLoading} />
+	<!-- fiksna višina obeh plošč, runi ozki stolpec: brez praznin, klik vodi na podrobnosti -->
+	<div class="grid gap-6 {showRuns ? 'lg:grid-cols-[minmax(0,1fr)_23rem]' : ''}">
+		<HomePanel
+			title="Coming up"
+			href="/calendar"
+			more="Calendar"
+			id="upcoming-title"
+			end={upcoming.data?.length
+				? "That's the plan. Plans are for people who don't wipe."
+				: undefined}
+		>
+			<UpcomingEvents events={upcoming.data ?? []} loading={upcoming.isLoading} />
+		</HomePanel>
 		{#if showRuns}
-			<section class="space-y-3" aria-labelledby="runs-title">
-				<div class="flex items-end justify-between gap-2">
-					<div>
-						<h2 id="runs-title" class="section-title">Latest dungeon runs</h2>
-						<p class="section-lead">Fresh corpses, still warm.</p>
-					</div>
-					<a href="/runs" class="shrink-0 text-sm text-primary hover:underline">All runs →</a>
-				</div>
-				<div class="space-y-2">
-					{#each runs.results as run (run.id)}<RunCard {run} />{/each}
-				</div>
-			</section>
+			<HomePanel
+				title="Latest runs"
+				href="/runs"
+				more="All runs"
+				id="runs-title"
+				end={runs.results.length < 10
+					? "That's every run so far. Go make more corpses."
+					: 'Older runs →'}
+			>
+				<ul class="divide-y divide-border/40">
+					{#each runs.results as run (run.id)}<li><RunRow {run} /></li>{/each}
+				</ul>
+			</HomePanel>
 		{/if}
 	</div>
 

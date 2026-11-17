@@ -119,11 +119,11 @@
 		></div>
 	</div>
 
-	<div class="grid items-center gap-4 px-6 pt-6 sm:px-10 lg:grid-cols-[1.15fr_1fr]">
-		<div class="space-y-3.5 pb-6 sm:pb-7">
+	<div class="grid items-center gap-4 px-6 pt-5 sm:px-10 lg:grid-cols-[1.15fr_1fr]">
+		<div class="space-y-3 pb-5 sm:pb-6">
 			<p class="eyebrow text-primary/90">WoW Forever · EU · a company of friends</p>
 			<h1
-				class="font-display text-3xl leading-tight font-bold text-primary drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] xl:text-[2.75rem]"
+				class="font-display text-3xl leading-tight font-bold text-primary drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] xl:text-[2.35rem]"
 			>
 				The Company of Questionable Decisions
 			</h1>
@@ -131,7 +131,7 @@
 				Levels, loot, dungeon logs and spectacular deaths of our heroes – live from the game. Mostly
 				the deaths.
 			</p>
-			<div class="flex flex-wrap gap-2">
+			<div class="flex flex-wrap items-center gap-2">
 				<Button
 					href="/join"
 					size="lg"
@@ -148,14 +148,17 @@
 				<Button href="/link" variant="ghost" size="lg" class="h-11 gap-2 text-muted-foreground"
 					><Download class="size-4" /> Companion</Button
 				>
+				{#if socials.length}
+					<span class="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
+					<SocialLinks {socials} />
+				{/if}
 			</div>
-			<SocialLinks {socials} />
 			{#if stats.length}
-				<dl class="flex flex-wrap gap-x-8 gap-y-2 pt-1">
+				<dl class="flex flex-wrap gap-x-6 gap-y-1">
 					{#each stats as s (s.label)}
 						<div>
 							<dt class="stat-label">{s.label}</dt>
-							<dd class="stat-value text-foreground">{s.value}</dd>
+							<dd class="stat-value text-xl text-foreground">{s.value}</dd>
 						</div>
 					{/each}
 				</dl>
@@ -164,25 +167,25 @@
 
 		<!-- junaki -->
 		{#if shown.length}
-			<div class="relative hidden h-[23rem] items-end justify-center self-end lg:flex">
+			<div class="relative hidden h-[19rem] items-end justify-center self-end lg:flex">
 				{#each shown as h, i (h.slug)}
 					{@const c = classColor(h.classId ?? undefined)}
 					{@const said = bubbleFor(i)}
 					<a
 						href="/c/{h.slug}"
-						class="group relative mx-0.5 h-full w-44 shrink-0 {slot(i)} hover:z-10"
+						class="group relative mx-0.5 h-full w-40 shrink-0 {slot(i)} hover:z-10"
 						aria-label={h.name}
 					>
 						<!-- sij iz sredine lika v barvi razreda -->
 						<div
-							class="glow pointer-events-none absolute top-[15.2rem] left-1/2 h-[23rem] w-[18rem] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-70 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
+							class="glow pointer-events-none absolute top-[12.6rem] left-1/2 h-[19rem] w-[15rem] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-70 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
 							style="background: radial-gradient(closest-side, {c} 0%, {c}cc 40%, {c}55 70%, transparent 100%)"
 						></div>
-						<!-- render: širok PNG, lik v sredini (x 42–62 %, y 34–81 %); 42rem slika = lik ~20rem -->
+						<!-- render: širok PNG, lik v sredini (x 42–62 %, y 34–81 %); 35rem slika = lik ~16.5rem -->
 						<img
 							src={h.render}
 							alt=""
-							class="pointer-events-none absolute bottom-0 left-1/2 h-[42rem] max-w-none -translate-x-1/2 translate-y-[10rem] drop-shadow-[0_10px_30px_rgba(0,0,0,0.7)] transition-transform duration-500 group-hover:translate-y-[9.5rem]"
+							class="pointer-events-none absolute bottom-0 left-1/2 h-[35rem] max-w-none -translate-x-1/2 translate-y-[8.3rem] drop-shadow-[0_10px_30px_rgba(0,0,0,0.7)] transition-transform duration-500 group-hover:translate-y-[7.9rem]"
 							onerror={() => (broken[h.slug] = true)}
 						/>
 						<span

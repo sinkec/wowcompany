@@ -72,7 +72,7 @@
 <footer class="mx-auto max-w-6xl px-4 pb-10 text-center text-xs text-muted-foreground/70">
 	{#if site.data?.socials.length}
 		<div class="mb-3 flex justify-center">
-			<SocialLinks socials={site.data.socials} variant="icons" />
+			<SocialLinks socials={site.data.socials} />
 		</div>
 	{/if}
 	<p class="mb-1 font-display text-muted-foreground">

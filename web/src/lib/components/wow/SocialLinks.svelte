@@ -18,8 +18,7 @@
 	import Globe from '@lucide/svelte/icons/globe';
 
 	type Social = { kind: string; url: string; label?: string };
-	let { socials, variant = 'buttons' }: { socials: Social[]; variant?: 'buttons' | 'icons' } =
-		$props();
+	let { socials }: { socials: Social[] } = $props();
 
 	const ICON: Record<string, { title: string; path: string; hex: string } | undefined> = {
 		discord: siDiscord,
@@ -44,27 +43,24 @@
 </script>
 
 {#if socials.length}
-	<div class="flex flex-wrap items-center gap-2">
+	<div class="flex flex-wrap items-center gap-1">
 		{#each socials as s, i (i)}
 			<Tip text={label(s)}>
-			<a
-				href={s.url}
-				target="_blank"
-				rel="noopener noreferrer"
-				aria-label={label(s)}
-				class={variant === 'buttons'
-					? 'inline-flex h-11 items-center gap-2 rounded-md border border-border/70 bg-background/50 px-4 text-sm font-semibold backdrop-blur transition hover:border-primary/60 hover:bg-accent/60'
-					: 'inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent/50 hover:text-foreground'}
-			>
-				{#if ICON[s.kind]}
-					<svg viewBox="0 0 24 24" class="size-4" fill={color(s)} aria-hidden="true"
-						><path d={ICON[s.kind]!.path} /></svg
-					>
-				{:else}
-					<Globe class="size-4" />
-				{/if}
-				{#if variant === 'buttons'}<span>{label(s)}</span>{/if}
-			</a>
+				<a
+					href={s.url}
+					target="_blank"
+					rel="noopener noreferrer"
+					aria-label={label(s)}
+					class="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent/50 hover:text-foreground"
+				>
+					{#if ICON[s.kind]}
+						<svg viewBox="0 0 24 24" class="size-4" fill={color(s)} aria-hidden="true"
+							><path d={ICON[s.kind]!.path} /></svg
+						>
+					{:else}
+						<Globe class="size-4" />
+					{/if}
+				</a>
 			</Tip>
 		{/each}
 	</div>
