@@ -279,7 +279,7 @@
 								</p>
 							{/if}
 							{#if me.data?.role === 'admin'}
-								<a href="/admin#events" class="block text-xs text-primary hover:underline"
+								<a href="/admin?edit={e.id}#events" class="block text-xs text-primary hover:underline"
 									>Edit in the Office →</a
 								>
 							{/if}

@@ -80,6 +80,22 @@
 		};
 		document.getElementById('event-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}
+	// /admin?edit=<id>#events (gumb »Edit in the Office« v koledarju): odpri ta dogodek v obrazcu
+	let linkedDone = false;
+	$effect(() => {
+		const events = data.data?.events;
+		if (linkedDone || !events) return;
+		const url = new URL(location.href);
+		const id = url.searchParams.get('edit');
+		linkedDone = true;
+		if (!id) return;
+		const hit = events.find((e) => e.id === id);
+		if (hit) edit(hit);
+		else toast.error('That event is too old to edit here (or it was deleted).');
+		url.searchParams.delete('edit');
+		history.replaceState(history.state, '', url);
+	});
+
 	async function save(e: SubmitEvent) {
 		e.preventDefault();
 		saving = true;
