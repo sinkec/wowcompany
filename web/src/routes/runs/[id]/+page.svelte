@@ -107,12 +107,17 @@
 	const bossSegs = $derived(
 		(run?.segments ?? []).map((s, idx) => ({ ...s, idx })).filter((s) => s.kind === 'boss')
 	);
+	const fightMs = $derived(run?.combatMs || run?.durationMs || 1);
 	const totalDeaths = $derived(run?.totalDeaths ?? null);
 
 	// ?tab=meter|bosses|deaths|timeline|spells → povezava naravnost na zavihek
-	const TABS = ['meter', 'numbers', 'bosses', 'deaths', 'loot', 'timeline', 'replay', 'spells'];
+	const TABS = ['meter', 'bosses', 'deaths', 'loot', 'timeline', 'replay', 'spells'];
+	// stare povezave: ?tab=numbers je zdaj v Overview, ?tab=timeline pri runu z replayem je pod replayem
+	const ALIAS: Record<string, string> = { numbers: 'meter' };
 	function initialTab(a: { details: boolean; deaths: boolean; loot: boolean }) {
-		const t = page.url.searchParams.get('tab') ?? '';
+		let t = page.url.searchParams.get('tab') ?? '';
+		t = ALIAS[t] ?? t;
+		if (t === 'timeline' && run?.hasReplay) t = 'replay';
 		const ok = (x: string) => (x === 'deaths' ? a.deaths : x === 'loot' ? a.loot : a.details);
 		if (TABS.includes(t) && ok(t)) return t;
 		return a.details ? 'meter' : a.deaths ? 'deaths' : 'loot';
@@ -361,8 +366,7 @@
 		{:else}
 			<Tabs.Root value={initialTab(run.access)}>
 				<Tabs.List class="flex-wrap">
-					<Tabs.Trigger value="meter" disabled={!run.access.details}>The Meter</Tabs.Trigger>
-					<Tabs.Trigger value="numbers" disabled={!run.access.details}>Big Numbers</Tabs.Trigger>
+					<Tabs.Trigger value="meter" disabled={!run.access.details}>Overview</Tabs.Trigger>
 					<Tabs.Trigger value="bosses" disabled={!run.access.details}>Bosses</Tabs.Trigger>
 					<Tabs.Trigger value="deaths" disabled={!run.access.deaths}>Autopsies</Tabs.Trigger>
 					<Tabs.Trigger value="loot" disabled={!run.access.loot}
@@ -370,7 +374,9 @@
 								>({loot.length})</span
 							>{/if}</Tabs.Trigger
 					>
-					<Tabs.Trigger value="timeline" disabled={!run.access.details}>Timeline</Tabs.Trigger>
+					{#if !run.hasReplay}<Tabs.Trigger value="timeline" disabled={!run.access.details}
+							>Timeline</Tabs.Trigger
+						>{/if}
 					{#if run.hasReplay}<Tabs.Trigger value="replay">Replay</Tabs.Trigger>{/if}
 					<Tabs.Trigger value="spells" disabled={!run.access.details}>Combat Log</Tabs.Trigger>
 				</Tabs.List>
@@ -481,22 +487,161 @@
 								<tfoot class="text-xs text-muted-foreground">
 									<tr class="border-t border-border/50">
 										<td class="px-3 py-2">Party</td>
-										<td class="px-3 py-2">{fmtRate(totalDmg / (run.durationMs / 1000))} DPS</td>
+										<td class="px-3 py-2">{fmtRate(totalDmg / (fightMs / 1000))} DPS</td>
 										<td class="px-3 py-2 text-right tabular-nums">{fmtNum(totalDmg)}</td>
-										<td class="px-3 py-2">{fmtRate(totalHeal / (run.durationMs / 1000))} HPS</td>
+										<td class="px-3 py-2">{fmtRate(totalHeal / (fightMs / 1000))} HPS</td>
 										<td colspan="8"></td>
 									</tr>
 								</tfoot>
 							</table>
 						</div>
 						<p class="text-xs text-muted-foreground">
-							DPS/HPS over the whole run, trash and corpse runs included — standing around dead
-							counts against you, as it should. “Active” = time spent actually pressing buttons.
+							{#if run.combatMs}
+								DPS/HPS over the {fmtDuration(run.combatMs)} the party actually fought (like Details!
+								“effective time”) – walking, AFK and corpse runs don't count.
+							{:else}
+								DPS/HPS over the whole run (recorded before Companion 0.1.15), trash and corpse runs
+								included.
+							{/if}
+							“Active” = time spent actually pressing buttons.
 						</p>
 					{:else}
 						<p class="text-sm text-muted-foreground italic">
 							No numbers. The meter died before anyone else did.
 						</p>
+					{/if}
+					<!-- navade, rekordi, škoda po urokih (prej zavihek Big Numbers) -->
+					{#if habits.length || spellBoard.length || (run.enemyHeals ?? []).length}
+						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+							{#each habits as h (h.title)}
+								<div class="wow-frame rounded-lg p-4">
+									<div class="eyebrow">{h.title}</div>
+									<div class="mt-1 text-2xl font-bold text-primary tabular-nums">{h.value}</div>
+									<div class="mt-1 text-sm">
+										<span
+											class="font-semibold"
+											style="color: {classColor(classes[h.slug] ?? undefined)}"
+											>{names[h.slug] ?? h.slug}</span
+										>
+										<span class="text-muted-foreground">· {h.note}</span>
+									</div>
+								</div>
+							{/each}
+						</div>
+						<div class="grid gap-3 lg:grid-cols-2">
+							{#if spellBoard.length}
+								<section class="wow-frame rounded-lg p-4">
+									<h3 class="card-title">Damage by spell (whole party)</h3>
+									<ul class="mt-2 space-y-1 text-sm">
+										{#each spellBoard as sp (sp.key)}
+											<li class="flex items-baseline justify-between gap-2">
+												<span class="truncate"
+													>{sp.name}
+													<span
+														class="text-xs"
+														style="color: {classColor(classes[sp.slug] ?? undefined)}"
+														>{names[sp.slug] ?? sp.slug}</span
+													></span
+												>
+												<span class="tabular-nums">{fmtNum(sp.amount)}</span>
+											</li>
+										{/each}
+									</ul>
+								</section>
+							{/if}
+							{#if (run.enemyHeals ?? []).length}
+								<section class="wow-frame rounded-lg p-4">
+									<h3 class="card-title">Mobs that healed themselves</h3>
+									<p class="section-lead">
+										Kill the healer first. Every time. Apparently not this time.
+									</p>
+									<ul class="mt-2 space-y-1 text-sm">
+										{#each run.enemyHeals ?? [] as e (e.name)}
+											<li class="flex justify-between gap-2">
+												<span>{e.name}</span><span class="text-[#1eff00] tabular-nums"
+													>+{fmtNum(e.amount)}</span
+												>
+											</li>
+										{/each}
+									</ul>
+								</section>
+							{/if}
+						</div>
+					{/if}
+					{#if !records.length}
+						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
+							No big numbers on file. This run was recorded by an older Companion — update the app
+							and the next one will name and shame the biggest crit.
+						</div>
+					{:else}
+						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+							{#each bestRecords as { kind, best } (kind)}
+								{#if best}
+									<div class="wow-frame rounded-lg p-4">
+										<div class="eyebrow">
+											{RECORD_LABEL[kind].title}
+										</div>
+										<div class="mt-1 text-3xl font-bold text-primary tabular-nums">
+											{fmtNum(best.amount)}
+										</div>
+										<div class="mt-1 text-sm">
+											<span
+												class="font-semibold"
+												style="color: {classColor(classes[best.slug] ?? undefined)}"
+												>{names[best.slug] ?? best.slug}</span
+											>
+											<span class="text-muted-foreground">·</span>
+											{best.spell}{#if best.pet}<span class="text-xs text-muted-foreground">
+													(pet)</span
+												>{/if}
+											{#if best.unit}<span class="text-muted-foreground">
+													{RECORD_LABEL[kind].prep}</span
+												>
+												{best.unit}{/if}
+										</div>
+										<div class="mt-1 text-xs text-muted-foreground italic">
+											{RECORD_LABEL[kind].quip} · at {fmtDuration(best.atMs)}
+										</div>
+									</div>
+								{/if}
+							{/each}
+						</div>
+
+						<section class="wow-frame overflow-x-auto rounded-lg p-4">
+							<table class="w-full text-sm">
+								<thead>
+									<tr class="text-left text-xs text-muted-foreground">
+										<th class="pb-2 font-normal">Hero</th>
+										{#each RECORD_KINDS as kind (kind)}
+											<th class="pb-2 text-right font-normal">{RECORD_LABEL[kind].title}</th>
+										{/each}
+									</tr>
+								</thead>
+								<tbody>
+									{#each players as p (p.slug)}
+										<tr class="border-t border-border">
+											<td
+												class="py-1.5 pr-3 font-semibold"
+												style="color: {classColor(p.classId ?? undefined)}">{p.name}</td
+											>
+											{#each RECORD_KINDS as kind (kind)}
+												{@const r = recordOf(p.slug, kind)}
+												<td
+													class="py-1.5 pl-3 text-right tabular-nums"
+													title={r
+														? `${r.spell}${r.unit ? ` ${RECORD_LABEL[kind].prep} ${r.unit}` : ''} · at ${fmtDuration(r.atMs)}`
+														: ''}
+												>
+													{#if r}{fmtNum(r.amount)}
+														<span class="block text-xs text-muted-foreground">{r.spell}</span>
+													{:else}<span class="text-muted-foreground">—</span>{/if}
+												</td>
+											{/each}
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</section>
 					{/if}
 				</Tabs.Content>
 
@@ -1066,140 +1211,6 @@
 				</Tabs.Content>
 
 				<!-- BIG NUMBERS -->
-				<Tabs.Content value="numbers" class="mt-4 space-y-4">
-					{#if habits.length || spellBoard.length || (run.enemyHeals ?? []).length}
-						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-							{#each habits as h (h.title)}
-								<div class="wow-frame rounded-lg p-4">
-									<div class="eyebrow">{h.title}</div>
-									<div class="mt-1 text-2xl font-bold text-primary tabular-nums">{h.value}</div>
-									<div class="mt-1 text-sm">
-										<span
-											class="font-semibold"
-											style="color: {classColor(classes[h.slug] ?? undefined)}"
-											>{names[h.slug] ?? h.slug}</span
-										>
-										<span class="text-muted-foreground">· {h.note}</span>
-									</div>
-								</div>
-							{/each}
-						</div>
-						<div class="grid gap-3 lg:grid-cols-2">
-							{#if spellBoard.length}
-								<section class="wow-frame rounded-lg p-4">
-									<h3 class="card-title">Damage by spell (whole party)</h3>
-									<ul class="mt-2 space-y-1 text-sm">
-										{#each spellBoard as sp (sp.key)}
-											<li class="flex items-baseline justify-between gap-2">
-												<span class="truncate"
-													>{sp.name}
-													<span
-														class="text-xs"
-														style="color: {classColor(classes[sp.slug] ?? undefined)}"
-														>{names[sp.slug] ?? sp.slug}</span
-													></span
-												>
-												<span class="tabular-nums">{fmtNum(sp.amount)}</span>
-											</li>
-										{/each}
-									</ul>
-								</section>
-							{/if}
-							{#if (run.enemyHeals ?? []).length}
-								<section class="wow-frame rounded-lg p-4">
-									<h3 class="card-title">Mobs that healed themselves</h3>
-									<p class="section-lead">
-										Kill the healer first. Every time. Apparently not this time.
-									</p>
-									<ul class="mt-2 space-y-1 text-sm">
-										{#each run.enemyHeals ?? [] as e (e.name)}
-											<li class="flex justify-between gap-2">
-												<span>{e.name}</span><span class="text-[#1eff00] tabular-nums"
-													>+{fmtNum(e.amount)}</span
-												>
-											</li>
-										{/each}
-									</ul>
-								</section>
-							{/if}
-						</div>
-					{/if}
-					{#if !records.length}
-						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
-							No big numbers on file. This run was recorded by an older Companion — update the app
-							and the next one will name and shame the biggest crit.
-						</div>
-					{:else}
-						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-							{#each bestRecords as { kind, best } (kind)}
-								{#if best}
-									<div class="wow-frame rounded-lg p-4">
-										<div class="eyebrow">
-											{RECORD_LABEL[kind].title}
-										</div>
-										<div class="mt-1 text-3xl font-bold text-primary tabular-nums">
-											{fmtNum(best.amount)}
-										</div>
-										<div class="mt-1 text-sm">
-											<span
-												class="font-semibold"
-												style="color: {classColor(classes[best.slug] ?? undefined)}"
-												>{names[best.slug] ?? best.slug}</span
-											>
-											<span class="text-muted-foreground">·</span>
-											{best.spell}{#if best.pet}<span class="text-xs text-muted-foreground">
-													(pet)</span
-												>{/if}
-											{#if best.unit}<span class="text-muted-foreground">
-													{RECORD_LABEL[kind].prep}</span
-												>
-												{best.unit}{/if}
-										</div>
-										<div class="mt-1 text-xs text-muted-foreground italic">
-											{RECORD_LABEL[kind].quip} · at {fmtDuration(best.atMs)}
-										</div>
-									</div>
-								{/if}
-							{/each}
-						</div>
-
-						<section class="wow-frame overflow-x-auto rounded-lg p-4">
-							<table class="w-full text-sm">
-								<thead>
-									<tr class="text-left text-xs text-muted-foreground">
-										<th class="pb-2 font-normal">Hero</th>
-										{#each RECORD_KINDS as kind (kind)}
-											<th class="pb-2 text-right font-normal">{RECORD_LABEL[kind].title}</th>
-										{/each}
-									</tr>
-								</thead>
-								<tbody>
-									{#each players as p (p.slug)}
-										<tr class="border-t border-border">
-											<td
-												class="py-1.5 pr-3 font-semibold"
-												style="color: {classColor(p.classId ?? undefined)}">{p.name}</td
-											>
-											{#each RECORD_KINDS as kind (kind)}
-												{@const r = recordOf(p.slug, kind)}
-												<td
-													class="py-1.5 pl-3 text-right tabular-nums"
-													title={r
-														? `${r.spell}${r.unit ? ` ${RECORD_LABEL[kind].prep} ${r.unit}` : ''} · at ${fmtDuration(r.atMs)}`
-														: ''}
-												>
-													{#if r}{fmtNum(r.amount)}
-														<span class="block text-xs text-muted-foreground">{r.spell}</span>
-													{:else}<span class="text-muted-foreground">—</span>{/if}
-												</td>
-											{/each}
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						</section>
-					{/if}
-				</Tabs.Content>
 
 				<!-- TIMELINE -->
 				<Tabs.Content value="timeline" class="mt-4">

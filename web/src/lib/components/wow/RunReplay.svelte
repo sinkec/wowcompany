@@ -11,6 +11,7 @@
 	import { api } from '#convex/_generated/api.js';
 	import { classColor, dungeonTile } from '#lib/wow.js';
 	import { fmtNum } from '#lib/runs.js';
+	import RunTimeline from './RunTimeline.svelte';
 	import { useAuth } from '@mmailaender/convex-better-auth-svelte/svelte';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
@@ -867,4 +868,22 @@
 			</section>
 		</aside>
 	</div>
+
+	<!-- grafi skozi čas, povezani s trakom: kazalec teče s predvajanjem, vlečenje po grafu premakne replay -->
+	{#if timeline}
+		<section class="panel mt-4 space-y-2">
+			<div class="flex flex-wrap items-baseline justify-between gap-2">
+				<h3 class="card-title">Over time</h3>
+				<span class="text-xs text-muted-foreground">drag across a chart to scrub the replay</span>
+			</div>
+			<RunTimeline
+				{timeline}
+				{segments}
+				{names}
+				{classes}
+				cursorMs={t}
+				onseek={(ms) => ((t = Math.min(durationMs, ms)), (playing = false))}
+			/>
+		</section>
+	{/if}
 {/if}

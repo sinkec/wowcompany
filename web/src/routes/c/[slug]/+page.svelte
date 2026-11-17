@@ -60,6 +60,7 @@
 		const f = statFilter.trim().toLowerCase();
 		const groups = new Map<string, StatLine[]>();
 		for (const l of list) {
+			if (!l.value) continue; // ničle so samo šum
 			if (f && !l.name.toLowerCase().includes(f) && !l.category.toLowerCase().includes(f)) continue;
 			if (!groups.has(l.category)) groups.set(l.category, []);
 			groups.get(l.category)!.push(l);
@@ -75,6 +76,72 @@
 
 	const n = (k: string) => (stats ? Number(stats[k] ?? 0) : 0);
 	const pct = (k: string) => `${fmt(n(k), 2)} %`;
+	// stati po skupinah; ničle (spell power bojevnika, odpornosti brez opreme) in prazne skupine skrite
+	const statPanel = $derived.by(() => {
+		if (!stats) return [];
+		const num = (label: string, k: string, digits = 0) => [label, k, fmt(n(k), digits)] as const;
+		const per = (label: string, k: string) => [label, k, pct(k)] as const;
+		const groups = [
+			{
+				h: 'Base',
+				rows: [
+					num('Strength', 'strength'),
+					num('Agility', 'agility'),
+					num('Stamina', 'stamina'),
+					num('Intellect', 'intellect'),
+					num('Spirit', 'spirit'),
+					num('Armor', 'armor')
+				]
+			},
+			{
+				h: 'Melee / Ranged',
+				rows: [
+					num('Attack power', 'attackPower'),
+					num('Ranged AP', 'rangedAttackPower'),
+					per('Crit', 'meleeCrit'),
+					per('Ranged crit', 'rangedCrit'),
+					num('Main hand DPS', 'mainHandDps', 1)
+				]
+			},
+			{
+				h: 'Spells',
+				rows: [
+					num('Spell power', 'spellPower'),
+					num('Healing', 'spellHealing'),
+					per('Spell crit', 'spellCrit'),
+					num('Mana regen', 'manaRegen')
+				]
+			},
+			{
+				h: 'Defense',
+				rows: [
+					num('Defense', 'defense'),
+					per('Dodge', 'dodge'),
+					per('Parry', 'parry'),
+					per('Block', 'block')
+				]
+			},
+			{
+				h: 'Resistances',
+				rows: [
+					num('Fire', 'resistFire'),
+					num('Frost', 'resistFrost'),
+					num('Shadow', 'resistShadow'),
+					num('Nature', 'resistNature'),
+					num('Arcane', 'resistArcane')
+				]
+			}
+		];
+		return groups
+			.map((g) => ({
+				h: g.h,
+				// 1 % spell crit = osnova vsakega razreda brez spell statov – brez pomena
+				rows: g.rows
+					.filter(([, k]) => n(k) > 0 && !(k === 'spellCrit' && n('spellPower') === 0 && n(k) <= 1))
+					.map(([label, , v]) => [label, v] as [string, string])
+			}))
+			.filter((g) => g.rows.length);
+	});
 </script>
 
 <svelte:head>
@@ -169,13 +236,13 @@
 
 			<Tabs.Root bind:value={tab}>
 				<Tabs.List class="flex-wrap">
-					<Tabs.Trigger value="gear">Gear & Guts</Tabs.Trigger>
+					<Tabs.Trigger value="gear">Gear & Stats</Tabs.Trigger>
 					<Tabs.Trigger value="talents">Talents</Tabs.Trigger>
+					<Tabs.Trigger value="runs">Dungeon Runs</Tabs.Trigger>
+					<Tabs.Trigger value="logs">Logs</Tabs.Trigger>
 					<Tabs.Trigger value="progress">Progress</Tabs.Trigger>
 					<Tabs.Trigger value="prof">Professions</Tabs.Trigger>
 					<Tabs.Trigger value="all">Every Stat Ever</Tabs.Trigger>
-					<Tabs.Trigger value="runs">Dungeon Runs</Tabs.Trigger>
-					<Tabs.Trigger value="logs">Logs</Tabs.Trigger>
 				</Tabs.List>
 
 				<!-- LOGS: Company Parses po bossih -->
@@ -275,7 +342,7 @@
 
 					<section class="wow-frame space-y-4 rounded-lg p-4 text-sm">
 						{#if stats}
-							{#each [{ h: 'Base', rows: [['Strength', fmt(n('strength'))], ['Agility', fmt(n('agility'))], ['Stamina', fmt(n('stamina'))], ['Intellect', fmt(n('intellect'))], ['Spirit', fmt(n('spirit'))], ['Armor', fmt(n('armor'))]] }, { h: 'Melee / Ranged', rows: [['Attack power', fmt(n('attackPower'))], ['Ranged AP', fmt(n('rangedAttackPower'))], ['Crit', pct('meleeCrit')], ['Ranged crit', pct('rangedCrit')], ['Main hand DPS', fmt(n('mainHandDps'), 1)]] }, { h: 'Spells', rows: [['Spell power', fmt(n('spellPower'))], ['Healing', fmt(n('spellHealing'))], ['Spell crit', pct('spellCrit')], ['Mana regen', fmt(n('manaRegen'))]] }, { h: 'Defense', rows: [['Defense', fmt(n('defense'))], ['Dodge', pct('dodge')], ['Parry', pct('parry')], ['Block', pct('block')]] }, { h: 'Resistances', rows: [['Fire', fmt(n('resistFire'))], ['Frost', fmt(n('resistFrost'))], ['Shadow', fmt(n('resistShadow'))], ['Nature', fmt(n('resistNature'))], ['Arcane', fmt(n('resistArcane'))]] }] as g (g.h)}
+							{#each statPanel as g (g.h)}
 								<div>
 									<h3 class="eyebrow mb-1 text-primary">
 										{g.h}

@@ -8,13 +8,26 @@
 		timeline,
 		segments,
 		names,
-		classes
+		classes,
+		cursorMs = null,
+		onseek
 	}: {
 		timeline: { bucketMs: number; players: Series[] };
 		segments: { kind: string; name: string; startMs: number; endMs: number; result: string }[];
 		names: Record<string, string>;
 		classes: Record<string, number | null>;
+		/** replay: trenutek predvajanja (črta, prihodnost zatemnjena, vsote do tega trenutka) */
+		cursorMs?: number | null;
+		/** replay: klik/vlečenje po grafu premakne predvajanje */
+		onseek?: (ms: number) => void;
 	} = $props();
+	const cursorBucket = $derived(cursorMs == null ? null : Math.floor(cursorMs / timeline.bucketMs));
+	let dragging = false;
+	function seekAt(e: PointerEvent) {
+		if (!onseek) return;
+		const r = (e.currentTarget as SVGElement).getBoundingClientRect();
+		onseek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * total);
+	}
 
 	let metric = $state<'damage' | 'healing' | 'taken'>('damage');
 	let hover = $state<number | null>(null);
@@ -43,6 +56,7 @@
 	function onMove(e: PointerEvent) {
 		const r = (e.currentTarget as SVGElement).getBoundingClientRect();
 		hover = Math.min(n - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * n)));
+		if (dragging) seekAt(e);
 	}
 </script>
 
@@ -85,8 +99,15 @@
 				class="h-12 w-full rounded bg-background/40"
 				role="img"
 				aria-label="{LABEL[metric]} over time for {names[p.slug] ?? p.slug}"
+				class:cursor-ew-resize={!!onseek}
 				onpointermove={onMove}
-				onpointerleave={() => (hover = null)}
+				onpointerleave={() => ((hover = null), (dragging = false))}
+				onpointerdown={(e) => {
+					if (!onseek) return;
+					dragging = true;
+					seekAt(e);
+				}}
+				onpointerup={() => (dragging = false)}
 			>
 				{#each bosses as b, i (i)}
 					<rect
@@ -109,13 +130,34 @@
 								: metric === 'healing'
 									? 'oklch(0.72 0.17 145)'
 									: 'var(--color-primary)'}
-							opacity={hover === null || hover === i ? 0.95 : 0.45}
+							opacity={cursorBucket !== null && i > cursorBucket
+								? 0.15
+								: hover === null || hover === i
+									? 0.95
+									: 0.45}
 						/>
 					{/if}
 				{/each}
+				{#if cursorMs != null}
+					<line
+						x1={(cursorMs / total) * W}
+						x2={(cursorMs / total) * W}
+						y1="0"
+						y2={H}
+						stroke="white"
+						stroke-width="1.5"
+						vector-effect="non-scaling-stroke"
+					/>
+				{/if}
 			</svg>
 			<div class="text-right text-xs text-muted-foreground tabular-nums">
-				{hover !== null ? fmtNum(vals[hover] ?? 0) : fmtNum(vals.reduce((a, b) => a + b, 0))}
+				{hover !== null
+					? fmtNum(vals[hover] ?? 0)
+					: fmtNum(
+							vals
+								.slice(0, cursorBucket === null ? vals.length : cursorBucket + 1)
+								.reduce((a, b) => a + b, 0)
+						)}
 			</div>
 		</div>
 	{/each}
