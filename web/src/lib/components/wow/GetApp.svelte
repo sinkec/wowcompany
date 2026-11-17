@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '#lib/components/ui/button/index.js';
 	// Prenos WowCompany Companion: zadnja izdaja "companion-v*" z GitHub Releases (javni API, brez žetona).
 	import { onMount } from 'svelte';
 	import Download from '@lucide/svelte/icons/download';
@@ -89,14 +90,11 @@
 	{:else}
 		<div class="flex flex-wrap items-center gap-3">
 			{#if primary}
-				<a
-					href={primary.browser_download_url}
-					class="inline-flex h-11 items-center gap-2 rounded-md bg-primary px-5 font-semibold text-primary-foreground transition hover:brightness-110"
-				>
+				<Button href={primary.browser_download_url} size="lg" class="h-11 gap-2 px-5 font-semibold">
 					<Download class="size-5" />
 					{primaryLabel}
 					<span class="text-xs font-normal opacity-80">{mb(primary.size)}</span>
-				</a>
+				</Button>
 			{/if}
 			<div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
 				{#if win && primary !== win}<a

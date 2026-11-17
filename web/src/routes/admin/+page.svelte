@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '#lib/confirm.svelte.js';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { useAuth } from '@mmailaender/convex-better-auth-svelte/svelte';
 	import { toast } from 'svelte-sonner';
@@ -29,6 +30,10 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import EventsAdmin from '#lib/components/admin/EventsAdmin.svelte';
+	import HeroesAdmin from '#lib/components/admin/HeroesAdmin.svelte';
+	import SimpleSelect from '#lib/components/form/SimpleSelect.svelte';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import TeamName from '#lib/components/admin/TeamName.svelte';
 	import { SOCIAL_KINDS, parseConvos, parseQuips } from '#convex/lib/siteContent.js';
 	import Archive from '@lucide/svelte/icons/archive';
@@ -36,7 +41,6 @@
 	import { attempt } from '#lib/errors.js';
 	import { api } from '#convex/_generated/api.js';
 	import type { Id } from '#convex/_generated/dataModel.js';
-	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
@@ -61,22 +65,6 @@
 			client.mutation(api.claims.decide, { claimId, accept }),
 			accept ? `${name} is in. May god have mercy on their soul.` : `${name} rejected. Brutal.`
 		);
-
-	// --- add hero directly
-	let addName = $state('');
-	let adding = $state(false);
-	async function addHero(e: SubmitEvent) {
-		e.preventDefault();
-		if (adding || addName.trim().length < 3) return;
-		adding = true;
-		const r = await run(client.action(api.admin.addPlayer, { name: addName }));
-		adding = false;
-		if (!r) return;
-		if (r.ok) {
-			toast.success(`${r.name} (lvl ${r.level}) added. Data arrives within a minute.`);
-			addName = '';
-		} else toast.error(r.error);
-	}
 
 	// --- visibility (splet za tujce / Discord kanal)
 	type Target = 'publicFields' | 'discordFields';
@@ -349,8 +337,16 @@
 		);
 		if (r !== undefined) toast.success(`${r} link${r === 1 ? '' : 's'} saved.`);
 	}
-	function resetQuips() {
-		if (!siteAdmin.data || !confirm('Replace both lists with the built-in jokes?')) return;
+	async function resetQuips() {
+		if (
+			!siteAdmin.data ||
+			!(await ask({
+				title: 'Replace both lists with the built-in jokes?',
+				description: 'Your own lines are gone once you save.',
+				confirm: 'Replace'
+			}))
+		)
+			return;
 		quipsText = siteAdmin.data.defaults.quips.join('\n');
 		convosText = siteAdmin.data.defaults.convos.map((c) => c.join('\n')).join('\n\n');
 	}
@@ -542,93 +538,7 @@
 					</div>{/if}
 
 				<!-- HEROES -->
-				{#if view === 'heroes'}<div class="space-y-4">
-						<form
-							onsubmit={addHero}
-							class="wow-frame flex flex-wrap items-end gap-3 rounded-lg p-4"
-						>
-							<div class="min-w-60 flex-1">
-								<label for="add" class="text-sm font-semibold text-primary"
-									>Add a hero directly</label
-								>
-								<Input
-									id="add"
-									bind:value={addName}
-									placeholder="Firstname Surname"
-									disabled={adding}
-								/>
-							</div>
-							<Button type="submit" disabled={adding || addName.trim().length < 3}
-								>{adding ? 'Asking Blizzard…' : 'Add'}</Button
-							>
-						</form>
-						<div class="wow-frame overflow-x-auto rounded-lg">
-							<table class="w-full text-sm">
-								<thead class="text-left text-xs text-muted-foreground uppercase">
-									<tr class="border-b border-border">
-										<th class="p-3">Hero</th><th class="p-3">Level</th><th class="p-3">Owner</th><th
-											class="p-3">Updated</th
-										><th></th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each ov.data?.players ?? [] as p (p.id)}
-										<tr class="border-b border-border/50 last:border-0">
-											<td class="p-3">
-												<a
-													href="/c/{p.slug}"
-													class="font-medium hover:underline"
-													style="color: {classColor(p.classId ?? 0)}">{p.displayName}</a
-												>
-												<div class="text-xs text-muted-foreground">
-													{p.className ?? 'no data yet'}
-												</div>
-											</td>
-											<td class="p-3 tabular-nums">{p.level ?? '–'}</td>
-											<td class="p-3 text-muted-foreground">{p.owner ?? 'added by you'}</td>
-											<td class="p-3 text-muted-foreground"
-												>{p.updatedAt ? ago(p.updatedAt) : 'pending'}</td
-											>
-											<td class="p-3 text-right">
-												<AlertDialog.Root>
-													<AlertDialog.Trigger
-														class={buttonVariants({ variant: 'ghost', size: 'sm' })}
-													>
-														<Trash class="size-4" />
-													</AlertDialog.Trigger>
-													<AlertDialog.Content>
-														<AlertDialog.Header>
-															<AlertDialog.Title>Banish {p.displayName}?</AlertDialog.Title>
-															<AlertDialog.Description>
-																All their history, gossip and shameful stats get deleted. Forever.
-																Like their dignity.
-															</AlertDialog.Description>
-														</AlertDialog.Header>
-														<AlertDialog.Footer>
-															<AlertDialog.Cancel>Spare them</AlertDialog.Cancel>
-															<AlertDialog.Action
-																onclick={() =>
-																	run(
-																		client.mutation(api.admin.removePlayer, { playerId: p.id }),
-																		`${p.displayName} banished.`
-																	)}>Banish</AlertDialog.Action
-															>
-														</AlertDialog.Footer>
-													</AlertDialog.Content>
-												</AlertDialog.Root>
-											</td>
-										</tr>
-									{:else}
-										<tr
-											><td colspan="5" class="p-6 text-center text-muted-foreground italic"
-												>Empty roster. Lonely at the top.</td
-											></tr
-										>
-									{/each}
-								</tbody>
-							</table>
-						</div>
-					</div>{/if}
+				{#if view === 'heroes'}<HeroesAdmin players={ov.data?.players ?? []} />{/if}
 
 				<!-- VISIBILITY -->
 				{#if view === 'web' || view === 'discord-posts'}<div class="max-w-3xl space-y-3">
@@ -745,20 +655,27 @@
 									<h2 class="card-title">Blizzard polling</h2>
 									<div>
 										<div class="mb-2 text-sm">Check every</div>
-										<div class="flex flex-wrap gap-1">
+										<ToggleGroup.Root
+											type="single"
+											variant="outline"
+											size="sm"
+											class="flex-wrap"
+											aria-label="Check every"
+											bind:value={
+												() => String(st.pollIntervalSec / 60),
+												(v) =>
+													v &&
+													run(
+														client.mutation(api.admin.updateSettings, {
+															pollIntervalSec: Number(v) * 60
+														})
+													)
+											}
+										>
 											{#each INTERVALS as m (m)}
-												<button
-													class="rounded-md px-3 py-1 text-sm transition-colors {st.pollIntervalSec ===
-													m * 60
-														? 'bg-primary text-primary-foreground'
-														: 'bg-muted text-muted-foreground hover:bg-accent'}"
-													onclick={() =>
-														run(
-															client.mutation(api.admin.updateSettings, { pollIntervalSec: m * 60 })
-														)}>{m} min</button
-												>
+												<ToggleGroup.Item value={String(m)}>{m} min</ToggleGroup.Item>
 											{/each}
-										</div>
+										</ToggleGroup.Root>
 										<p class="mt-2 text-xs text-muted-foreground">
 											Blizzard only updates a hero when they log out, so 1–2 minutes means news
 											within minutes.
@@ -824,9 +741,16 @@
 									{/if}
 									<form
 										class="flex flex-wrap items-center gap-2"
-										onsubmit={(e) => {
+										onsubmit={async (e) => {
 											e.preventDefault();
-											if (!confirm('Start a new parse season now? The ladder starts from zero.'))
+											if (
+												!(await ask({
+													title: 'Start a new parse season now?',
+													description:
+														'The ladder starts from zero. The old season stays viewable.',
+													confirm: 'Start season'
+												}))
+											)
 												return;
 											run(
 												client.mutation(
@@ -1189,21 +1113,19 @@
 								<div class="flex flex-wrap items-end gap-3">
 									<label class="space-y-1 text-sm">
 										<span class="stat-label block">Region</span>
-										<select
+										<SimpleSelect
 											bind:value={pickRegion}
-											class="h-9 rounded-md border border-input bg-background/60 px-2"
-										>
-											{#each rs.regions as r (r)}<option value={r}>{r.toUpperCase()}</option>{/each}
-										</select>
+											class="w-28"
+											options={rs.regions.map((r) => ({ value: r, label: r.toUpperCase() }))}
+										/>
 									</label>
 									<label class="space-y-1 text-sm">
 										<span class="stat-label block">Ruleset</span>
-										<select
+										<SimpleSelect
 											bind:value={pickRuleset}
-											class="h-9 rounded-md border border-input bg-background/60 px-2"
-										>
-											{#each rs.rulesets as r (r)}<option value={r}>{r}</option>{/each}
-										</select>
+											class="w-36"
+											options={rs.rulesets.map((r) => ({ value: r, label: r }))}
+										/>
 									</label>
 									{#if !rs.realm}
 										<Button onclick={() => saveRealm(true)}>Set realm: {pickLabel}</Button>
@@ -1297,12 +1219,12 @@
 							</div>
 							{#each socialsDraft as row, i (i)}
 								<div class="flex flex-wrap gap-2">
-									<select
+									<SimpleSelect
 										bind:value={row.kind}
-										class="h-9 rounded-md border border-input bg-background/60 px-2 text-sm"
-									>
-										{#each SOCIAL_KINDS as k (k)}<option value={k}>{k}</option>{/each}
-									</select>
+										class="w-36"
+										label="Network"
+										options={SOCIAL_KINDS.map((k) => ({ value: k, label: k }))}
+									/>
 									<Input
 										bind:value={row.url}
 										placeholder="https://discord.gg/…"
@@ -1340,21 +1262,13 @@
 							</div>
 							<label class="block space-y-1 text-sm">
 								<span class="font-medium">Random lines – one per line</span>
-								<textarea
-									bind:value={quipsText}
-									rows="10"
-									class="w-full rounded-md border border-input bg-background/60 px-3 py-2 font-mono text-xs"
-								></textarea>
+								<Textarea bind:value={quipsText} rows={10} class="font-mono text-xs" />
 							</label>
 							<label class="block space-y-1 text-sm">
 								<span class="font-medium"
 									>Conversations of three – three lines each, an empty line between conversations</span
 								>
-								<textarea
-									bind:value={convosText}
-									rows="12"
-									class="w-full rounded-md border border-input bg-background/60 px-3 py-2 font-mono text-xs"
-								></textarea>
+								<Textarea bind:value={convosText} rows={12} class="font-mono text-xs" />
 							</label>
 							<div class="flex flex-wrap gap-2">
 								<Button size="sm" onclick={saveQuips} disabled={!!convoCheck}>Save lines</Button>
@@ -1434,13 +1348,13 @@
 						<form onsubmit={postNews} class="panel space-y-3">
 							<h3 class="card-title">Post company news</h3>
 							<Input bind:value={newsTitle} placeholder="Headline" maxlength={140} />
-							<textarea
+							<Textarea
 								bind:value={newsText}
-								rows="3"
-								maxlength="600"
+								rows={3}
+								maxlength={600}
 								placeholder="What happened? Keep it short, they won't read more anyway."
-								class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm"
-							></textarea>
+								class="text-sm"
+							/>
 							<Input bind:value={newsUrl} placeholder="Link (optional, https://… or /runs/…)" />
 							<div class="flex flex-wrap items-center gap-2">
 								<Button type="submit" size="sm" disabled={newsTitle.trim().length < 3}>Post</Button>

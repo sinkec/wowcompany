@@ -1,4 +1,8 @@
 <script lang="ts">
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import * as Table from '#lib/components/ui/table/index.js';
+	import SortHead from '#lib/components/table/SortHead.svelte';
+	import { TableSort } from '#lib/sort.svelte.js';
 	import { page } from '$app/state';
 	import { useQuery } from 'convex-svelte';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
@@ -214,6 +218,88 @@
 	const recordOf = (slug: string, kind: string) =>
 		records.find((r) => r.slug === slug && r.kind === kind) ?? null;
 
+	// ---- sortiranje tabel (klik na glavo stolpca)
+	type P = (typeof players)[number];
+	const meterSort = new TableSort<
+		| 'hero'
+		| 'dps'
+		| 'damage'
+		| 'hps'
+		| 'overheal'
+		| 'shields'
+		| 'taken'
+		| 'env'
+		| 'deaths'
+		| 'kicks'
+		| 'crit'
+		| 'active'
+	>('damage');
+	const meterRows = $derived(
+		meterSort.apply(players, {
+			hero: (p: P) => p.name,
+			dps: (p: P) => p.dps,
+			damage: (p: P) => p.damage,
+			hps: (p: P) => p.hps,
+			overheal: (p: P) => p.overheal,
+			shields: (p: P) => p.shielding,
+			taken: (p: P) => p.damageTaken,
+			env: (p: P) => p.environmentalTaken,
+			deaths: (p: P) => p.deaths,
+			kicks: (p: P) => p.interrupts,
+			crit: (p: P) => p.critPct,
+			active: (p: P) => p.activeMs
+		})
+	);
+	const recordSort = new TableSort<string>();
+	const recordRows = $derived(
+		recordSort.apply(players, {
+			hero: (p: P) => p.name,
+			...Object.fromEntries(
+				RECORD_KINDS.map((k) => [k, (p: P) => recordOf(p.slug, k)?.amount ?? null])
+			)
+		})
+	);
+	type SpellRow = {
+		name: string;
+		amount: number;
+		casts?: number;
+		hits: number;
+		crits: number;
+		max?: number | null;
+		overheal?: number | null;
+	};
+	const spellSort = new TableSort<
+		'name' | 'amount' | 'casts' | 'hits' | 'crit' | 'avg' | 'max' | 'overheal'
+	>('amount');
+	const sortSpells = <T extends SpellRow>(list: T[]) =>
+		spellSort.apply(list, {
+			name: (x) => x.name,
+			amount: (x) => x.amount,
+			casts: (x) => x.casts,
+			hits: (x) => x.hits,
+			crit: (x) => (x.hits ? x.crits / x.hits : null),
+			avg: (x) => (x.hits ? x.amount / x.hits : null),
+			max: (x) => x.max,
+			overheal: (x) => (x.overheal ? x.overheal / Math.max(1, x.amount + x.overheal) : null)
+		});
+	const rollSort = new TableSort<'when' | 'item' | 'top'>('when', 'asc');
+	const rollRows = $derived(
+		rollSort.apply(rolls, {
+			when: (r) => r.atMs,
+			item: (r) => r.item,
+			top: (r) => Math.max(-1, ...r.entries.map((e) => e.roll ?? -1))
+		})
+	);
+	const lootSort = new TableSort<'when' | 'item' | 'quality' | 'who'>('when', 'asc');
+	const lootRows = $derived(
+		lootSort.apply(loot, {
+			when: (l) => l.atMs,
+			item: (l) => l.item,
+			quality: (l) => l.quality,
+			who: (l) => (l.slug ? (names[l.slug] ?? l.looter) : l.looter)
+		})
+	);
+
 	let spellsFor = $state<string | null>(null);
 	const spellPlayer = $derived(players.find((p) => p.slug === spellsFor) ?? players[0] ?? null);
 
@@ -385,33 +471,61 @@
 				<Tabs.Content value="meter" class="mt-4 space-y-4">
 					{#if players.length}
 						<div class="wow-frame overflow-x-auto rounded-lg">
-							<table class="w-full min-w-[760px] text-sm">
-								<thead class="text-xs text-muted-foreground">
-									<tr class="border-b border-border/50">
-										<th class="px-3 py-2 text-left">Hero</th>
-										<th class="w-[22%] px-3 py-2 text-left">DPS</th>
-										<th class="px-3 py-2 text-right">Damage</th>
-										<th class="w-[16%] px-3 py-2 text-left">HPS</th>
-										<th class="px-3 py-2 text-right" title="Healing that landed on full health bars"
-											>Overheal</th
+							<Table.Root class="w-full min-w-[760px] text-sm">
+								<Table.Header class="text-xs text-muted-foreground">
+									<Table.Row class="border-b border-border/50">
+										<SortHead sort={meterSort} key="hero" first="asc" class="px-3">Hero</SortHead>
+										<SortHead sort={meterSort} key="dps" class="w-[22%] px-3">DPS</SortHead>
+										<SortHead sort={meterSort} key="damage" align="right" class="px-3"
+											>Damage</SortHead
 										>
-										<th class="px-3 py-2 text-right">Shields</th>
-										<th class="px-3 py-2 text-right">Taken</th>
-										<th
-											class="px-3 py-2 text-right"
-											title="Lava, fire, falling, drowning – self-inflicted stupidity">Env.</th
+										<SortHead sort={meterSort} key="hps" class="w-[16%] px-3">HPS</SortHead>
+										<SortHead
+											sort={meterSort}
+											key="overheal"
+											align="right"
+											class="px-3"
+											title="Healing that landed on full health bars">Overheal</SortHead
 										>
-										<th class="px-3 py-2 text-right">☠</th>
-										<th class="px-3 py-2 text-right" title="Interrupts">Kicks</th>
-										<th class="px-3 py-2 text-right">Crit</th>
-										<th class="px-3 py-2 text-right">Active</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each players as p (p.slug)}
+										<SortHead sort={meterSort} key="shields" align="right" class="px-3"
+											>Shields</SortHead
+										>
+										<SortHead sort={meterSort} key="taken" align="right" class="px-3"
+											>Taken</SortHead
+										>
+										<SortHead
+											sort={meterSort}
+											key="env"
+											align="right"
+											class="px-3"
+											title="Lava, fire, falling, drowning – self-inflicted stupidity"
+											>Env.</SortHead
+										>
+										<SortHead
+											sort={meterSort}
+											key="deaths"
+											align="right"
+											class="px-3"
+											title="Deaths">☠</SortHead
+										>
+										<SortHead
+											sort={meterSort}
+											key="kicks"
+											align="right"
+											class="px-3"
+											title="Interrupts">Kicks</SortHead
+										>
+										<SortHead sort={meterSort} key="crit" align="right" class="px-3">Crit</SortHead>
+										<SortHead sort={meterSort} key="active" align="right" class="px-3"
+											>Active</SortHead
+										>
+									</Table.Row>
+								</Table.Header>
+								<Table.Body>
+									{#each meterRows as p (p.slug)}
 										{@const active = pct(p.activeMs, run.durationMs)}
-										<tr class="border-b border-border/30 last:border-0">
-											<td class="px-3 py-2">
+										<Table.Row class="border-b border-border/30 last:border-0">
+											<Table.Cell class="px-3 py-2">
 												<span
 													class="font-semibold whitespace-nowrap"
 													style="color: {classColor(p.classId ?? undefined)}">{p.name}</span
@@ -420,8 +534,8 @@
 														class="ml-1 text-[10px] text-muted-foreground"
 														title="Uploaded this run">📣</span
 													>{/if}
-											</td>
-											<td class="px-3 py-2">
+											</Table.Cell>
+											<Table.Cell class="px-3 py-2">
 												<div class="flex items-center gap-2">
 													<div class="h-2 flex-1 overflow-hidden rounded bg-muted">
 														<div
@@ -431,14 +545,14 @@
 													</div>
 													<span class="w-12 text-right tabular-nums">{fmtRate(p.dps)}</span>
 												</div>
-											</td>
-											<td class="px-3 py-2 text-right tabular-nums">
+											</Table.Cell>
+											<Table.Cell class="px-3 py-2 text-right tabular-nums">
 												{fmtNum(p.damage)}
 												<div class="text-[10px] text-muted-foreground">
 													{pct(p.damage, totalDmg)}%
 												</div>
-											</td>
-											<td class="px-3 py-2">
+											</Table.Cell>
+											<Table.Cell class="px-3 py-2">
 												<div class="flex items-center gap-2">
 													<div class="h-2 flex-1 overflow-hidden rounded bg-muted">
 														<div
@@ -448,14 +562,14 @@
 													</div>
 													<span class="w-10 text-right tabular-nums">{fmtRate(p.hps)}</span>
 												</div>
-											</td>
-											<td class="px-3 py-2 text-right text-muted-foreground tabular-nums"
-												>{p.overheal ? fmtNum(p.overheal) : ''}</td
+											</Table.Cell>
+											<Table.Cell class="px-3 py-2 text-right text-muted-foreground tabular-nums"
+												>{p.overheal ? fmtNum(p.overheal) : ''}</Table.Cell
 											>
-											<td class="px-3 py-2 text-right text-muted-foreground tabular-nums"
-												>{p.shielding ? fmtNum(p.shielding) : ''}</td
+											<Table.Cell class="px-3 py-2 text-right text-muted-foreground tabular-nums"
+												>{p.shielding ? fmtNum(p.shielding) : ''}</Table.Cell
 											>
-											<td class="px-3 py-2 text-right tabular-nums">
+											<Table.Cell class="px-3 py-2 text-right tabular-nums">
 												{fmtNum(p.damageTaken)}
 												<div class="mt-1 h-1 overflow-hidden rounded bg-muted">
 													<div
@@ -463,37 +577,45 @@
 														style="width: {(p.damageTaken / maxTaken) * 100}%"
 													></div>
 												</div>
-											</td>
-											<td
+											</Table.Cell>
+											<Table.Cell
 												class="px-3 py-2 text-right tabular-nums {p.environmentalTaken
 													? 'text-orange-300'
 													: 'text-muted-foreground'}"
-												>{p.environmentalTaken ? fmtNum(p.environmentalTaken) : ''}</td
+												>{p.environmentalTaken ? fmtNum(p.environmentalTaken) : ''}</Table.Cell
 											>
-											<td class="px-3 py-2 text-right text-red-300 tabular-nums">
+											<Table.Cell class="px-3 py-2 text-right text-red-300 tabular-nums">
 												{#if p.deaths == null}<Locked compact />{:else}{p.deaths || ''}{/if}
-											</td>
-											<td class="px-3 py-2 text-right tabular-nums">{p.interrupts || ''}</td>
-											<td class="px-3 py-2 text-right text-muted-foreground tabular-nums"
-												>{p.critPct}%</td
+											</Table.Cell>
+											<Table.Cell class="px-3 py-2 text-right tabular-nums"
+												>{p.interrupts || ''}</Table.Cell
 											>
-											<td
+											<Table.Cell class="px-3 py-2 text-right text-muted-foreground tabular-nums"
+												>{p.critPct}%</Table.Cell
+											>
+											<Table.Cell
 												class="px-3 py-2 text-right text-muted-foreground tabular-nums"
-												title={ACTIVE_QUIP(active)}>{active}%</td
+												title={ACTIVE_QUIP(active)}>{active}%</Table.Cell
 											>
-										</tr>
+										</Table.Row>
 									{/each}
-								</tbody>
-								<tfoot class="text-xs text-muted-foreground">
-									<tr class="border-t border-border/50">
-										<td class="px-3 py-2">Party</td>
-										<td class="px-3 py-2">{fmtRate(totalDmg / (fightMs / 1000))} DPS</td>
-										<td class="px-3 py-2 text-right tabular-nums">{fmtNum(totalDmg)}</td>
-										<td class="px-3 py-2">{fmtRate(totalHeal / (fightMs / 1000))} HPS</td>
-										<td colspan="8"></td>
-									</tr>
-								</tfoot>
-							</table>
+								</Table.Body>
+								<Table.Footer class="text-xs text-muted-foreground">
+									<Table.Row class="border-t border-border/50">
+										<Table.Cell class="px-3 py-2">Party</Table.Cell>
+										<Table.Cell class="px-3 py-2"
+											>{fmtRate(totalDmg / (fightMs / 1000))} DPS</Table.Cell
+										>
+										<Table.Cell class="px-3 py-2 text-right tabular-nums"
+											>{fmtNum(totalDmg)}</Table.Cell
+										>
+										<Table.Cell class="px-3 py-2"
+											>{fmtRate(totalHeal / (fightMs / 1000))} HPS</Table.Cell
+										>
+										<Table.Cell colspan={8}></Table.Cell>
+									</Table.Row>
+								</Table.Footer>
+							</Table.Root>
 						</div>
 						<p class="text-xs text-muted-foreground">
 							{#if run.combatMs}
@@ -608,25 +730,29 @@
 						</div>
 
 						<section class="wow-frame overflow-x-auto rounded-lg p-4">
-							<table class="w-full text-sm">
-								<thead>
-									<tr class="text-left text-xs text-muted-foreground">
-										<th class="pb-2 font-normal">Hero</th>
+							<Table.Root class="w-full text-sm">
+								<Table.Header>
+									<Table.Row class="text-left text-xs text-muted-foreground">
+										<SortHead sort={recordSort} key="hero" first="asc" class="font-normal"
+											>Hero</SortHead
+										>
 										{#each RECORD_KINDS as kind (kind)}
-											<th class="pb-2 text-right font-normal">{RECORD_LABEL[kind].title}</th>
+											<SortHead sort={recordSort} key={kind} align="right" class="font-normal"
+												>{RECORD_LABEL[kind].title}</SortHead
+											>
 										{/each}
-									</tr>
-								</thead>
-								<tbody>
-									{#each players as p (p.slug)}
-										<tr class="border-t border-border">
-											<td
+									</Table.Row>
+								</Table.Header>
+								<Table.Body>
+									{#each recordRows as p (p.slug)}
+										<Table.Row class="border-t border-border">
+											<Table.Cell
 												class="py-1.5 pr-3 font-semibold"
-												style="color: {classColor(p.classId ?? undefined)}">{p.name}</td
+												style="color: {classColor(p.classId ?? undefined)}">{p.name}</Table.Cell
 											>
 											{#each RECORD_KINDS as kind (kind)}
 												{@const r = recordOf(p.slug, kind)}
-												<td
+												<Table.Cell
 													class="py-1.5 pl-3 text-right tabular-nums"
 													title={r
 														? `${r.spell}${r.unit ? ` ${RECORD_LABEL[kind].prep} ${r.unit}` : ''} · at ${fmtDuration(r.atMs)}`
@@ -635,12 +761,12 @@
 													{#if r}{fmtNum(r.amount)}
 														<span class="block text-xs text-muted-foreground">{r.spell}</span>
 													{:else}<span class="text-muted-foreground">—</span>{/if}
-												</td>
+												</Table.Cell>
 											{/each}
-										</tr>
+										</Table.Row>
 									{/each}
-								</tbody>
-							</table>
+								</Table.Body>
+							</Table.Root>
 						</section>
 					{/if}
 				</Tabs.Content>
@@ -746,57 +872,94 @@
 											{/if}
 											{#each [{ title: 'Spells & abilities: damage', list: dp(p).spells ?? [], total: p.damage }, { title: 'Spells & abilities: healing', list: dp(p).heals ?? [], total: p.healing }] as part (part.title)}
 												{#if part.list.length}
-													<table class="w-full">
-														<thead class="text-muted-foreground">
-															<tr class="border-b border-border/40">
-																<th class="py-1 text-left">{part.title}</th>
-																<th class="py-1 text-right">Amount</th>
-																<th class="py-1 text-right">%</th>
-																<th class="py-1 text-right">Casts</th>
-																<th class="py-1 text-right">Hits</th>
-																<th class="py-1 text-right">Crit</th>
-																<th class="hidden py-1 text-right sm:table-cell">Avg</th>
-																<th class="hidden py-1 text-right sm:table-cell">Min–Max</th>
-																{#if part.title.endsWith('healing')}<th
-																		class="hidden py-1 text-right sm:table-cell">Overheal</th
+													<Table.Root class="w-full">
+														<Table.Header class="text-muted-foreground">
+															<Table.Row class="border-b border-border/40">
+																<SortHead sort={spellSort} key="name" first="asc" class="h-8"
+																	>{part.title}</SortHead
+																>
+																<SortHead sort={spellSort} key="amount" align="right" class="h-8"
+																	>Amount</SortHead
+																>
+																<Table.Head class="h-8 text-right">%</Table.Head>
+																<SortHead sort={spellSort} key="casts" align="right" class="h-8"
+																	>Casts</SortHead
+																>
+																<SortHead sort={spellSort} key="hits" align="right" class="h-8"
+																	>Hits</SortHead
+																>
+																<SortHead sort={spellSort} key="crit" align="right" class="h-8"
+																	>Crit</SortHead
+																>
+																<SortHead
+																	sort={spellSort}
+																	key="avg"
+																	align="right"
+																	class="hidden h-8 sm:table-cell">Avg</SortHead
+																>
+																<SortHead
+																	sort={spellSort}
+																	key="max"
+																	align="right"
+																	class="hidden h-8 sm:table-cell">Min–Max</SortHead
+																>
+																{#if part.title.endsWith('healing')}<SortHead
+																		sort={spellSort}
+																		key="overheal"
+																		align="right"
+																		class="hidden h-8 sm:table-cell">Overheal</SortHead
 																	>{/if}
-															</tr>
-														</thead>
-														<tbody>
-															{#each part.list as x (x.id + ':' + x.pet)}
-																<tr class="border-b border-border/20 last:border-0">
-																	<td class="py-1"
+															</Table.Row>
+														</Table.Header>
+														<Table.Body>
+															{#each sortSpells(part.list) as x (x.id + ':' + x.pet)}
+																<Table.Row class="border-b border-border/20 last:border-0">
+																	<Table.Cell class="py-1"
 																		>{x.name}{#if x.pet}<span class="text-muted-foreground">
 																				(pet)</span
-																			>{/if}</td
+																			>{/if}</Table.Cell
 																	>
-																	<td class="py-1 text-right tabular-nums">{fmtNum(x.amount)}</td>
-																	<td class="py-1 text-right tabular-nums"
+																	<Table.Cell class="py-1 text-right tabular-nums"
+																		>{fmtNum(x.amount)}</Table.Cell
+																	>
+																	<Table.Cell class="py-1 text-right tabular-nums"
 																		>{part.total
 																			? Math.round((x.amount / part.total) * 100)
-																			: 0}%</td
+																			: 0}%</Table.Cell
 																	>
-																	<td class="py-1 text-right tabular-nums">{x.casts || '—'}</td>
-																	<td class="py-1 text-right tabular-nums">{x.hits}</td>
-																	<td class="py-1 text-right tabular-nums"
-																		>{x.hits ? Math.round((x.crits / x.hits) * 100) : 0}%</td
+																	<Table.Cell class="py-1 text-right tabular-nums"
+																		>{x.casts || '—'}</Table.Cell
 																	>
-																	<td class="hidden py-1 text-right tabular-nums sm:table-cell"
-																		>{x.hits ? fmtNum(Math.round(x.amount / x.hits)) : '—'}</td
+																	<Table.Cell class="py-1 text-right tabular-nums"
+																		>{x.hits}</Table.Cell
 																	>
-																	<td class="hidden py-1 text-right tabular-nums sm:table-cell"
-																		>{x.max ? `${fmtNum(x.min ?? 0)}–${fmtNum(x.max)}` : '—'}</td
+																	<Table.Cell class="py-1 text-right tabular-nums"
+																		>{x.hits
+																			? Math.round((x.crits / x.hits) * 100)
+																			: 0}%</Table.Cell
 																	>
-																	{#if part.title.endsWith('healing')}<td
+																	<Table.Cell
+																		class="hidden py-1 text-right tabular-nums sm:table-cell"
+																		>{x.hits
+																			? fmtNum(Math.round(x.amount / x.hits))
+																			: '—'}</Table.Cell
+																	>
+																	<Table.Cell
+																		class="hidden py-1 text-right tabular-nums sm:table-cell"
+																		>{x.max
+																			? `${fmtNum(x.min ?? 0)}–${fmtNum(x.max)}`
+																			: '—'}</Table.Cell
+																	>
+																	{#if part.title.endsWith('healing')}<Table.Cell
 																			class="hidden py-1 text-right tabular-nums sm:table-cell"
 																			>{x.overheal
 																				? `${Math.round(((x.overheal ?? 0) / Math.max(1, x.amount + (x.overheal ?? 0))) * 100)}%`
-																				: '—'}</td
+																				: '—'}</Table.Cell
 																		>{/if}
-																</tr>
+																</Table.Row>
 															{/each}
-														</tbody>
-													</table>
+														</Table.Body>
+													</Table.Root>
 												{/if}
 											{/each}
 											{#if bossQ.data?.some((x) => x.timeline)}
@@ -1107,21 +1270,25 @@
 								</div>
 							{/if}
 							<div class="wow-frame overflow-hidden rounded-lg">
-								<table class="w-full text-sm">
-									<thead class="text-xs text-muted-foreground">
-										<tr class="border-b border-border/50">
-											<th class="w-20 px-3 py-2 text-left">When</th>
-											<th class="px-3 py-2 text-left">Item</th>
-											<th class="px-3 py-2 text-left">Rolls</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#each rolls as r, i (i)}
-											<tr class="border-b border-border/30 align-top last:border-0">
-												<td class="px-3 py-1.5 text-muted-foreground tabular-nums"
-													>{fmtDuration(Math.max(0, r.atMs))}</td
+								<Table.Root class="w-full text-sm">
+									<Table.Header class="text-xs text-muted-foreground">
+										<Table.Row class="border-b border-border/50">
+											<SortHead sort={rollSort} key="when" first="asc" class="w-20 px-3"
+												>When</SortHead
+											>
+											<SortHead sort={rollSort} key="item" first="asc" class="px-3">Item</SortHead>
+											<SortHead sort={rollSort} key="top" class="px-3" title="Highest roll"
+												>Rolls</SortHead
+											>
+										</Table.Row>
+									</Table.Header>
+									<Table.Body>
+										{#each rollRows as r, i (i)}
+											<Table.Row class="border-b border-border/30 align-top last:border-0">
+												<Table.Cell class="px-3 py-1.5 text-muted-foreground tabular-nums"
+													>{fmtDuration(Math.max(0, r.atMs))}</Table.Cell
 												>
-												<td class="px-3 py-1.5">
+												<Table.Cell class="px-3 py-1.5">
 													<ItemLink
 														name={r.item}
 														color={lootColor(r.quality)}
@@ -1130,8 +1297,8 @@
 													{#if !r.winner}<div class="text-xs text-muted-foreground">
 															Nobody wanted it. Not even the vendor.
 														</div>{/if}
-												</td>
-												<td class="px-3 py-1.5">
+												</Table.Cell>
+												<Table.Cell class="px-3 py-1.5">
 													<div class="flex flex-wrap gap-x-3 gap-y-0.5">
 														{#each sortedEntries(r) as e (e.slug)}
 															<span
@@ -1153,38 +1320,48 @@
 															</span>
 														{/each}
 													</div>
-												</td>
-											</tr>
+												</Table.Cell>
+											</Table.Row>
 										{/each}
-									</tbody>
-								</table>
+									</Table.Body>
+								</Table.Root>
 							</div>
 							<h3 class="eyebrow pt-2 text-primary">Everything looted</h3>
 						{/if}
 						<div class="wow-frame overflow-hidden rounded-lg">
-							<table class="w-full text-sm">
-								<thead class="text-xs text-muted-foreground">
-									<tr class="border-b border-border/50">
-										<th class="w-20 px-3 py-2 text-left">When</th>
-										<th class="px-3 py-2 text-left">Item</th>
-										<th class="px-3 py-2 text-left">Grabbed by</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each loot as l, i (i)}
-										<tr class="border-b border-border/30 last:border-0">
-											<td class="px-3 py-1.5 text-muted-foreground tabular-nums"
-												>{fmtDuration(Math.max(0, l.atMs))}</td
+							<Table.Root class="w-full text-sm">
+								<Table.Header class="text-xs text-muted-foreground">
+									<Table.Row class="border-b border-border/50">
+										<SortHead sort={lootSort} key="when" first="asc" class="w-20 px-3"
+											>When</SortHead
+										>
+										<SortHead sort={lootSort} key="item" first="asc" class="px-3">Item</SortHead>
+										<SortHead sort={lootSort} key="quality" class="px-3" title="Item quality"
+											>Quality</SortHead
+										>
+										<SortHead sort={lootSort} key="who" first="asc" class="px-3"
+											>Grabbed by</SortHead
+										>
+									</Table.Row>
+								</Table.Header>
+								<Table.Body>
+									{#each lootRows as l, i (i)}
+										<Table.Row class="border-b border-border/30 last:border-0">
+											<Table.Cell class="px-3 py-1.5 text-muted-foreground tabular-nums"
+												>{fmtDuration(Math.max(0, l.atMs))}</Table.Cell
 											>
-											<td class="px-3 py-1.5">
+											<Table.Cell class="px-3 py-1.5">
 												<ItemLink
 													name={l.item}
 													color={lootColor(l.quality)}
 													detail={l.itemId ? itemDetail.get(l.itemId) : null}
 												/>
 												{#if l.count > 1}<span class="text-muted-foreground"> ×{l.count}</span>{/if}
-											</td>
-											<td class="px-3 py-1.5">
+											</Table.Cell>
+											<Table.Cell class="px-3 py-1.5 text-xs" style="color: {lootColor(l.quality)}"
+												>{l.quality != null ? (QUALITY_NAME[l.quality] ?? '') : '—'}</Table.Cell
+											>
+											<Table.Cell class="px-3 py-1.5">
 												{#if l.slug && tracked.has(l.slug)}
 													<a
 														href="/c/{l.slug}"
@@ -1197,11 +1374,11 @@
 														>{l.slug ? (names[l.slug] ?? l.looter) : l.looter}</span
 													>
 												{/if}
-											</td>
-										</tr>
+											</Table.Cell>
+										</Table.Row>
 									{/each}
-								</tbody>
-							</table>
+								</Table.Body>
+							</Table.Root>
 						</div>
 						<p class="text-xs text-muted-foreground">
 							From the uploader's <code>/chatlog</code>.{#if !rolls.length}
@@ -1245,17 +1422,24 @@
 
 				<!-- SPELLS -->
 				<Tabs.Content value="spells" class="mt-4 space-y-3">
-					<div class="flex flex-wrap gap-1.5">
+					<ToggleGroup.Root
+						type="single"
+						variant="outline"
+						spacing={1}
+						class="flex-wrap"
+						aria-label="Hero"
+						bind:value={() => spellPlayer?.slug ?? '', (v) => v && (spellsFor = v)}
+					>
 						{#each players as p (p.slug)}
-							<button
-								class="rounded-md border px-2.5 py-1 text-sm {spellPlayer?.slug === p.slug
-									? 'border-primary bg-primary/15'
-									: 'border-border hover:border-primary/60'}"
-								style="color: {classColor(p.classId ?? undefined)}"
-								onclick={() => (spellsFor = p.slug)}>{p.name}</button
+							<ToggleGroup.Item
+								value={p.slug}
+								class="data-[state=on]:text-[var(--hero)]"
+								style="color: {classColor(p.classId ?? undefined)}; --hero: {classColor(
+									p.classId ?? undefined
+								)}">{p.name}</ToggleGroup.Item
 							>
 						{/each}
-					</div>
+					</ToggleGroup.Root>
 					{#if spellPlayer?.combat}
 						<section class="wow-frame space-y-2 rounded-lg p-4">
 							<h3 class="font-display font-semibold text-primary">

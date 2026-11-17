@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '#lib/components/ui/button/index.js';
 	import { useQuery } from 'convex-svelte';
 	import Skull from '@lucide/svelte/icons/skull';
 	import { api } from '#convex/_generated/api.js';
@@ -15,13 +16,26 @@
 	import GossipFeed from '#lib/components/wow/GossipFeed.svelte';
 	import type { RosterEntry } from '#lib/types.js';
 	import { weekSince } from '#lib/wow.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import { TableSort, type SortValue } from '#lib/sort.svelte.js';
+	import type { RosterKey } from '#lib/components/wow/RosterTable.svelte';
 	import PageHeader from '#lib/components/wow/PageHeader.svelte';
 	import Users from '@lucide/svelte/icons/users';
 
 	const roster = useQuery(api.players.list, { since: weekSince() });
 	const feed = useQuery(api.events.recent, { limit: 20 });
-	type SortKey = 'level' | 'seen' | 'name';
-	let sort = $state<SortKey>('level');
+	// en sort za oba pogleda: glava tabele (seznam) ali preklopnik (kartice); listanje po sortiranju
+	const sort = new TableSort<RosterKey>('level');
+	const rosterValue: Record<RosterKey, (c: RosterEntry) => SortValue> = {
+		name: (c) => c.displayName,
+		// enaka raven: več izkušenj višje
+		level: (c) => (c.summary?.level ?? 0) * 1e9 + (c.summary?.experience ?? 0),
+		talents: (c) => c.summary?.talentSpec,
+		ilvl: (c) => c.summary?.ilvlEquipped,
+		kills: (c) => c.summary?.kills,
+		deaths: (c) => c.summary?.deaths,
+		seen: (c) => c.summary?.lastLogin
+	};
 
 	// --- prikaz roster: kartice ali kompakten seznam (privzeto seznam pri > 8 junakih)
 	type View = 'cards' | 'list';
@@ -56,23 +70,14 @@
 	const pageSize = $derived(PAGE_SIZE[view]);
 	const withData = $derived(players.filter((p) => p.summary));
 	const sorted = $derived(
-		[...players]
-			.filter((p) => {
-				const q = query.trim().toLowerCase();
-				if (!q) return true;
-				const sm = p.summary;
-				return [p.displayName, sm?.className, sm?.race, sm?.guild, sm?.talentSpec].some((x) =>
-					x?.toLowerCase().includes(q)
-				);
-			})
-			.sort((a, b) => {
-				if (sort === 'name') return a.displayName.localeCompare(b.displayName);
-				if (sort === 'seen') return (b.summary?.lastLogin ?? 0) - (a.summary?.lastLogin ?? 0);
-				return (
-					(b.summary?.level ?? 0) - (a.summary?.level ?? 0) ||
-					(b.summary?.experience ?? 0) - (a.summary?.experience ?? 0)
-				);
-			})
+		sort.apply(players, rosterValue).filter((p) => {
+			const q = query.trim().toLowerCase();
+			if (!q) return true;
+			const sm = p.summary;
+			return [p.displayName, sm?.className, sm?.race, sm?.guild, sm?.talentSpec].some((x) =>
+				x?.toLowerCase().includes(q)
+			);
+		})
 	);
 
 	const pages = $derived(Math.max(1, Math.ceil(sorted.length / pageSize)));
@@ -119,36 +124,40 @@
 						>
 					</h2>
 					<div class="flex items-center gap-2">
-						<div class="hidden gap-1 text-sm sm:flex" role="group" aria-label="Sort">
-							{#each [['level', 'level'], ['seen', 'last seen'], ['name', 'name']] as [k, l] (k)}
-								<button
-									class="rounded-md px-2.5 py-1 transition-colors {sort === k
-										? 'bg-primary text-primary-foreground'
-										: 'text-muted-foreground hover:bg-accent'}"
-									onclick={() => ((sort = k as SortKey), (page = 0))}>{l}</button
-								>
-							{/each}
-						</div>
-						<div class="flex rounded-md border border-border p-0.5" role="group" aria-label="View">
-							<button
-								class="rounded p-1 {view === 'cards'
-									? 'bg-accent text-foreground'
-									: 'text-muted-foreground hover:text-foreground'}"
-								aria-label="Cards"
-								aria-pressed={view === 'cards'}
-								title="Cards"
-								onclick={() => setView('cards')}><LayoutGrid class="size-4" /></button
+						{#if view === 'cards'}
+							<ToggleGroup.Root
+								type="single"
+								size="sm"
+								class="hidden sm:flex"
+								aria-label="Sort"
+								bind:value={
+									() => sort.key ?? '',
+									(v) => {
+										if (!v) return;
+										sort.set(v as RosterKey, v === 'name' ? 'asc' : 'desc');
+										page = 0;
+									}
+								}
 							>
-							<button
-								class="rounded p-1 {view === 'list'
-									? 'bg-accent text-foreground'
-									: 'text-muted-foreground hover:text-foreground'}"
-								aria-label="List"
-								aria-pressed={view === 'list'}
-								title="List"
-								onclick={() => setView('list')}><List class="size-4" /></button
+								<ToggleGroup.Item value="level">level</ToggleGroup.Item>
+								<ToggleGroup.Item value="seen">last seen</ToggleGroup.Item>
+								<ToggleGroup.Item value="name">name</ToggleGroup.Item>
+							</ToggleGroup.Root>
+						{/if}
+						<ToggleGroup.Root
+							type="single"
+							variant="outline"
+							size="sm"
+							aria-label="View"
+							bind:value={() => view, (v) => v && setView(v as View)}
+						>
+							<ToggleGroup.Item value="cards" aria-label="Cards" title="Cards"
+								><LayoutGrid class="size-4" /></ToggleGroup.Item
 							>
-						</div>
+							<ToggleGroup.Item value="list" aria-label="List" title="List"
+								><List class="size-4" /></ToggleGroup.Item
+							>
+						</ToggleGroup.Root>
 					</div>
 				</div>
 
@@ -166,11 +175,12 @@
 						/>
 					</div>
 					<div class="flex shrink-0 items-center gap-1">
-						<button
-							class="grid size-9 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+						<Button
+							variant="outline"
+							size="icon"
 							aria-label="Previous heroes"
 							disabled={pageIdx === 0}
-							onclick={() => go(-1)}><ChevronLeft class="size-4" /></button
+							onclick={() => go(-1)}><ChevronLeft class="size-4" /></Button
 						>
 						<span
 							class="w-[5.5rem] text-center text-xs text-muted-foreground tabular-nums"
@@ -181,11 +191,12 @@
 									(pageIdx + 1) * pageSize
 								)} of {sorted.length}{:else}0 of 0{/if}
 						</span>
-						<button
-							class="grid size-9 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+						<Button
+							variant="outline"
+							size="icon"
 							aria-label="Next heroes"
 							disabled={pageIdx >= pages - 1}
-							onclick={() => go(1)}><ChevronRight class="size-4" /></button
+							onclick={() => go(1)}><ChevronRight class="size-4" /></Button
 						>
 					</div>
 				</div>
@@ -199,7 +210,7 @@
 							Nobody matches "{query}". Maybe they quit. Maybe they're hiding. Probably hiding.
 						</p>
 					{:else if view === 'list'}
-						<RosterTable rows={pageRows} {allowed} />
+						<RosterTable rows={pageRows} {allowed} {sort} onsort={() => (page = 0)} />
 					{:else}
 						<div class="grid h-full gap-4 sm:grid-cols-2 sm:grid-rows-2">
 							{#each pageRows as c (c.slug)}<CharacterCard {c} />{/each}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '#lib/components/ui/button/index.js';
 	// Hero naslovnice: ozadje = slika najnovejše uradne novice, spredaj trije naključni junaki v celi
 	// postavi (Blizzard render) s sijem v barvi razreda in stripovskimi oblački: tri različne šale ali
 	// pogovor treh, oblački se prikazujejo po vrsti, kot bi se pogovarjali. Šale in povezave na skupnost
@@ -131,20 +132,21 @@
 				the deaths.
 			</p>
 			<div class="flex flex-wrap gap-2">
-				<a
+				<Button
 					href="/join"
-					class="inline-flex h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:brightness-110"
-					><UserPlus class="size-4" /> Join the company</a
+					size="lg"
+					class="h-11 gap-2 px-4 font-semibold shadow-lg shadow-primary/20"
+					><UserPlus class="size-4" /> Join the company</Button
 				>
-				<a
+				<Button
 					href="/runs"
-					class="inline-flex h-11 items-center gap-2 rounded-md border border-primary/50 bg-background/50 px-4 text-sm font-semibold backdrop-blur transition hover:bg-accent/60"
-					><Swords class="size-4" /> Dungeon runs</a
+					variant="outline"
+					size="lg"
+					class="h-11 gap-2 border-primary/50 bg-background/50 px-4 font-semibold backdrop-blur"
+					><Swords class="size-4" /> Dungeon runs</Button
 				>
-				<a
-					href="/link"
-					class="inline-flex h-11 items-center gap-2 rounded-md px-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
-					><Download class="size-4" /> Companion</a
+				<Button href="/link" variant="ghost" size="lg" class="h-11 gap-2 text-muted-foreground"
+					><Download class="size-4" /> Companion</Button
 				>
 			</div>
 			<SocialLinks {socials} />

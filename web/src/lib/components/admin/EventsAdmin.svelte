@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '#lib/confirm.svelte.js';
 	// Office → Website → Events: naši dogodki na koledarju (nov, uredi, briši) + stanje praznikov iz igre.
 	// Discord: objava ob shranjevanju in opomnik uro prej (če je kljukica in polje "calendar" za Discord).
 	import { useConvexClient, useQuery } from 'convex-svelte';
@@ -12,6 +13,11 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
+	import SimpleSelect from '#lib/components/form/SimpleSelect.svelte';
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import {
 		EVENT_KINDS,
 		KIND_EMOJI,
@@ -117,7 +123,15 @@
 		form = blank();
 	}
 	async function remove(id: string, title: string) {
-		if (!confirm(`Delete "${title}"? Sign-ups go with it.`)) return;
+		if (
+			!(await ask({
+				title: `Delete "${title}"?`,
+				description: 'Sign-ups go with it.',
+				confirm: 'Delete',
+				destructive: true
+			}))
+		)
+			return;
 		await attempt(
 			client.mutation(api.calendar.remove, { id: id as Id<'calendarEvents'> }),
 			'Deleted. It never happened.'
@@ -128,7 +142,6 @@
 	const now = Date.now();
 	const upcoming = $derived((data.data?.events ?? []).filter((e) => e.endAt >= now));
 	const past = $derived((data.data?.events ?? []).filter((e) => e.endAt < now).reverse());
-	const selectCls = 'h-9 rounded-md border border-input bg-background/60 px-2 text-sm';
 </script>
 
 <div class="max-w-3xl space-y-4">
@@ -148,13 +161,17 @@
 					required
 				/>
 			</label>
-			<label class="space-y-1 text-sm">
+			<div class="space-y-1 text-sm">
 				<span class="text-muted-foreground">Type</span>
-				<select bind:value={form.kind} class="{selectCls} w-full">
-					{#each EVENT_KINDS as k (k)}<option value={k}>{KIND_EMOJI[k]} {KIND_LABEL[k]}</option
-						>{/each}
-				</select>
-			</label>
+				<SimpleSelect
+					bind:value={form.kind}
+					label="Type"
+					options={EVENT_KINDS.map((k) => ({
+						value: k,
+						label: `${KIND_EMOJI[k]} ${KIND_LABEL[k]}`
+					}))}
+				/>
+			</div>
 		</div>
 		<div class="grid gap-3 sm:grid-cols-3">
 			<label class="space-y-1 text-sm">
@@ -172,19 +189,15 @@
 		</div>
 		<label class="block space-y-1 text-sm">
 			<span class="text-muted-foreground">Details (optional)</span>
-			<textarea
+			<Textarea
 				bind:value={form.description}
 				maxlength={600}
-				rows="3"
-				class="w-full rounded-md border border-input bg-background/60 p-2 text-sm"
-				placeholder="Bring potions. Bring a healer. Bring dignity, optionally."></textarea>
+				rows={3}
+				placeholder="Bring potions. Bring a healer. Bring dignity, optionally."
+			/>
 		</label>
 		<label class="flex items-start gap-2 text-sm">
-			<input
-				type="checkbox"
-				bind:checked={form.discord}
-				class="mt-1 accent-[var(--color-primary)]"
-			/>
+			<Checkbox bind:checked={form.discord} class="mt-0.5" />
 			<span>
 				Announce in Discord now, remind one hour before
 				{#if !discordOn}
@@ -243,24 +256,29 @@
 			{/each}
 		</ul>
 		{#if past.length}
-			<details class="text-sm">
-				<summary class="cursor-pointer text-muted-foreground">Last 30 days ({past.length})</summary>
-				<ul class="mt-2 space-y-1">
-					{#each past as e (e.id)}
-						<li class="flex items-center gap-2 text-muted-foreground">
-							<span class="flex-1 truncate"
-								>{KIND_EMOJI[e.kind]} {e.title} · {fmtSpan(e)} · {e.going.length} went</span
-							>
-							<Button
-								variant="ghost"
-								size="icon"
-								aria-label="Delete {e.title}"
-								onclick={() => remove(e.id, e.title)}><Trash class="size-4" /></Button
-							>
-						</li>
-					{/each}
-				</ul>
-			</details>
+			<Collapsible.Root class="text-sm">
+				<Collapsible.Trigger
+					class="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground [&[data-state=open]>svg]:rotate-90"
+					><ChevronRight class="size-4 transition-transform" /> Last 30 days ({past.length})</Collapsible.Trigger
+				>
+				<Collapsible.Content>
+					<ul class="mt-2 space-y-1">
+						{#each past as e (e.id)}
+							<li class="flex items-center gap-2 text-muted-foreground">
+								<span class="flex-1 truncate"
+									>{KIND_EMOJI[e.kind]} {e.title} · {fmtSpan(e)} · {e.going.length} went</span
+								>
+								<Button
+									variant="ghost"
+									size="icon"
+									aria-label="Delete {e.title}"
+									onclick={() => remove(e.id, e.title)}><Trash class="size-4" /></Button
+								>
+							</li>
+						{/each}
+					</ul>
+				</Collapsible.Content>
+			</Collapsible.Root>
 		{/if}
 	</section>
 

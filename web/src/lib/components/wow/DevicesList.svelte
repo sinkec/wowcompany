@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '#lib/confirm.svelte.js';
 	import { errText } from '#lib/errors.js';
 	// "My devices" – povezane Companion aplikacije (uporablja /link in /settings).
 	import { useConvexClient, useQuery } from 'convex-svelte';
@@ -13,7 +14,15 @@
 	const devices = useQuery(api.companion.myDevices, {});
 
 	async function revoke(deviceId: Id<'devices'>, name: string) {
-		if (!confirm(`Revoke "${name}"? It will stop uploading runs immediately.`)) return;
+		if (
+			!(await ask({
+				title: `Revoke "${name}"?`,
+				description: 'It will stop uploading runs immediately.',
+				confirm: 'Revoke',
+				destructive: true
+			}))
+		)
+			return;
 		try {
 			await client.mutation(api.companion.revokeDevice, { deviceId });
 			toast.success(`${name} revoked`, { description: 'Exiled. Hearthstone confiscated.' });

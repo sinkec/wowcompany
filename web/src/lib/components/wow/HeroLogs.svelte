@@ -4,6 +4,10 @@
 	import { api } from '#convex/_generated/api.js';
 	import Locked from '#lib/components/wow/Locked.svelte';
 	import { ROLE_LABEL, fmtDuration, fmtRate, fmtWhen, parseColor, parseQuip } from '#lib/runs.js';
+	import * as Table from '#lib/components/ui/table/index.js';
+	import SortHead from '#lib/components/table/SortHead.svelte';
+	import SeasonPicker from './SeasonPicker.svelte';
+	import { TableSort } from '#lib/sort.svelte.js';
 
 	let { slug }: { slug: string } = $props();
 	let season = $state<number | undefined>(undefined);
@@ -17,6 +21,28 @@
 		for (const e of d.encounters) m.set(e.zone, [...(m.get(e.zone) ?? []), e]);
 		return [...m.entries()];
 	});
+	type Enc = Extract<NonNullable<typeof d>, { locked: false }>['encounters'][number];
+	type Kill = Enc['list'][number];
+	// sort je skupen vsem tabelam (dungeonom) in vsem razprtim seznamom killov
+	const bossSort = new TableSort<'boss' | 'bestPct' | 'best' | 'medianPct' | 'kills' | 'fastest'>();
+	const bossValue = {
+		boss: (e: Enc) => e.encounter,
+		bestPct: (e: Enc) => e.bestPct,
+		best: (e: Enc) => e.best,
+		medianPct: (e: Enc) => e.medianPct,
+		kills: (e: Enc) => e.kills,
+		// manj časa je bolje: "padajoče" = najhitrejši zgoraj
+		fastest: (e: Enc) => (e.fastestMs ? -e.fastestMs : null)
+	};
+	const killSort = new TableSort<'when' | 'pct' | 'rank' | 'value' | 'ilvl' | 'duration'>('when');
+	const killValue = {
+		when: (k: Kill) => k.at,
+		pct: (k: Kill) => k.pct,
+		rank: (k: Kill) => -k.rank,
+		value: (k: Kill) => k.value,
+		ilvl: (k: Kill) => k.ilvl,
+		duration: (k: Kill) => -k.durationMs
+	};
 	const pctText = (p: number | null) => (p === null ? '—' : String(Math.floor(p)));
 	const nameOf = (s: string) =>
 		d && !d.locked ? (d.people.find((p) => p.slug === s)?.name ?? s) : s;
@@ -40,18 +66,7 @@
 				</div>
 			</div>
 		</div>
-		{#if d.seasons.length > 1}
-			<div class="flex flex-wrap gap-1 text-sm">
-				{#each d.seasons as s (s.number)}
-					<button
-						class="rounded-md border px-3 py-1 {s.number === d.season
-							? 'border-primary text-primary'
-							: 'border-border text-muted-foreground hover:text-foreground'}"
-						onclick={() => (season = s.number)}>{s.name}</button
-					>
-				{/each}
-			</div>
-		{/if}
+		<SeasonPicker seasons={d.seasons} current={d.season} onpick={(n) => (season = n)} />
 	</div>
 
 	{#if !d.encounters.length}
@@ -64,49 +79,57 @@
 	{#each zones as [zone, list] (zone)}
 		<section class="wow-frame overflow-hidden rounded-lg">
 			<h3 class="border-b border-border/50 px-4 py-2 text-sm font-semibold text-primary">{zone}</h3>
-			<table class="w-full text-sm">
-				<thead class="text-xs text-muted-foreground">
-					<tr class="border-b border-border/50">
-						<th class="px-3 py-2 text-left">Boss</th>
-						<th class="px-3 py-2 text-right">Best %</th>
-						<th class="px-3 py-2 text-right">Best</th>
-						<th class="hidden px-3 py-2 text-right sm:table-cell">Median %</th>
-						<th class="px-3 py-2 text-right">Kills</th>
-						<th class="hidden px-3 py-2 text-right sm:table-cell">Fastest</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each list as e (key(e))}
-						<tr
-							class="cursor-pointer border-b border-border/30 last:border-0 hover:bg-muted/30"
+			<Table.Root>
+				<Table.Header>
+					<Table.Row class="text-xs hover:bg-transparent">
+						<SortHead sort={bossSort} key="boss" first="asc" class="px-3">Boss</SortHead>
+						<SortHead sort={bossSort} key="bestPct" align="right" class="px-3">Best %</SortHead>
+						<SortHead sort={bossSort} key="best" align="right" class="px-3">Best</SortHead>
+						<SortHead
+							sort={bossSort}
+							key="medianPct"
+							align="right"
+							class="hidden px-3 sm:table-cell">Median %</SortHead
+						>
+						<SortHead sort={bossSort} key="kills" align="right" class="px-3">Kills</SortHead>
+						<SortHead sort={bossSort} key="fastest" align="right" class="hidden px-3 sm:table-cell"
+							>Fastest</SortHead
+						>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each bossSort.apply(list, bossValue) as e (key(e))}
+						<Table.Row
+							class="cursor-pointer"
+							aria-expanded={open === key(e)}
 							onclick={() => (open = open === key(e) ? null : key(e))}
 						>
-							<td class="px-3 py-1.5">
+							<Table.Cell class="px-3">
 								{e.encounter}
 								<span class="ml-1 text-xs text-muted-foreground">{ROLE_LABEL[e.role]}</span>
-							</td>
-							<td
-								class="px-3 py-1.5 text-right font-semibold tabular-nums"
-								style="color: {parseColor(e.bestPct)}">{pctText(e.bestPct)}</td
+							</Table.Cell>
+							<Table.Cell
+								class="px-3 text-right font-semibold tabular-nums"
+								style="color: {parseColor(e.bestPct)}">{pctText(e.bestPct)}</Table.Cell
 							>
-							<td class="px-3 py-1.5 text-right tabular-nums"
+							<Table.Cell class="px-3 text-right tabular-nums"
 								>{fmtRate(e.best)}
 								<span class="text-xs text-muted-foreground"
 									>{e.role === 'heal' ? 'hps' : 'dps'}</span
-								></td
+								></Table.Cell
 							>
-							<td
-								class="hidden px-3 py-1.5 text-right tabular-nums sm:table-cell"
-								style="color: {parseColor(e.medianPct)}">{pctText(e.medianPct)}</td
+							<Table.Cell
+								class="hidden px-3 text-right tabular-nums sm:table-cell"
+								style="color: {parseColor(e.medianPct)}">{pctText(e.medianPct)}</Table.Cell
 							>
-							<td class="px-3 py-1.5 text-right tabular-nums">{e.kills}</td>
-							<td class="hidden px-3 py-1.5 text-right tabular-nums sm:table-cell"
-								>{fmtDuration(e.fastestMs)}</td
+							<Table.Cell class="px-3 text-right tabular-nums">{e.kills}</Table.Cell>
+							<Table.Cell class="hidden px-3 text-right tabular-nums sm:table-cell"
+								>{fmtDuration(e.fastestMs)}</Table.Cell
 							>
-						</tr>
+						</Table.Row>
 						{#if open === key(e)}
-							<tr class="border-b border-border/30 bg-muted/20">
-								<td colspan="6" class="px-3 py-2">
+							<Table.Row class="bg-muted/20 hover:bg-muted/20">
+								<Table.Cell colspan={6} class="px-3 py-2 whitespace-normal">
 									<p class="mb-2 text-xs text-muted-foreground italic">{parseQuip(e.bestPct)}</p>
 									{#if e.top}
 										<p class="mb-2 text-xs">
@@ -129,43 +152,59 @@
 											{/if}
 										</p>
 									{/if}
-									<table class="w-full text-xs">
-										<thead class="text-muted-foreground">
-											<tr>
-												<th class="py-1 text-left">When</th>
-												<th class="py-1 text-right">%</th>
-												<th class="py-1 text-right">Rank</th>
-												<th class="py-1 text-right">{e.role === 'heal' ? 'HPS' : 'DPS'}</th>
-												<th class="py-1 text-right">ilvl</th>
-												<th class="py-1 text-right">Duration</th>
-											</tr>
-										</thead>
-										<tbody>
-											{#each e.list as k (k.runId + k.at)}
-												<tr>
-													<td class="py-1">
+									<Table.Root class="text-xs">
+										<Table.Header>
+											<Table.Row class="hover:bg-transparent">
+												<SortHead sort={killSort} key="when" class="h-8">When</SortHead>
+												<SortHead sort={killSort} key="pct" align="right" class="h-8">%</SortHead>
+												<SortHead sort={killSort} key="rank" align="right" class="h-8"
+													>Rank</SortHead
+												>
+												<SortHead sort={killSort} key="value" align="right" class="h-8"
+													>{e.role === 'heal' ? 'HPS' : 'DPS'}</SortHead
+												>
+												<SortHead sort={killSort} key="ilvl" align="right" class="h-8"
+													>ilvl</SortHead
+												>
+												<SortHead sort={killSort} key="duration" align="right" class="h-8"
+													>Duration</SortHead
+												>
+											</Table.Row>
+										</Table.Header>
+										<Table.Body>
+											{#each killSort.apply(e.list, killValue) as k (k.runId + k.at)}
+												<Table.Row onclick={(ev) => ev.stopPropagation()}>
+													<Table.Cell class="py-1">
 														<a href="/runs/{k.runId}" class="hover:text-primary hover:underline"
 															>{fmtWhen(k.at)}</a
 														>
-													</td>
-													<td
+													</Table.Cell>
+													<Table.Cell
 														class="py-1 text-right font-semibold tabular-nums"
-														style="color: {parseColor(k.pct)}">{pctText(k.pct)}</td
+														style="color: {parseColor(k.pct)}">{pctText(k.pct)}</Table.Cell
 													>
-													<td class="py-1 text-right tabular-nums">{k.rank} / {k.outOf}</td>
-													<td class="py-1 text-right tabular-nums">{fmtRate(k.value)}</td>
-													<td class="py-1 text-right tabular-nums">{k.ilvl ?? '—'}</td>
-													<td class="py-1 text-right tabular-nums">{fmtDuration(k.durationMs)}</td>
-												</tr>
+													<Table.Cell class="py-1 text-right tabular-nums"
+														>{k.rank} / {k.outOf}</Table.Cell
+													>
+													<Table.Cell class="py-1 text-right tabular-nums"
+														>{fmtRate(k.value)}</Table.Cell
+													>
+													<Table.Cell class="py-1 text-right tabular-nums"
+														>{k.ilvl ?? '—'}</Table.Cell
+													>
+													<Table.Cell class="py-1 text-right tabular-nums"
+														>{fmtDuration(k.durationMs)}</Table.Cell
+													>
+												</Table.Row>
 											{/each}
-										</tbody>
-									</table>
-								</td>
-							</tr>
+										</Table.Body>
+									</Table.Root>
+								</Table.Cell>
+							</Table.Row>
 						{/if}
 					{/each}
-				</tbody>
-			</table>
+				</Table.Body>
+			</Table.Root>
 		</section>
 	{/each}
 	<p class="text-xs text-muted-foreground">

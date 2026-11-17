@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	// Arhiv starih realmov (samo člani, samo branje): junaki, runi, lestvice. Po 30 dneh izbris.
 	import { useQuery } from 'convex-svelte';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
@@ -55,16 +57,18 @@
 			Nothing archived. The company never moved – loyal, or just lazy.
 		</p>
 	{:else}
-		<div class="flex flex-wrap gap-2">
+		<ToggleGroup.Root
+			type="single"
+			variant="outline"
+			spacing={1}
+			class="flex-wrap"
+			aria-label="Archived realm"
+			bind:value={() => key ?? '', (v) => v && (picked = v)}
+		>
 			{#each list.data as a (a.key)}
-				<button
-					class="rounded-md border px-3 py-1.5 text-sm {key === a.key
-						? 'border-primary bg-primary/10 text-primary'
-						: 'border-border text-muted-foreground hover:text-foreground'}"
-					onclick={() => (picked = a.key)}>{a.label}</button
-				>
+				<ToggleGroup.Item value={a.key}>{a.label}</ToggleGroup.Item>
 			{/each}
-		</div>
+		</ToggleGroup.Root>
 
 		{#if archive}
 			<section
@@ -83,10 +87,8 @@
 								: ''}{/if}
 					</p>
 				</div>
-				<button
-					class="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-					disabled={!contents.data}
-					onclick={download}><Download class="size-4" /> Download (JSON)</button
+				<Button size="lg" disabled={!contents.data} onclick={download}
+					><Download class="size-4" /> Download (JSON)</Button
 				>
 			</section>
 

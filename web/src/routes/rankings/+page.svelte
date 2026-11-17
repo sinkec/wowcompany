@@ -9,6 +9,13 @@
 
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
+	import * as Table from '#lib/components/ui/table/index.js';
+	import SeasonPicker from '#lib/components/wow/SeasonPicker.svelte';
+	import SortHead from '#lib/components/table/SortHead.svelte';
+	import PageHeader from '#lib/components/wow/PageHeader.svelte';
+	import { TableSort } from '#lib/sort.svelte.js';
+
+	const valueSort = new TableSort<'zone' | 'xp' | 'coin' | 'runs'>('xp');
 
 	// ?season=N (npr. iz arhiva starega realma)
 	let season = $state<number | undefined>(
@@ -24,29 +31,17 @@
 <svelte:head><title>Rankings — WowCompany</title></svelte:head>
 
 <div class="space-y-6">
-	<section class="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
-		<div class="min-w-0 space-y-1 sm:flex-1">
-			<h1 class="page-title flex items-center gap-3">
-				<Trophy class="size-8" /> Rankings
-			</h1>
-			<p class="page-lead">
-				Best boss kill per hero, per season. Numbers from the Companion's combat logs, bragging
-				rights from you. Healers get their own board so they stop complaining.
-			</p>
-		</div>
-		{#if d && !d.locked && d.seasons.length > 1}
-			<div class="flex flex-wrap gap-1 text-sm">
-				{#each d.seasons as s (s.number)}
-					<button
-						class="rounded-md border px-3 py-1 {s.number === d.season
-							? 'border-primary text-primary'
-							: 'border-border text-muted-foreground hover:text-foreground'}"
-						onclick={() => (season = s.number)}>{s.name}</button
-					>
-				{/each}
-			</div>
-		{/if}
-	</section>
+	<PageHeader
+		title="Rankings"
+		icon={Trophy}
+		lead="Best boss kill per hero, per season. Numbers from the Companion's combat logs, bragging rights from you. Healers get their own board so they stop complaining."
+	>
+		{#snippet actions()}
+			{#if d && !d.locked}
+				<SeasonPicker seasons={d.seasons} current={d.season} onpick={(n) => (season = n)} />
+			{/if}
+		{/snippet}
+	</PageHeader>
 
 	{#if d?.locked}
 		<Locked what="who parses grey (and who carries)" />
@@ -103,26 +98,26 @@
 					average experience and coin per hour inside, from whoever had the Companion running. time
 					is money, and you are broke.
 				</p>
-				<table class="mt-3 w-full text-sm">
-					<thead class="text-xs text-muted-foreground">
-						<tr class="border-b border-border/50">
-							<th class="py-1 text-left">Dungeon</th>
-							<th class="py-1 text-right">XP / hour</th>
-							<th class="py-1 text-right">Coin / hour</th>
-							<th class="py-1 text-right">Runs</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each d.value as z (z.zone)}
-							<tr class="border-b border-border/30 last:border-0">
-								<td class="py-1">{z.zone}</td>
-								<td class="py-1 text-right tabular-nums">{fmtNum(z.xpPerHour)}</td>
-								<td class="py-1 text-right tabular-nums">{fmtMoney(z.copperPerHour)}</td>
-								<td class="py-1 text-right tabular-nums">{z.runs}</td>
-							</tr>
+				<Table.Root class="mt-3">
+					<Table.Header>
+						<Table.Row class="text-xs hover:bg-transparent">
+							<SortHead sort={valueSort} key="zone" first="asc">Dungeon</SortHead>
+							<SortHead sort={valueSort} key="xp" align="right">XP / hour</SortHead>
+							<SortHead sort={valueSort} key="coin" align="right">Coin / hour</SortHead>
+							<SortHead sort={valueSort} key="runs" align="right">Runs</SortHead>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each valueSort.apply( d.value, { zone: (z) => z.zone, xp: (z) => z.xpPerHour, coin: (z) => z.copperPerHour, runs: (z) => z.runs } ) as z (z.zone)}
+							<Table.Row>
+								<Table.Cell>{z.zone}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{fmtNum(z.xpPerHour)}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{fmtMoney(z.copperPerHour)}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{z.runs}</Table.Cell>
+							</Table.Row>
 						{/each}
-					</tbody>
-				</table>
+					</Table.Body>
+				</Table.Root>
 			</section>
 		{/if}
 

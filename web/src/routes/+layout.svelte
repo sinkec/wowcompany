@@ -9,6 +9,7 @@
 	import SocialLinks from '#lib/components/wow/SocialLinks.svelte';
 	import MainNav from '#lib/components/layout/MainNav.svelte';
 	import Brand from '#lib/components/layout/Brand.svelte';
+	import ConfirmHost from '#lib/components/layout/ConfirmHost.svelte';
 	import { brandName } from '#convex/lib/siteContent.js';
 	import { GITHUB_URL } from '#lib/site.js';
 	import type { LayoutProps } from './$types';
@@ -87,3 +88,4 @@
 </footer>
 
 <Toaster theme="dark" richColors position="bottom-right" />
+<ConfirmHost />

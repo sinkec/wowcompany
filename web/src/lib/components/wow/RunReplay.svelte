@@ -1,4 +1,9 @@
 <script lang="ts">
+	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
+	import { Slider } from '#lib/components/ui/slider/index.js';
+	import { Toggle } from '#lib/components/ui/toggle/index.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import { ask } from '#lib/confirm.svelte.js';
 	import { errText } from '#lib/errors.js';
 	// Replay runa: zemljevid iz poti partyja (combat log x/y vsaki 2 s – Companion v0.1.12+), igralci
 	// z avatarjem in imenom, trak časovnice (vleci / play / pavza / hitrost) in statistika v izbranem
@@ -551,16 +556,16 @@
 				</div>
 				<div class="flex flex-wrap items-center justify-end gap-1 text-xs">
 					{#if dm.data && !editing}
-						<button
-							class="rounded border px-2 py-0.5 {showPaths
-								? 'border-primary text-primary'
-								: 'border-border text-muted-foreground'}"
-							onclick={() => (showPaths = !showPaths)}>Paths</button
+						<Toggle variant="outline" size="sm" class="h-7 px-2 text-xs" bind:pressed={showPaths}
+							>Paths</Toggle
 						>
 					{/if}
 					{#if isAdmin && !editing}
 						<label
-							class="inline-flex cursor-pointer items-center gap-1 rounded border border-border px-2 py-0.5 text-muted-foreground hover:text-foreground"
+							class="{buttonVariants({
+								variant: 'outline',
+								size: 'sm'
+							})} h-7 cursor-pointer px-2 text-xs"
 							title="Screenshot of the in-game map (M) of this dungeon"
 						>
 							<MapIcon class="size-3" />
@@ -574,24 +579,26 @@
 							/>
 						</label>
 						{#if dm.data}
-							<button
-								class="rounded border border-border px-2 py-0.5 text-muted-foreground hover:text-foreground"
-								onclick={startEdit}>Align</button
+							<Button variant="outline" size="sm" class="h-7 px-2 text-xs" onclick={startEdit}
+								>Align</Button
 							>
 						{/if}
 					{/if}
 				</div>
 				{#if maps.length > 1}
-					<div class="flex gap-1 text-xs">
+					<ToggleGroup.Root
+						type="single"
+						variant="outline"
+						size="sm"
+						aria-label="Floor"
+						bind:value={() => String(map), (v) => (pickedMap = v ? Number(v) : null)}
+					>
 						{#each maps as m, i (m)}
-							<button
-								class="rounded border px-2 py-0.5 {map === m
-									? 'border-primary text-primary'
-									: 'border-border text-muted-foreground'}"
-								onclick={() => (pickedMap = pickedMap === m ? null : m)}>Floor {i + 1}</button
+							<ToggleGroup.Item value={String(m)} class="h-7 px-2 text-xs"
+								>Floor {i + 1}</ToggleGroup.Item
 							>
 						{/each}
-					</div>
+					</ToggleGroup.Root>
 				{/if}
 			</div>
 			<svg
@@ -721,37 +728,44 @@
 					{#each [{ k: 'width', l: 'Size', min: f.span * 0.2, max: f.span * 4 }, { k: 'x', l: 'Left / right', min: f.x - f.w, max: f.x + f.w }, { k: 'y', l: 'Up / down', min: f.y - f.h, max: f.y + f.h }, { k: 'rotate', l: 'Rotate', min: -180, max: 180 }] as c (c.k)}
 						<label class="flex items-center gap-3">
 							<span class="w-24 shrink-0">{c.l}</span>
-							<input
-								type="range"
+							<Slider
+								type="single"
 								min={c.min}
 								max={c.max}
 								step={c.k === 'rotate' ? 0.5 : f.span / 1000}
 								bind:value={draft[c.k as keyof Align]}
-								class="w-full accent-[var(--primary)]"
+								aria-label={c.l}
 							/>
 						</label>
 					{/each}
 					<div class="flex flex-wrap gap-2">
-						<button
-							class="rounded-md bg-primary px-3 py-1.5 font-semibold text-primary-foreground"
-							onclick={saveAlign}>Save alignment</button
+						<Button size="sm" onclick={saveAlign}>Save alignment</Button>
+						<Button
+							size="sm"
+							variant="outline"
+							onclick={() => dm.data && (draft = fitAlign(dm.data.aspect))}>Fit to paths</Button
 						>
-						<button
-							class="rounded-md border border-border px-3 py-1.5"
-							onclick={() => dm.data && (draft = fitAlign(dm.data.aspect))}>Fit to paths</button
+						<Button size="sm" variant="ghost" onclick={() => ((editing = false), (frozen = null))}
+							>Cancel</Button
 						>
-						<button
-							class="rounded-md border border-border px-3 py-1.5"
-							onclick={() => ((editing = false), (frozen = null))}>Cancel</button
-						>
-						<button
-							class="ml-auto rounded-md border border-destructive/60 px-3 py-1.5 text-destructive"
+						<Button
+							size="sm"
+							variant="destructive"
+							class="ml-auto"
 							onclick={async () => {
-								if (!confirm('Remove the map image of this dungeon?')) return;
+								if (
+									!(await ask({
+										title: 'Remove the map image of this dungeon?',
+										description: 'The replay falls back to the drawn paths.',
+										confirm: 'Remove map',
+										destructive: true
+									}))
+								)
+									return;
 								await client.mutation(api.dungeonMaps.remove, { instanceId });
 								editing = false;
 								frozen = null;
-							}}>Remove map</button
+							}}>Remove map</Button
 						>
 					</div>
 				</div>
@@ -780,37 +794,35 @@
 						></div>
 					{/each}
 				</div>
-				<input
-					type="range"
-					min="0"
+				<Slider
+					type="single"
+					min={0}
 					max={durationMs}
-					step="500"
+					step={500}
 					bind:value={t}
-					class="w-full accent-[var(--primary)]"
 					aria-label="Replay time"
 				/>
 				<div class="flex flex-wrap items-center gap-2">
-					<button
-						class="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground"
-						onclick={toggle}
-					>
+					<Button onclick={toggle} class="gap-1.5">
 						{#if playing}<Pause class="size-4" /> Pause{:else}<Play class="size-4" /> Play{/if}
-					</button>
-					<button
-						class="grid size-9 place-items-center rounded-md border border-border text-muted-foreground hover:text-foreground"
+					</Button>
+					<Button
+						variant="outline"
+						size="icon"
 						aria-label="Back to the start"
-						onclick={() => ((t = 0), (playing = false))}><RotateCcw class="size-4" /></button
+						onclick={() => ((t = 0), (playing = false))}><RotateCcw class="size-4" /></Button
 					>
-					<div class="flex gap-1 text-xs">
+					<ToggleGroup.Root
+						type="single"
+						variant="outline"
+						size="sm"
+						aria-label="Speed"
+						bind:value={() => String(speed), (v) => v && (speed = Number(v) as typeof speed)}
+					>
 						{#each SPEEDS as s (s)}
-							<button
-								class="rounded border px-2 py-1 {speed === s
-									? 'border-primary text-primary'
-									: 'border-border text-muted-foreground'}"
-								onclick={() => (speed = s)}>{s}×</button
-							>
+							<ToggleGroup.Item value={String(s)} class="text-xs">{s}×</ToggleGroup.Item>
 						{/each}
-					</div>
+					</ToggleGroup.Root>
 					<span class="ml-auto font-display text-lg tabular-nums"
 						>{clock(t)}
 						<span class="text-sm text-muted-foreground">/ {clock(durationMs)}</span></span

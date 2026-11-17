@@ -25,6 +25,12 @@
 - **Grafi = Chart.js** (`lib/chart.ts` barve iz teme, `ChartCanvas.svelte` ovoj): napredek junaka (stopnice +
   preliv), časovnica runa/replay (na sekundo, 30 s povprečje, barve razredov ali stalna paleta, boss boji osenčeni,
   kazalec replaya z zatemnjeno prihodnostjo, vlečenje = premik, legenda = vsote do kazalca, klik skrije junaka).
+- **UI = shadcn-svelte povsod** (17. 11. pozno): tabele `Table.*` + sortiranje po stolpcih (`lib/sort.svelte.ts`
+  `TableSort`, glava `components/table/SortHead.svelte`); preklopniki `ToggleGroup`/`Toggle` (aktivno = zlato, v
+  `ui/toggle-group/toggle-group-item.svelte`; vezava `bind:value={() => x, (v) => …}`, da klik na izbrano ne odznači);
+  `Select` prek `components/form/SimpleSelect.svelte`, `Textarea`, `Checkbox`, `Collapsible`, `Slider` (replay);
+  potrditve `ask()` (`lib/confirm.svelte.ts`) + `ConfirmHost` v layoutu namesto `confirm()`/`prompt()`.
+  Brez Prettierja čez `components/ui` (vendor datoteke).
 - **Skupno:** `lib/errors.ts` (`errText`, `attempt`) namesto kopij po straneh; hero stran bere `?tab=`.
 
 ## ZAČNI TUKAJ – stanje 16. 11. 2026 (dopoldne)

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import { ask } from '#lib/confirm.svelte.js';
 	import { errText } from '#lib/errors.js';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -115,7 +117,14 @@
 		}
 	}
 	async function disown(id: Id<'players'>, name: string) {
-		if (!confirm(`Disown ${name}? The hero stays on the portal, just not under your name.`)) return;
+		if (
+			!(await ask({
+				title: `Disown ${name}?`,
+				description: 'The hero stays on the portal, just not under your name.',
+				confirm: 'Disown'
+			}))
+		)
+			return;
 		try {
 			await client.mutation(api.profile.disown, { playerId: id });
 			toast(`${name} disowned`, { description: 'Abandoned like a quest at 9/10 boar livers.' });
@@ -124,10 +133,15 @@
 		}
 	}
 	async function remove(id: Id<'players'>, name: string) {
-		const typed = prompt(
-			`Remove ${name} from WowCompany? Stats, history and the Tavern Gossip about them are deleted for good.\n\nType "${name}" to confirm:`
-		);
-		if (typed === null) return;
+		const sure = await ask({
+			title: `Remove ${name} from WowCompany?`,
+			description: 'Stats, history and the Tavern Gossip about them are deleted for good.',
+			confirm: 'Erase',
+			destructive: true,
+			typeToConfirm: name
+		});
+		if (!sure) return;
+		const typed = name;
 		try {
 			await client.mutation(api.profile.removeCharacter, { playerId: id, confirmName: typed });
 			toast(`${name} has been erased`, {
@@ -321,21 +335,31 @@
 								>.
 							</p>
 						{:else}
-							<div class="flex flex-wrap gap-2">
+							<ToggleGroup.Root
+								type="single"
+								variant="outline"
+								size="lg"
+								spacing={2}
+								class="flex-wrap"
+								aria-label="Main hero"
+								bind:value={
+									() => me.profile.mainSlug ?? '',
+									(v) => {
+										const c = me.characters.find((x) => x.slug === v);
+										if (c) setMain(c.id, c.name);
+									}
+								}
+							>
 								{#each me.characters as c (c.id)}
-									{@const isMain = me.profile.mainSlug === c.slug}
-									<button
-										onclick={() => !isMain && setMain(c.id, c.name)}
-										class="flex min-h-11 items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors {isMain
-											? 'border-primary bg-primary/10'
-											: 'border-border hover:border-primary/60'}"
-									>
-										{#if isMain}<Star class="size-4 fill-primary text-primary" />{/if}
+									<ToggleGroup.Item value={c.slug} class="gap-2 px-3">
+										{#if me.profile.mainSlug === c.slug}<Star
+												class="size-4 fill-primary text-primary"
+											/>{/if}
 										<span style="color: {classColor(c.classId ?? undefined)}">{c.name}</span>
 										{#if c.level}<span class="text-xs text-muted-foreground">{c.level}</span>{/if}
-									</button>
+									</ToggleGroup.Item>
 								{/each}
-							</div>
+							</ToggleGroup.Root>
 						{/if}
 					</section>
 					<section class="space-y-3">

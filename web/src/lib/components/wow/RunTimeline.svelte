@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Toggle } from '#lib/components/ui/toggle/index.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	// Časovnica runa (Chart.js): na sekundo po igralcih (barva razreda), boss boji osenčeni (wipe rdeče),
 	// skupna os. Replay: kazalec predvajanja, prihodnost zatemnjena, vsote do tega trenutka; klik ali
 	// vlečenje po grafu premakne predvajanje.
@@ -219,17 +221,17 @@
 
 <div class="space-y-3">
 	<div class="flex flex-wrap items-center gap-2 text-sm">
-		<div class="flex rounded-md border border-border p-0.5" role="group" aria-label="Metric">
+		<ToggleGroup.Root
+			type="single"
+			variant="outline"
+			size="sm"
+			aria-label="Metric"
+			bind:value={() => metric, (v) => v && (metric = v as Metric)}
+		>
 			{#each Object.entries(LABEL) as [k, label] (k)}
-				<button
-					class="rounded px-2.5 py-1 transition-colors {metric === k
-						? 'bg-primary/15 text-primary'
-						: 'text-muted-foreground hover:text-foreground'}"
-					aria-pressed={metric === k}
-					onclick={() => (metric = k as Metric)}>{label}</button
-				>
+				<ToggleGroup.Item value={k}>{label}</ToggleGroup.Item>
 			{/each}
-		</div>
+		</ToggleGroup.Root>
 		<span class="ml-auto text-xs text-muted-foreground">
 			per second{win > 1 ? `, ${(win * bucket) / 1000} s average` : ''} · shaded = boss fights{#if bosses.some((b) => b.result === 'wipe')},
 				red = wipes{/if}
@@ -261,20 +263,17 @@
 			{#each ranked as p (p.slug)}
 				{@const c = colorOf[p.slug]}
 				<li>
-					<button
-						class="flex items-center gap-2 rounded-md border border-border px-2.5 py-1 text-xs transition {hidden[
-							p.slug
-						]
-							? 'opacity-40'
-							: 'hover:bg-accent/50'}"
-						aria-pressed={!hidden[p.slug]}
+					<Toggle
+						variant="outline"
+						size="sm"
+						class="gap-2 text-xs aria-pressed:bg-transparent data-[state=off]:opacity-40"
 						title={hidden[p.slug] ? 'Show' : 'Hide'}
-						onclick={() => (hidden = { ...hidden, [p.slug]: !hidden[p.slug] })}
+						bind:pressed={() => !hidden[p.slug], (on) => (hidden = { ...hidden, [p.slug]: !on })}
 					>
 						<span class="size-2.5 rounded-full" style="background: {c}"></span>
 						<span class="font-semibold">{names[p.slug] ?? p.slug}</span>
 						<span class="text-muted-foreground tabular-nums">{fmtNum(sums[p.slug] ?? 0)}</span>
-					</button>
+					</Toggle>
 				</li>
 			{/each}
 		</ul>
