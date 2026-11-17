@@ -16,7 +16,7 @@ globals = {
 read_globals = {
     "C_TooltipInfo",
     "C_Calendar", "C_DateAndTime", "CalendarFrame",
-    "UnitPosition", "C_Map",
+    "UnitPosition", "C_Map", "C_ChatInfo", "Ambiguate", "strsplit", "wipe",
     "Settings", "InterfaceOptions_AddCategory", "InterfaceOptionsFrame_OpenToCategory",
     "IsShiftKeyDown", "LE_PARTY_CATEGORY_INSTANCE",
     "BackdropTemplateMixin",

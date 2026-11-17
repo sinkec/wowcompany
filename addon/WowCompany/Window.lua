@@ -650,6 +650,11 @@ function Win.Refresh()
     local seg = state.sessionName or (s.winScope == "overall" and "Overall" or nil)
     win.title:SetText((secs and ("[" .. ns.fmtTime(secs) .. "] ") or "") .. label
         .. (seg and ("  |cff9d9d9d" .. seg .. "|r") or ""))
+    -- 📡 n = in a dungeon, how many in the party record the combat log (empty when you are alone or outside)
+    if win.recorders then
+        local n = ns.Party and ns.Logging.InDungeon() and #ns.Party.Recorders() > 1 and ns.Party.RecordingCount()
+        win.recorders:SetText(n and (n > 0 and ("|cff4de34d" .. n .. "|r") or "|cffff52420|r") or "")
+    end
     if #rows == 0 then
         local hidden = session and type(session.combatSources) == "table" and #session.combatSources > 0
         win.empty:SetText(deferred and "Details! is doing the counting.\n/wowco details off brings ours back."
@@ -768,13 +773,21 @@ local function build()
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:SetText("Logging", GOLD[1], GOLD[2], GOLD[3])
         GameTooltip:AddLine(ns.Logging.Describe(), 1, 1, 1, true)
+        if ns.Party and ns.Logging.InDungeon() then
+            GameTooltip:AddLine(" ")
+            for _, l in ipairs(ns.Party.TooltipLines()) do GameTooltip:AddLine(l[1], l[2], l[3], l[4], true) end
+        end
         GameTooltip:AddLine("Click: logs on / off", 0.6, 0.6, 0.6)
         GameTooltip:Show()
     end)
     light:SetScript("OnLeave", function() if type(GameTooltip) == "table" then GameTooltip:Hide() end end)
 
+    -- how many in the party record the combat log (party addons answer each other: Party.lua)
+    win.recorders = font(bar, "GameFontHighlightSmall", "LEFT")
+    win.recorders:SetPoint("LEFT", light, "RIGHT", 3, 0)
+
     win.title = font(bar, "GameFontNormalSmall", "LEFT")
-    win.title:SetPoint("LEFT", light, "RIGHT", 4, 0)
+    win.title:SetPoint("LEFT", win.recorders, "RIGHT", 3, 0)
     win.title:SetPoint("RIGHT", segmentBtn, "LEFT", -4, 0)
 
     win.body = CreateFrame("Frame", nil, win)

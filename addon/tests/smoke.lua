@@ -83,7 +83,7 @@ end
 function issecretvalue(v) return v == SECRET end
 function time() return 1794672089 end
 function GetServerTime() return 1794672089 end
-function GetTime() return 1000 end
+function GetTime() return game.time or 1000 end
 function LoggingCombat(on)
     if on ~= nil then game.combatLog = on end
     return game.combatLog
@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.6.9" end,
+    GetAddOnMetadata = function() return "0.7.0" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -275,6 +275,20 @@ C_Calendar = {
 function UnitPosition() if game.secrets then return SECRET, SECRET, SECRET, SECRET end return -1234.56, 567.89, 12.3, 43 end
 C_Map = C_Map or {}
 C_Map.GetBestMapForUnit = function() return nil end
+
+-- addon messages (Party.lua) and the WoW string helpers it uses
+local addonSent = {}
+C_ChatInfo = {
+    RegisterAddonMessagePrefix = function() return true end,
+    SendAddonMessage = function(prefix, text, ch) table.insert(addonSent, { prefix = prefix, text = text, ch = ch }) end,
+}
+function Ambiguate(name) return (string.gsub(name, "%-[^%-]+$", "")) end
+function wipe(t) for k in pairs(t) do t[k] = nil end return t end
+function strsplit(sep, s)
+    local out = {}
+    for piece in (s .. sep):gmatch("(.-)" .. sep) do out[#out + 1] = piece end
+    return unpack(out)
+end
 
 -- ------------------------------------------------------------------ load the addon like the game does
 local ns = {}
@@ -490,7 +504,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.6%.9|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.7%.0|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -851,6 +865,29 @@ check(cal and cal.from == 1793491200 - 3600, "calendar: window starts on the 1st
 local calLines = table.concat(WowCompanyDB.export, "\n")
 check(string.find(calLines, "v1|CAL|" .. faireStart .. "|", 1, true) and not string.find(calLines, "Secret guild"),
     "calendar: exported, guild events never")
+
+
+-- ------------------------------------------------------------------ party: who records
+check(ns.Party.Newer("0.7.10", "0.7.9") and not ns.Party.Newer("0.7.0", "0.7.0"), "party: version compare")
+game.grouped, game.instanceType = true, "party"
+game.time = 5000
+addonSent = {}
+ns.Party.Hello()
+check(#addonSent == 1 and addonSent[1].prefix == "WowCoParty" and addonSent[1].ch == "PARTY"
+    and addonSent[1].text:match("^S\t0%.7%.0\t[01]\t[01]\t[01]\t1$"), "party: hello asks the others")
+fire("CHAT_MSG_ADDON", "WowCoParty", "S\t0.7.1\t1\t1\t0\t1", "PARTY", "Sinek Helgater-CAMWOWEU5Realm4PvP")
+check(#ns.Party.Recorders() == 2 and ns.Party.Recorders()[2].name == "Sinek Helgater"
+    and ns.Party.Recorders()[2].combat, "party: a member's status is heard")
+check(#addonSent == 2 and addonSent[2].text:match("\t0$"), "party: answers once, without asking back")
+fire("CHAT_MSG_ADDON", "WowCoParty", "S\t0.7.1\t1\t1\t0\t0", "GUILD", "Stranger-Realm")
+check(#ns.Party.Recorders() == 2, "party: guild messages are ignored")
+check(ns.Party.RecordingCount() >= 1 and #ns.Party.TooltipLines() == 3, "party: count and tooltip")
+printed = {}
+runTimers()
+check(said("Sinek Helgater has WowCompany 0%.7%.1"), "party: warns about an older addon")
+fire("GROUP_ROSTER_UPDATE")
+check(#ns.Party.Recorders() == 1, "party: a roster change forgets and asks again")
+game.grouped, game.instanceType = false, "none"
 
 realPrint(failures == 0 and "all addon checks passed" or (failures .. " addon check(s) FAILED"))
 os.exit(failures == 0 and 0 or 1)

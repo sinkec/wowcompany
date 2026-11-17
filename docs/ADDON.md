@@ -373,3 +373,12 @@ retail od 7.1. **Addon v instanci ne more snemati poti** (tudi OpenMap v instanc
 dungeonu ostanejo iz advanced combat loga; strežnik zdaj replay vseh snemalcev istega runa **združi**
 (`lib/replayMerge.ts`) – vsak log doda pozicije svojega snemalca, tudi daleč od ostalih. Več članov s
 Companionom in vklopljenim combat logom = popolnejši replay.
+
+### 4.7 Kdo snema v partyju (addon 0.7.0, 18. 11. 2026)
+
+`Party.lua`: addon sporočila (predpona `WowCoParty`, samo PARTY/INSTANCE_CHAT, nikoli guild):
+`S\tverzija\tcombat\tchat\tadvanced\task`. Ob vstopu v dungeon in spremembi partyja pozdrav z `ask=1`
+(največ 1 na 5 s), drugi odgovorijo (`ask=0`, največ 1 na 5 s); ob spremembi lastnega logiranja znova.
+Meter: število ob lučki = koliko jih snema combat log (zeleno, rdeča 0), tooltip lučke = seznam. Enkrat na
+dungeon (po 20 s) opozorilo v chatu: nihče ne snema / nekdo ima novejši addon. Podatki samo v pomnilniku.
+Nepreverjeno v igri: ali sporočila med addoni na Forever v dungeonu pridejo (OpenMap jih uporablja za GUILD).
