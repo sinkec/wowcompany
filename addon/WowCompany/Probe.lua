@@ -7,11 +7,13 @@
 --   2. What does C_DamageMeter.GetCombatSessionSourceFrom… return (spells? biggest hits?)
 --   3. Does CHAT_MSG_LOOT carry an item link (item id + quality colour)?
 --   4. Who is the party leader, seen from an addon?
+--   5. Does an addon get its OWN position inside a dungeon (UnitPosition, C_Map), in and out of
+--      combat? (For recording each member's exact path; OpenMap notes it can be secret here.)
 -- No names of other players are stored: only shapes, flags and numbers.
 
 local _, ns = ...
 
-local sample = { loot = {}, combat = {}, meterEvents = 0 }
+local sample = { loot = {}, combat = {}, meterEvents = 0, position = {} }
 
 local function isSecret(v) return ns.isSecret(v) end
 
@@ -104,6 +106,56 @@ ns.on("CHAT_MSG_LOOT", function(msg)
     })
 end)
 
+-- 5. own position in a dungeon: a sample every 2 s from entering, at most 60 (two minutes of play)
+local POS_EVERY, POS_MAX = 2, 60
+local posTicker
+local function round(v, step)
+    if type(v) ~= "number" then return v end
+    return math.floor(v / step + 0.5) * step
+end
+local function posValue(v)
+    if isSecret(v) then return "<secret>" end
+    if type(v) == "number" then return round(v, 0.1) end
+    return v == nil and "<nil>" or dump(v)
+end
+function ns.ProbePosition()
+    local entry = { t = ns.now(), combat = ns.inCombat and true or false }
+    local ok, y, x, z, map = pcall(UnitPosition, "player")
+    entry.unitPosition = ok and { y = posValue(y), x = posValue(x), z = posValue(z), map = posValue(map) }
+        or ("error: " .. tostring(y))
+    if type(C_Map) == "table" then
+        local okB, best = pcall(C_Map.GetBestMapForUnit, "player")
+        entry.bestMap = okB and posValue(best) or "error"
+        if okB and type(best) == "number" and not isSecret(best) then
+            local okP, pos = pcall(C_Map.GetPlayerMapPosition, best, "player")
+            if not okP then
+                entry.mapPosition = "error"
+            elseif pos == nil or isSecret(pos) then
+                entry.mapPosition = posValue(pos)
+            else
+                local okXY, px, py = pcall(pos.GetXY, pos)
+                entry.mapPosition = okXY and { x = posValue(px), y = posValue(py) } or "error"
+            end
+        end
+    end
+    return entry
+end
+local function samplePosition()
+    if #sample.position >= POS_MAX or not ns.Logging.InDungeon() then
+        if posTicker then posTicker:Cancel() posTicker = nil end
+        return
+    end
+    table.insert(sample.position, ns.ProbePosition())
+end
+local function startPositionSampling()
+    if posTicker or #sample.position >= POS_MAX or not ns.Logging.InDungeon() then return end
+    if type(C_Timer) ~= "table" or type(C_Timer.NewTicker) ~= "function" then return end
+    samplePosition()
+    posTicker = C_Timer.NewTicker(POS_EVERY, samplePosition)
+end
+ns.on("PLAYER_ENTERING_WORLD", function() later(3, startPositionSampling) end)
+ns.on("ZONE_CHANGED_NEW_AREA", function() later(3, startPositionSampling) end)
+
 local function call(fn, ...)
     if type(fn) ~= "function" then return "missing" end
     local function pack(...) return { n = select("#", ...), ... } end
@@ -157,6 +209,9 @@ local function report()
     if type(C_PartyInfo) == "table" then out.group.lootMethod = call(C_PartyInfo.GetLootMethod) end
 
     out.instance = call(GetInstanceInfo)
+    -- 5. own position: right now, and the samples since entering a dungeon
+    out.positionNow = ns.ProbePosition()
+    out.positionNow.inDungeon = ns.Logging.InDungeon()
     out.logging = { combat = ns.Logging.CombatOn(), chat = ns.Logging.ChatOn(), advanced = ns.Logging.Advanced() }
     return out
 end
@@ -199,7 +254,7 @@ local MAX_DIAG = 90000
 ns.on("PLAYER_LOGOUT", function()
     if not (ns.db and ns.db.settings.diagnostics) then return end
     -- nothing happened since the game loaded (a quick /reload): keep the last report, send nothing new
-    if #sample.combat == 0 and #sample.loot == 0 then return end
+    if #sample.combat == 0 and #sample.loot == 0 and #sample.position == 0 then return end
     local r = report()
     ns.db.probe = r
     local body = json(r)
@@ -221,6 +276,9 @@ end)
 
 ns.command("probe", "probe – save a technical report for the Companion's author (then /reload)", function()
     ns.db.probe = report()
-    ns.say("probe saved: " .. #sample.combat .. " fights and " .. #sample.loot .. " loot lines sampled. "
+    local now = ns.db.probe.positionNow
+    local up = type(now.unitPosition) == "table" and now.unitPosition.x or now.unitPosition
+    ns.say("probe saved: " .. #sample.combat .. " fights, " .. #sample.loot .. " loot lines, "
+        .. #sample.position .. " position samples (own position now: " .. tostring(up) .. "). "
         .. "Type |cffffffff/reload|r to write it to disk.")
 end)

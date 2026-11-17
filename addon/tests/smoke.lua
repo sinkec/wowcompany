@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.6.8" end,
+    GetAddOnMetadata = function() return "0.6.9" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -270,6 +270,11 @@ C_Calendar = {
     end,
     GetHolidayInfo = function() return { description = "Games|n and prizes" } end,
 }
+
+-- own position: plain out of combat, secret in combat (the case to find out in game); no world map in a dungeon
+function UnitPosition() if game.secrets then return SECRET, SECRET, SECRET, SECRET end return -1234.56, 567.89, 12.3, 43 end
+C_Map = C_Map or {}
+C_Map.GetBestMapForUnit = function() return nil end
 
 -- ------------------------------------------------------------------ load the addon like the game does
 local ns = {}
@@ -485,7 +490,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.6%.8|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.6%.9|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -716,6 +721,11 @@ for _, l in ipairs(p.sample.loot) do
 end
 check(sawSecret, "probe survives a secret loot line")
 check(p.group.members.player.leader == true and p.group.members.player.hasSurname, "probe sees the leader")
+check(p.positionNow.unitPosition.x == 567.9 and p.positionNow.unitPosition.map == 43
+    and p.positionNow.bestMap == "<nil>", "probe: own position read, rounded; no world map in a dungeon")
+game.secrets = true
+check(ns.ProbePosition().unitPosition.x == "<secret>", "probe: a secret position is marked, not crashed on")
+game.secrets = false
 
 -- unknown command prints help, a broken handler does not kill the addon
 slash("wat")
