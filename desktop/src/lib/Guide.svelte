@@ -60,8 +60,19 @@
 		}
 	]);
 	// namestitev / posodobitev addona, ki je priložen aplikaciji
+	// samo če je priložena verzija NOVEJŠA (ne ponujaj vrnitve na starejšo, npr. ročno nameščen addon)
+	const newer = (a: string, b: string) => {
+		const pa = a.split('.').map(Number);
+		const pb = b.split('.').map(Number);
+		for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+			const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+			if (d) return d > 0;
+		}
+		return false;
+	};
 	const addonOutdated = $derived(
-		!!status.addon.installedVersion && status.addon.installedVersion !== status.addon.bundledVersion
+		!!status.addon.installedVersion &&
+			newer(status.addon.bundledVersion, status.addon.installedVersion)
 	);
 	let installing = $state(false);
 	let installNote = $state<string | null>(null);
