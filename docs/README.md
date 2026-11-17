@@ -10,8 +10,8 @@
 ## Novo 17. 11. 2026 (zvečer)
 
 **Odprto (stanje ob zaključku, zadnji commit na `main`, vse pushano):**
-- Uporabnik pushne tag `companion-v0.1.20` (Companion 0.1.20 = addon 0.6.8 s `Calendar.lua`; po posodobitvi
-  igro znova zagnati). Zadnja izdaja na GitHubu je 0.1.18 (0.1.19 ni bila nikoli izdana).
+- Companion 0.1.20 je izdan (uporabnik pushal tag 17. 11. zvečer). V naslednji izdaji pride popravek `a2b2592`
+  (gumb za addon ponudi samo NOVEJŠO priloženo verzijo – 0.1.17 je ponujala vrnitev 0.6.7 → 0.6.4).
 - Prod Office: Discord → Slash commands → **Register commands** (`/events`, `/news`); Discord → Posts → vklopi
   **Calendar**; po želji Website → Home page → **Company name**.
 - V igri nepreverjeno: prazniki iz `C_Calendar` (ali Forever vrne HOLIDAY in pravi `endTime`), živa lastna vrstica
