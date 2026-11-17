@@ -178,14 +178,14 @@
 					>
 						<!-- sij iz sredine lika v barvi razreda -->
 						<div
-							class="glow pointer-events-none absolute top-[12.6rem] left-1/2 h-[19rem] w-[15rem] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-70 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
+							class="glow pointer-events-none absolute top-[13.3rem] left-1/2 h-[17rem] w-[13.5rem] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-70 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
 							style="background: radial-gradient(closest-side, {c} 0%, {c}cc 40%, {c}55 70%, transparent 100%)"
 						></div>
-						<!-- render: širok PNG, lik v sredini (x 42–62 %, y 34–81 %); 35rem slika = lik ~16.5rem -->
+						<!-- render: širok PNG, lik v sredini (x 42–62 %, y 34–81 %); 31rem slika = lik ~14.5rem, glava ~6rem pod vrhom (prostor za oblaček) -->
 						<img
 							src={h.render}
 							alt=""
-							class="pointer-events-none absolute bottom-0 left-1/2 h-[35rem] max-w-none -translate-x-1/2 translate-y-[8.3rem] drop-shadow-[0_10px_30px_rgba(0,0,0,0.7)] transition-transform duration-500 group-hover:translate-y-[7.9rem]"
+							class="pointer-events-none absolute bottom-0 left-1/2 h-[31rem] max-w-none -translate-x-1/2 translate-y-[7.5rem] drop-shadow-[0_10px_30px_rgba(0,0,0,0.7)] transition-transform duration-500 group-hover:translate-y-[7.1rem]"
 							onerror={() => (broken[h.slug] = true)}
 						/>
 						<span
@@ -197,10 +197,10 @@
 						<!-- stripovski oblaček nad glavo -->
 						{#if said}
 							<div
-								class="bubble pointer-events-none absolute left-1/2 z-20 w-max max-w-[11.5rem] {i ===
+								class="bubble pointer-events-none absolute left-1/2 z-20 w-max max-w-[9.5rem] {i ===
 								0
 									? 'top-0'
-									: 'top-[0.9rem]'} -translate-x-1/2 rounded-[1.1rem] border-2 border-[#1a1208] bg-[#fff8e6] px-3 py-2 text-center text-[0.8rem] leading-snug font-semibold text-[#1a1208] shadow-[3px_3px_0_#1a1208]"
+									: 'top-[0.9rem]'} -translate-x-1/2 rounded-[1.1rem] border-2 border-[#1a1208] bg-[#fff8e6] px-2.5 py-1.5 text-center text-[0.75rem] leading-snug font-semibold text-[#1a1208] shadow-[3px_3px_0_#1a1208]"
 								role="status"
 							>
 								{said}
