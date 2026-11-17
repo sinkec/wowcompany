@@ -120,6 +120,9 @@
 	const TABS = ['meter', 'bosses', 'deaths', 'loot', 'timeline', 'replay', 'spells'];
 	// stare povezave: ?tab=numbers je zdaj v Overview, ?tab=timeline pri runu z replayem je pod replayem
 	const ALIAS: Record<string, string> = { numbers: 'meter' };
+	/** izbrani zavihek (null = iz URL ali privzeti) */
+	let tabSel = $state<string | null>(null);
+
 	function initialTab(a: { details: boolean; deaths: boolean; loot: boolean }) {
 		let t = page.url.searchParams.get('tab') ?? '';
 		t = ALIAS[t] ?? t;
@@ -338,141 +341,169 @@
 			</p>
 		</Card.Root>
 	{:else}
-		<!-- HEADER -->
-		<Card.Root class="space-y-4 p-5">
-			<div class="flex flex-wrap items-start gap-4">
-				<div class="min-w-0 flex-1 space-y-1">
-					<div class="flex flex-wrap items-center gap-2">
-						<h1 class="page-title">{run.zone}</h1>
-						{#if badge}<span
-								class="rounded border px-2 py-0.5 text-sm font-semibold {TONE[badge.tone]}"
-								>{badge.text}</span
+		<Tabs.Root
+			bind:value={() => tabSel ?? initialTab(run.access), (v) => (tabSel = v)}
+			class="gap-6"
+		>
+			<!-- meni runa: na vrhu, ostane pod glavnim menijem med drsenjem -->
+			{#if run.access.details || run.access.deaths || run.access.loot}
+				<div class="sticky top-16 z-20 -mx-4 bg-background/85 px-4 py-2 backdrop-blur">
+					<Tabs.List class="flex-wrap">
+						<Tabs.Trigger value="meter" disabled={!run.access.details}>Overview</Tabs.Trigger>
+						<Tabs.Trigger value="bosses" disabled={!run.access.details}>Bosses</Tabs.Trigger>
+						<Tabs.Trigger value="deaths" disabled={!run.access.deaths}>Autopsies</Tabs.Trigger>
+						<Tabs.Trigger value="loot" disabled={!run.access.loot}
+							>Loot{#if loot.length}&nbsp;<span class="text-xs text-muted-foreground"
+									>({loot.length})</span
+								>{/if}</Tabs.Trigger
+						>
+						{#if !run.hasReplay}<Tabs.Trigger value="timeline" disabled={!run.access.details}
+								>Timeline</Tabs.Trigger
 							>{/if}
-						{#if run.result.wipes}
-							<span class="rounded border border-destructive/40 px-2 py-0.5 text-sm text-red-300"
-								>💀 {run.result.wipes} wipe{run.result.wipes === 1 ? '' : 's'}</span
-							>
-						{/if}
-					</div>
-					<p class="text-sm text-muted-foreground">
-						{fmtWhen(run.startedAt)} · {END_REASON[run.endReason] ?? run.endReason}
-					</p>
+						{#if run.hasReplay}<Tabs.Trigger value="replay">Replay</Tabs.Trigger>{/if}
+						<Tabs.Trigger value="spells" disabled={!run.access.details}>Combat Log</Tabs.Trigger>
+					</Tabs.List>
 				</div>
-				<div class="text-right">
-					<div class="flex items-center justify-end gap-2 text-3xl font-bold tabular-nums">
-						<Clock class="size-6 text-primary/70" />
-						{fmtDuration(run.durationMs)}
+			{/if}
+
+			<!-- HEADER: polna glava na Overview, drugje ena vrstica (več prostora za vsebino zavihka) -->
+			{#if (tabSel ?? initialTab(run.access)) === 'meter' || (!run.access.details && !run.access.deaths && !run.access.loot)}
+				<Card.Root class="space-y-4 p-5">
+					<div class="flex flex-wrap items-start gap-4">
+						<div class="min-w-0 flex-1 space-y-1">
+							<div class="flex flex-wrap items-center gap-2">
+								<h1 class="page-title">{run.zone}</h1>
+								{#if badge}<span
+										class="rounded border px-2 py-0.5 text-sm font-semibold {TONE[badge.tone]}"
+										>{badge.text}</span
+									>{/if}
+								{#if run.result.wipes}
+									<span
+										class="rounded border border-destructive/40 px-2 py-0.5 text-sm text-red-300"
+										>💀 {run.result.wipes} wipe{run.result.wipes === 1 ? '' : 's'}</span
+									>
+								{/if}
+							</div>
+							<p class="text-sm text-muted-foreground">
+								{fmtWhen(run.startedAt)} · {END_REASON[run.endReason] ?? run.endReason}
+							</p>
+						</div>
+						<div class="text-right">
+							<div class="flex items-center justify-end gap-2 text-3xl font-bold tabular-nums">
+								<Clock class="size-6 text-primary/70" />
+								{fmtDuration(run.durationMs)}
+							</div>
+							<p class="text-xs text-muted-foreground italic">{durationQuip(run.durationMs)}</p>
+							{#if run.combatMs}
+								<Tip
+									as="div"
+									class="w-fit cursor-help text-xs text-muted-foreground"
+									text="DPS and HPS use this time, like Details!"
+								>
+									{fmtDuration(run.combatMs)} actually fighting
+								</Tip>
+							{/if}
+						</div>
 					</div>
-					<p class="text-xs text-muted-foreground italic">{durationQuip(run.durationMs)}</p>
-					{#if run.combatMs}
+
+					<div class="grid gap-3 text-sm sm:grid-cols-3">
+						<div class="rounded-md border border-border/50 bg-background/30 p-3">
+							<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+								<Megaphone class="size-3.5" /> Snitched by
+							</div>
+							<div class="font-semibold">{run.recordedBy.map((r) => r.name).join(', ')}</div>
+							{#if run.recordedBy.length > 1}<div class="text-xs text-muted-foreground">
+									Multiple witnesses. No alibi possible.
+								</div>{/if}
+						</div>
 						<Tip
 							as="div"
-							class="w-fit cursor-help text-xs text-muted-foreground"
-							text="DPS and HPS use this time, like Details!"
+							class="rounded-md border border-border/50 bg-background/30 p-3"
+							text={run.leader ? null : "The combat log doesn't record the group leader."}
 						>
-							{fmtDuration(run.combatMs)} actually fighting
+							<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+								<Crown class="size-3.5" /> Party leader
+							</div>
+							<div class="font-semibold">{run.leader ?? 'Unknown'}</div>
+							{#if !run.leader}<div class="text-xs text-muted-foreground">
+									The combat log refuses to name names. Coming with the addon.
+								</div>{/if}
 						</Tip>
-					{/if}
-				</div>
-			</div>
-
-			<div class="grid gap-3 text-sm sm:grid-cols-3">
-				<div class="rounded-md border border-border/50 bg-background/30 p-3">
-					<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-						<Megaphone class="size-3.5" /> Snitched by
-					</div>
-					<div class="font-semibold">{run.recordedBy.map((r) => r.name).join(', ')}</div>
-					{#if run.recordedBy.length > 1}<div class="text-xs text-muted-foreground">
-							Multiple witnesses. No alibi possible.
-						</div>{/if}
-				</div>
-				<Tip
-					as="div"
-					class="rounded-md border border-border/50 bg-background/30 p-3"
-					text={run.leader ? null : "The combat log doesn't record the group leader."}
-				>
-					<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-						<Crown class="size-3.5" /> Party leader
-					</div>
-					<div class="font-semibold">{run.leader ?? 'Unknown'}</div>
-					{#if !run.leader}<div class="text-xs text-muted-foreground">
-							The combat log refuses to name names. Coming with the addon.
-						</div>{/if}
-				</Tip>
-				<div class="rounded-md border border-border/50 bg-background/30 p-3">
-					<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-						<Skull class="size-3.5" /> Body count
-					</div>
-					{#if totalDeaths != null}
-						<div class="font-semibold">{totalDeaths} death{totalDeaths === 1 ? '' : 's'}</div>
-						<div class="text-xs text-muted-foreground">{deathQuip(totalDeaths)}</div>
-					{:else}
-						<Locked compact />
-					{/if}
-				</div>
-			</div>
-
-			<div class="flex flex-wrap gap-1.5">
-				{#each run.party as p (p.slug)}
-					{#if p.tracked}
-						<a
-							href="/c/{p.slug}"
-							class="rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-sm hover:border-primary"
-							style="color: {classColor(p.classId ?? undefined)}">{p.name}</a
-						>
-					{:else}
-						<Tip
-							class="rounded-md border border-dashed border-border/60 px-2.5 py-1 text-sm text-muted-foreground"
-							text="Not tracked on the portal. A tourist.">{p.name}</Tip
-						>
-					{/if}
-				{/each}
-			</div>
-		</Card.Root>
-
-		<!-- AWARDS -->
-		{#if run.awards?.length || run.failAwards?.length}
-			<section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-				{#each [...(run.awards ?? []), ...(run.failAwards ?? [])] as a (a.key)}
-					<Card.Root class="p-4">
-						<div class="flex items-center gap-2 font-display font-semibold text-primary">
-							<Trophy class="size-4" />
-							{a.title}
+						<div class="rounded-md border border-border/50 bg-background/30 p-3">
+							<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+								<Skull class="size-3.5" /> Body count
+							</div>
+							{#if totalDeaths != null}
+								<div class="font-semibold">{totalDeaths} death{totalDeaths === 1 ? '' : 's'}</div>
+								<div class="text-xs text-muted-foreground">{deathQuip(totalDeaths)}</div>
+							{:else}
+								<Locked compact />
+							{/if}
 						</div>
-						<div
-							class="mt-1 text-sm font-semibold"
-							style="color: {classColor(classes[a.slug] ?? undefined)}"
-						>
-							{names[a.slug] ?? a.slug}
-						</div>
-						<p class="text-xs text-muted-foreground">{a.detail}</p>
-					</Card.Root>
-				{/each}
-			</section>
-		{/if}
+					</div>
 
-		{#if !run.access.details && !run.access.deaths && !run.access.loot}
-			<Locked what="the meter, the bosses and the autopsy reports" />
-		{:else}
-			<Tabs.Root value={initialTab(run.access)}>
-				<Tabs.List class="flex-wrap">
-					<Tabs.Trigger value="meter" disabled={!run.access.details}>Overview</Tabs.Trigger>
-					<Tabs.Trigger value="bosses" disabled={!run.access.details}>Bosses</Tabs.Trigger>
-					<Tabs.Trigger value="deaths" disabled={!run.access.deaths}>Autopsies</Tabs.Trigger>
-					<Tabs.Trigger value="loot" disabled={!run.access.loot}
-						>Loot{#if loot.length}&nbsp;<span class="text-xs text-muted-foreground"
-								>({loot.length})</span
-							>{/if}</Tabs.Trigger
-					>
-					{#if !run.hasReplay}<Tabs.Trigger value="timeline" disabled={!run.access.details}
-							>Timeline</Tabs.Trigger
+					<div class="flex flex-wrap gap-1.5">
+						{#each run.party as p (p.slug)}
+							{#if p.tracked}
+								<a
+									href="/c/{p.slug}"
+									class="rounded-md border border-border/60 bg-background/40 px-2.5 py-1 text-sm hover:border-primary"
+									style="color: {classColor(p.classId ?? undefined)}">{p.name}</a
+								>
+							{:else}
+								<Tip
+									class="rounded-md border border-dashed border-border/60 px-2.5 py-1 text-sm text-muted-foreground"
+									text="Not tracked on the portal. A tourist.">{p.name}</Tip
+								>
+							{/if}
+						{/each}
+					</div>
+				</Card.Root>
+			{:else}
+				<Card.Root class="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3">
+					<h1 class="font-display text-xl font-bold text-primary">{run.zone}</h1>
+					{#if badge}<span
+							class="rounded border px-2 py-0.5 text-xs font-semibold {TONE[badge.tone]}"
+							>{badge.text}</span
 						>{/if}
-					{#if run.hasReplay}<Tabs.Trigger value="replay">Replay</Tabs.Trigger>{/if}
-					<Tabs.Trigger value="spells" disabled={!run.access.details}>Combat Log</Tabs.Trigger>
-				</Tabs.List>
+					<span class="text-sm text-muted-foreground">{fmtWhen(run.startedAt)}</span>
+					<span class="flex flex-wrap gap-x-2 text-sm">
+						{#each run.party as p (p.slug)}<span style="color: {classColor(p.classId ?? undefined)}"
+								>{p.name}</span
+							>{/each}
+					</span>
+					<span class="ml-auto font-display text-xl font-semibold tabular-nums"
+						>{fmtDuration(run.durationMs)}</span
+					>
+				</Card.Root>
+			{/if}
 
+			{#if !run.access.details && !run.access.deaths && !run.access.loot}
+				<Locked what="the meter, the bosses and the autopsy reports" />
+			{:else}
 				<!-- METER -->
 				<Tabs.Content value="meter" class="mt-4 space-y-4">
+					<!-- AWARDS (samo na Overview) -->
+					{#if run.awards?.length || run.failAwards?.length}
+						<section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+							{#each [...(run.awards ?? []), ...(run.failAwards ?? [])] as a (a.key)}
+								<Card.Root class="p-4">
+									<div class="flex items-center gap-2 font-display font-semibold text-primary">
+										<Trophy class="size-4" />
+										{a.title}
+									</div>
+									<div
+										class="mt-1 text-sm font-semibold"
+										style="color: {classColor(classes[a.slug] ?? undefined)}"
+									>
+										{names[a.slug] ?? a.slug}
+									</div>
+									<p class="text-xs text-muted-foreground">{a.detail}</p>
+								</Card.Root>
+							{/each}
+						</section>
+					{/if}
+
 					{#if players.length}
 						<Card.Root class="overflow-x-auto">
 							<Table.Root class="w-full min-w-[760px] text-sm">
@@ -762,10 +793,10 @@
 															? `${r.spell}${r.unit ? ` ${RECORD_LABEL[kind].prep} ${r.unit}` : ''} · at ${fmtDuration(r.atMs)}`
 															: null}
 													>
-													{#if r}{fmtNum(r.amount)}
-														<span class="block text-xs text-muted-foreground">{r.spell}</span>
-													{:else}<span class="text-muted-foreground">—</span>{/if}
-												</Tip>
+														{#if r}{fmtNum(r.amount)}
+															<span class="block text-xs text-muted-foreground">{r.spell}</span>
+														{:else}<span class="text-muted-foreground">—</span>{/if}
+													</Tip>
 												</Table.Cell>
 											{/each}
 										</Table.Row>
@@ -1496,7 +1527,7 @@
 						</div>
 					{/if}
 				</Tabs.Content>
-			</Tabs.Root>
-		{/if}
+			{/if}
+		</Tabs.Root>
 	{/if}
 </div>

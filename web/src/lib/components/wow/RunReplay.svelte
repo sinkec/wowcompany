@@ -540,7 +540,7 @@
 {:else}
 	<div class="grid gap-4 lg:grid-cols-[1fr_20rem]">
 		<!-- zemljevid -->
-		<Card.Root class="p-5 relative isolate overflow-hidden !p-0">
+		<Card.Root class="relative isolate overflow-hidden !p-0 p-5">
 			{#if artOk}
 				<img
 					src={dungeonTile(zone)}
@@ -605,7 +605,7 @@
 			</div>
 			<svg
 				viewBox="{view.x} {view.y} {view.w} {view.h}"
-				class="aspect-[4/3] w-full"
+				class="aspect-[4/3] max-h-[58vh] w-full"
 				role="img"
 				aria-label="Party positions on the dungeon map"
 			>
@@ -802,7 +802,7 @@
 					type="single"
 					min={0}
 					max={durationMs}
-					step={500}
+					step={1}
 					bind:value={t}
 					aria-label="Replay time"
 				/>
@@ -837,7 +837,7 @@
 
 		<!-- analitika v trenutku t -->
 		<aside class="space-y-4">
-			<Card.Root class="p-5 space-y-2">
+			<Card.Root class="space-y-2 p-5">
 				<div class="eyebrow">At {clock(t)} · damage per second</div>
 				{#each stats as s (s.slug)}
 					{@const c = classColor(classes[s.slug] ?? undefined)}
@@ -861,7 +861,7 @@
 					</div>
 				{/each}
 			</Card.Root>
-			<Card.Root class="p-5 space-y-1.5">
+			<Card.Root class="space-y-1.5 p-5">
 				<div class="eyebrow">What just happened</div>
 				{#each events as e, i (i)}
 					<button
@@ -888,7 +888,7 @@
 
 	<!-- grafi skozi čas, povezani s trakom: kazalec teče s predvajanjem, vlečenje po grafu premakne replay -->
 	{#if timeline}
-		<Card.Root class="p-5 mt-4 space-y-2">
+		<Card.Root class="mt-4 space-y-2 p-5">
 			<div class="flex flex-wrap items-baseline justify-between gap-2">
 				<h3 class="card-title">Over time</h3>
 				<span class="text-xs text-muted-foreground">drag across a chart to scrub the replay</span>
