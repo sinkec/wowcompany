@@ -18,6 +18,8 @@ import { parsesEmbed } from './lib/discordRuns.js';
 import { loadHeroLogs } from './lib/parsesDb.js';
 import { getSettings } from './lib/settings.js';
 import type { DiscordConfig } from './lib/discordConfig.js';
+import { eventsListEmbed } from './lib/calendar.js';
+import { siteBrand } from './site.js';
 
 const EPHEMERAL = 64;
 const reply = (data: Record<string, unknown>) => ({
@@ -47,6 +49,49 @@ export const respond = internalQuery({
 		const fields = (await getSettings(ctx)).discordFields;
 		const site = process.env.SITE_URL;
 		const list = await activeSummaries(ctx);
+
+		if (command === 'events') {
+			const now = Date.now();
+			const rows = await ctx.db
+				.query('calendarEvents')
+				.withIndex('by_startAt', (q) => q.gte('startAt', now - 40 * 24 * 3600 * 1000))
+				.take(300);
+			const ours = fields.includes('calendar');
+			const next = rows
+				.filter((e) => e.endAt >= now && e.startAt < now + 30 * 24 * 3600 * 1000)
+				.filter((e) => e.source === 'game' || ours)
+				.sort((a, b) => a.startAt - b.startAt);
+			const list = [
+				...next.filter((e) => e.source === 'company').slice(0, 8),
+				...next.filter((e) => e.source === 'game').slice(0, 6)
+			].map((e) => ({ ...e, id: e._id, going: e.going ?? [] }));
+			return reply({ embeds: [eventsListEmbed(list, await siteBrand(ctx), site)] });
+		}
+
+		if (command === 'news') {
+			const rows = await ctx.db
+				.query('news')
+				.withIndex('by_hidden_and_publishedAt', (q) => q.eq('hidden', false))
+				.order('desc')
+				.take(5);
+			return reply({
+				embeds: [
+					{
+						title: '📰 Latest news',
+						...(site ? { url: site } : {}),
+						color: 0xffd100,
+						description:
+							rows
+								.map(
+									(n) =>
+										`**${n.url ? `[${n.title}](${n.url})` : n.title}** · <t:${Math.floor(n.publishedAt / 1000)}:R>\n${n.summary.slice(0, 160)}`
+								)
+								.join('\n\n') || 'No news. Azeroth is suspiciously quiet.',
+						footer: { text: `${await siteBrand(ctx)} · news` }
+					}
+				]
+			});
+		}
 
 		if (command === 'roster') return reply({ embeds: [rosterEmbed(list, fields, site)] });
 

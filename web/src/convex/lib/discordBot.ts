@@ -378,6 +378,8 @@ export function leaderboardEmbed(
 
 /** Definicije ukazov za registracijo pri Discordu. */
 export const COMMANDS = [
+	{ name: 'events', description: 'What is coming up: our events and in-game holidays', type: 1 },
+	{ name: 'news', description: 'The latest WoW Forever and company news', type: 1 },
 	{ name: 'roster', description: 'Everyone in the company, ranked and judged', type: 1 },
 	{
 		name: 'hero',

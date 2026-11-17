@@ -10,6 +10,7 @@ import { runEmbed, type RunPost } from './lib/discordRuns.js';
 import { runStandings } from './lib/parsesDb.js';
 import { getSettings } from './lib/settings.js';
 import type { DiscordConfig } from './lib/discordConfig.js';
+import { sendWebhook } from './lib/discordWebhook.js';
 
 const MAX_AGE_MS = 6 * 3600 * 1000; // starejših dogodkov ne objavljamo (npr. po izpadu)
 
@@ -48,24 +49,6 @@ export const markPosted = internalMutation({
 		for (const id of ids) await ctx.db.patch(id, { postedAt: now });
 	}
 });
-
-async function sendWebhook(
-	url: string | null,
-	body: object
-): Promise<{ ok: boolean; retryAfter?: number; error?: string }> {
-	if (!url) return { ok: false, error: 'No webhook configured. Set one in Office → Portal Room.' };
-	const res = await fetch(`${url}?wait=true`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ username: 'Tavern Gossip', allowed_mentions: { parse: [] }, ...body })
-	});
-	if (res.ok) return { ok: true };
-	if (res.status === 429) {
-		const j = (await res.json().catch(() => ({}))) as { retry_after?: number };
-		return { ok: false, retryAfter: j.retry_after ?? 5 };
-	}
-	return { ok: false, error: `${res.status} ${await res.text()}` };
-}
 
 /** Objavi vse neobjavljene dogodke (do 10 embedov na sporočilo). */
 export const postPending = internalAction({

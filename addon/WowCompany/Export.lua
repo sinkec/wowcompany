@@ -5,6 +5,7 @@
 --   v1|RUN|<instance id>|<start epoch s>|<end epoch s or 0>|<zone>|<leader or empty>
 --   v1|CHAR|<name>|<level>|<class>|<crit %>|<attack power>|<armor>|<item level>|<epoch s>
 --   v1|LOOT|<epoch s>|<item id>|<quality 0-6 or empty>|<count>|<item name>
+--   v1|CALWIN|… and v1|CAL|… – the in-game calendar's holidays (Calendar.lua)
 -- LOOT carries no looter: the chat log (read by the Companion) already says who took what, but
 -- without the item's quality and id. The app matches the two by item name and time.
 -- Privacy: the only other player ever named here is the leader of YOUR party.
@@ -120,6 +121,9 @@ function Export.Rebuild()
             "v1", "ITEM", tostring(id), num(it.ilvl), num(it.reqLevel), clean(it.slot), clean(it.kind),
             clean(it.subkind), num(it.sell), clean(it.bind), table.concat(it.lines or {}, "~"),
         }, "|"))
+    end
+    if ns.Calendar then
+        for _, l in ipairs(ns.Calendar.Lines()) do table.insert(lines, l) end
     end
     local char = charLine()
     if char then table.insert(lines, char) end

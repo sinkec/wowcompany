@@ -7,6 +7,26 @@
 | [ADDON.md](ADDON.md) | addon `WowCompany`: §1 stanje, §4.1 dejstva o Forever API-ju |
 | [STATS.md](STATS.md) | v0.3: statistika po vzoru Warcraft Logs + Details!, Company Parses, sezone, preureditev repozitorija |
 
+## Novo 17. 11. 2026 (zvečer)
+
+- **Meni po kategorijah:** Home (landing: hero, *Coming up* + zadnji runi, novice) · Company ▾ (**/heroes** roster +
+  Tavern Gossip, **/leaderboards** lestvice + sestava) · Dungeons ▾ (/runs, /rankings) · **/calendar**.
+  Komponente: `lib/components/layout/MainNav.svelte`, `Brand.svelte`.
+- **Ime ekipe:** Office → Website → Home page → *Company name* (`siteContent.teamName`, `site.saveTeamName`); glava
+  pokaže ime nad "WowCompany", naslov zavihka in Discord noge `brandName()` (`lib/siteContent.ts`).
+- **Koledar** (`convex/calendar.ts`, `lib/calendar.ts`, tabela `calendarEvents`): naši dogodki (Office → Website →
+  Events: nov/uredi/briši, kljukica *Discord* = objava ob shranjevanju + opomnik uro prej prek scheduler), člani
+  "I'm in"/"I'm out" z glavnim junakom; **prazniki iz igre**: addon 0.6.8 `Calendar.lua` bere `C_Calendar`
+  (samo HOLIDAY/SYSTEM, nikoli igralčevih/guildovih dogodkov), realm čas → UTC; vrstice `v1|CALWIN|` + `v1|CAL|`;
+  Companion 0.1.20 pošlje `POST /companion/calendar` (samo ob spremembi, `calendar-sent.json`). Vidnost: polje
+  `calendar` (splet za tujce + Discord; prazniki so vedno javni).
+- **Discord:** `/events` (naši + prazniki), `/news`; po deployu v Office → Discord → Slash commands **Register
+  commands**. Na prod je `discordFields` shranjen → polje *Calendar* v Discord → Posts vklopi ročno.
+- **Grafi = Chart.js** (`lib/chart.ts` barve iz teme, `ChartCanvas.svelte` ovoj): napredek junaka (stopnice +
+  preliv), časovnica runa/replay (na sekundo, 30 s povprečje, barve razredov ali stalna paleta, boss boji osenčeni,
+  kazalec replaya z zatemnjeno prihodnostjo, vlečenje = premik, legenda = vsote do kazalca, klik skrije junaka).
+- **Skupno:** `lib/errors.ts` (`errText`, `attempt`) namesto kopij po straneh; hero stran bere `?tab=`.
+
 ## ZAČNI TUKAJ – stanje 16. 11. 2026 (dopoldne)
 
 **Narejeno danes (commiti na `main`, še ne nujno pushani – preveri `git status`):**

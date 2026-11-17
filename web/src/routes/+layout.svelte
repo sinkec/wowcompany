@@ -3,37 +3,14 @@
 	import { createSvelteAuthClient } from '@mmailaender/convex-better-auth-svelte/svelte';
 	import { authClient } from '#lib/auth-client.js';
 	import { Toaster } from '#lib/components/ui/sonner/index.js';
-	import { page } from '$app/state';
-	import Swords from '@lucide/svelte/icons/swords';
-	import Trophy from '@lucide/svelte/icons/trophy';
-	import Users from '@lucide/svelte/icons/users';
-	import Archive from '@lucide/svelte/icons/archive';
 	import { useQuery } from 'convex-svelte';
 	import { api } from '#convex/_generated/api.js';
 	import UserMenu from '#lib/components/wow/UserMenu.svelte';
 	import SocialLinks from '#lib/components/wow/SocialLinks.svelte';
+	import MainNav from '#lib/components/layout/MainNav.svelte';
+	import Brand from '#lib/components/layout/Brand.svelte';
+	import { brandName } from '#convex/lib/siteContent.js';
 	import { GITHUB_URL } from '#lib/site.js';
-
-	const NAV = [
-		{
-			href: '/',
-			label: 'Heroes',
-			icon: Users,
-			match: (p: string) => p === '/' || p.startsWith('/c/')
-		},
-		{
-			href: '/runs',
-			label: 'Dungeon Runs',
-			icon: Swords,
-			match: (p: string) => p.startsWith('/runs')
-		},
-		{
-			href: '/rankings',
-			label: 'Rankings',
-			icon: Trophy,
-			match: (p: string) => p.startsWith('/rankings')
-		}
-	];
 	import type { LayoutProps } from './$types';
 
 	let { children, data }: LayoutProps = $props();
@@ -43,26 +20,15 @@
 	// Arhiv starih realmov: povezava samo za člane, ko arhiv obstaja
 	const archives = useQuery(api.realms.list, { now: Date.now() });
 	const site = useQuery(api.site.home, {});
-	const nav = $derived(
-		archives.data?.length
-			? [
-					...NAV,
-					{
-						href: '/archive',
-						label: 'Archive',
-						icon: Archive,
-						match: (p: string) => p.startsWith('/archive')
-					}
-				]
-			: NAV
-	);
+	const team = $derived(site.data?.teamName || null);
+	const brand = $derived(brandName(team));
 </script>
 
 <svelte:head>
 	<link rel="icon" href="/favicon.ico" sizes="48x48" />
 	<link rel="icon" href="/icon.svg" type="image/svg+xml" />
 	<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-	<title>WowCompany — Heroes, Loot & Corpse Runs</title>
+	<title>{brand} — Heroes, Loot & Corpse Runs</title>
 	<meta
 		name="description"
 		content="Tracking our WoW Forever heroes: levels, loot and spectacular deaths."
@@ -71,31 +37,8 @@
 
 <header class="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
 	<div class="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4">
-		<a
-			href="/"
-			class="mr-2 flex shrink-0 items-center gap-2 font-display text-lg font-bold text-primary sm:mr-4"
-		>
-			<img src="/icon.svg" alt="" class="size-8" />
-			<span class="hidden sm:inline">WowCompany</span>
-		</a>
-
-		<nav class="flex items-center gap-1" aria-label="Main">
-			{#each nav as item (item.href)}
-				{@const active = item.match(page.url.pathname)}
-				<a
-					href={item.href}
-					aria-current={active ? 'page' : undefined}
-					class="relative inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors sm:px-4 {active
-						? 'bg-accent/70 text-foreground'
-						: 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'}"
-				>
-					<item.icon class="size-4 {active ? 'text-primary' : ''}" />
-					<span class="hidden md:inline">{item.label}</span>
-					{#if active}<span class="absolute inset-x-3 -bottom-[13px] h-0.5 rounded bg-primary"
-						></span>{/if}
-				</a>
-			{/each}
-		</nav>
+		<Brand {team} />
+		<MainNav archive={!!archives.data?.length} />
 
 		<div class="ml-auto flex items-center gap-1.5">
 			<a
@@ -128,7 +71,7 @@
 		</div>
 	{/if}
 	<p class="mb-1 font-display text-muted-foreground">
-		WowCompany · WoW Forever · EU · est. by people who should be sleeping
+		{brand} · WoW Forever · est. by people who should be sleeping
 	</p>
 	<p>
 		Non-commercial fan project for a bunch of friends. Not affiliated with Blizzard Entertainment.

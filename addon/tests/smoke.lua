@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.6.7" end,
+    GetAddOnMetadata = function() return "0.6.8" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -246,6 +246,29 @@ C_DamageMeter = {
             { sessionID = 3, name = "" },
         }
     end,
+}
+
+
+-- the in-game calendar: realm time is UTC+1, one holiday that spans days (seen on several days)
+local function calTime(epoch)
+    local t = os.date("!*t", epoch + 3600)
+    return { year = t.year, month = t.month, monthDay = t.day, hour = t.hour, minute = t.min }
+end
+C_DateAndTime = { GetCurrentCalendarTime = function() return calTime(GetServerTime()) end }
+local faireStart = 1794700800 -- 2026-11-15 00:00 UTC
+C_Calendar = {
+    OpenCalendar = function() end,
+    SetAbsMonth = function() end,
+    GetMonthInfo = function(offset)
+        return offset == 0 and { year = 2026, month = 11, numDays = 30 } or { year = 2026, month = 12, numDays = 31 }
+    end,
+    GetNumDayEvents = function(offset, day) return (offset == 0 and day >= 15 and day <= 17) and 2 or 0 end,
+    GetDayEvent = function(_, _, i)
+        if i == 2 then return { calendarType = "GUILD_EVENT", title = "Secret guild raid", startTime = calTime(faireStart) } end
+        return { calendarType = "HOLIDAY", title = "Darkmoon Faire",
+            startTime = calTime(faireStart), endTime = calTime(faireStart + 3 * 86400) }
+    end,
+    GetHolidayInfo = function() return { description = "Games|n and prizes" } end,
 }
 
 -- ------------------------------------------------------------------ load the addon like the game does
@@ -462,7 +485,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.6%.7|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.6%.8|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -804,6 +827,20 @@ check(tabs() == 0, "chat tab: stays away after chat off")
 slash("chat on")
 check(tabs() == 1, "/wowco chat on brings it back")
 slash("log off")
+
+
+-- ------------------------------------------------------------------ in-game calendar
+check(ns.Calendar.Days(1970, 1, 1) == 0 and ns.Calendar.Days(2026, 11, 15) * 86400 == faireStart,
+    "calendar: dates to epoch days")
+fire("CALENDAR_UPDATE_EVENT_LIST")
+local cal = WowCompanyDB.calendar
+check(cal and #cal.events == 1 and cal.events[1].startAt == faireStart
+    and cal.events[1].endAt == faireStart + 3 * 86400,
+    "calendar: one holiday from three days, realm time turned into UTC")
+check(cal and cal.from == 1793491200 - 3600, "calendar: window starts on the 1st of the month, realm time")
+local calLines = table.concat(WowCompanyDB.export, "\n")
+check(string.find(calLines, "v1|CAL|" .. faireStart .. "|", 1, true) and not string.find(calLines, "Secret guild"),
+    "calendar: exported, guild events never")
 
 realPrint(failures == 0 and "all addon checks passed" or (failures .. " addon check(s) FAILED"))
 os.exit(failures == 0 and 0 or 1)

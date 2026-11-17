@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { errText } from '#lib/errors.js';
 	// "My devices" – povezane Companion aplikacije (uporablja /link in /settings).
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
@@ -17,7 +18,7 @@
 			await client.mutation(api.companion.revokeDevice, { deviceId });
 			toast.success(`${name} revoked`, { description: 'Exiled. Hearthstone confiscated.' });
 		} catch (e) {
-			toast.error((e as Error).message);
+			toast.error(errText(e));
 		}
 	}
 </script>

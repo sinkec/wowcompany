@@ -273,6 +273,9 @@ pub struct Core {
     pub runs_version: AtomicU64,
     /// `at` of the last addon diagnostics report sent to the portal (saved in `diag-sent`).
     diag_sent: Mutex<i64>,
+    /// The last calendar body sent to the portal (saved in `calendar-sent.json`): sent again only
+    /// when the addon read something different.
+    calendar_sent: Mutex<String>,
     /// Bumped to cancel a running link poller.
     link_gen: AtomicU64,
     wake_uploader: AtomicBool,
@@ -309,6 +312,9 @@ impl Core {
                     .ok()
                     .and_then(|s| s.trim().parse().ok())
                     .unwrap_or(0),
+            ),
+            calendar_sent: Mutex::new(
+                std::fs::read_to_string(config_dir.join("calendar-sent.json")).unwrap_or_default(),
             ),
             link_gen: AtomicU64::new(0),
             wake_uploader: AtomicBool::new(false),
@@ -811,6 +817,21 @@ impl Core {
                         let _ = std::fs::write(self.config_dir.join("diag-sent"), d.at.to_string());
                     }
                     Upload::Retry { .. } | Upload::Unauthorized(_) => {}
+                }
+            }
+
+            // in-game calendar (holidays): only when the addon read something new
+            let cal = self.addon.lock().expect("addon lock").export.calendar.clone();
+            if let Some(cal) = cal.filter(|c| c.to > c.from) {
+                let body = serde_json::to_string(&cal).unwrap_or_default();
+                if *self.calendar_sent.lock().expect("calendar lock") != body {
+                    match api.upload_calendar(&token, &body) {
+                        Upload::Ok { .. } | Upload::Rejected(_) => {
+                            let _ = std::fs::write(self.config_dir.join("calendar-sent.json"), &body);
+                            *self.calendar_sent.lock().expect("calendar lock") = body;
+                        }
+                        Upload::Retry { .. } | Upload::Unauthorized(_) => {}
+                    }
                 }
             }
 

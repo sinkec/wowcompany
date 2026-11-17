@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { errText } from '#lib/errors.js';
 	import { page } from '$app/state';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { useAuth } from '@mmailaender/convex-better-auth-svelte/svelte';
@@ -39,7 +40,7 @@
 			else
 				toast('Link denied', { description: 'Whoever that was, they can go back to the Barrens.' });
 		} catch (e) {
-			toast.error((e as Error).message.replace(/^.*ConvexError:\s*/, '').replace(/\s+at .*$/s, ''));
+			toast.error(errText(e));
 		} finally {
 			busy = false;
 		}

@@ -121,3 +121,14 @@ export function fillLine(line: string, speaker: number, names: string[]) {
 		.replace(/\{me\}/g, names[speaker] ?? '')
 		.replace(/\{([123])\}/g, (_, n) => names[Number(n) - 1] ?? '');
 }
+
+export const MAX_TEAM = 32;
+/** Ime ekipe (Guild Master): presledki stisnjeni, brez "WowCompany" na koncu (ta se doda sam). */
+export const cleanTeamName = (s: string) =>
+	s
+		.replace(/\s+/g, ' ')
+		.replace(/\s*wow\s*company\s*$/i, '')
+		.trim()
+		.slice(0, MAX_TEAM);
+/** Polno ime strani: "Ajmer Central WowCompany" ali samo "WowCompany". */
+export const brandName = (team?: string | null) => (team ? `${team} WowCompany` : 'WowCompany');

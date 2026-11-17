@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { errText } from '#lib/errors.js';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { useAuth } from '@mmailaender/convex-better-auth-svelte/svelte';
 	import { toast } from 'svelte-sonner';
@@ -44,7 +45,7 @@
 				name = '';
 			} else error = r.error;
 		} catch (err) {
-			error = (err as Error).message;
+			error = errText(err);
 		} finally {
 			busy = false;
 		}
@@ -63,8 +64,8 @@
 	<section class="space-y-2">
 		<h1 class="page-title">Petition the Guild Master</h1>
 		<p class="page-lead">
-			Want your hero tracked, judged and publicly shamed? Tell us who you are. The Guild Master will review your petition
-			while pretending to be busy.
+			Want your hero tracked, judged and publicly shamed? Tell us who you are. The Guild Master will
+			review your petition while pretending to be busy.
 		</p>
 	</section>
 
@@ -74,13 +75,16 @@
 		<div class="wow-frame flex flex-col items-center gap-4 rounded-lg p-10 text-center">
 			<ScrollText class="size-10 text-primary/70" />
 			<p>Sign in first. We need to know who to blame.</p>
-			<Button onclick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/join' })}>Sign in with Google</Button>
+			<Button onclick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/join' })}
+				>Sign in with Google</Button
+			>
 		</div>
 	{:else}
 		{#if mine.data?.role}
 			<p class="rounded-md border border-primary/40 bg-primary/10 p-3 text-sm">
-				You're already in ({mine.data.role === 'admin' ? 'Guild Master, obviously' : 'vouched member'}). Got alts? Add them
-				too, we don't judge. (We do.)
+				You're already in ({mine.data.role === 'admin'
+					? 'Guild Master, obviously'
+					: 'vouched member'}). Got alts? Add them too, we don't judge. (We do.)
 			</p>
 		{/if}
 
@@ -98,7 +102,9 @@
 					onblur={() => setTimeout(() => (focused = false), 150)}
 				/>
 				{#if focused && suggestions.length}
-					<ul class="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-border bg-popover shadow-lg">
+					<ul
+						class="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-border bg-popover shadow-lg"
+					>
 						{#each suggestions as m (m.slug)}
 							<li>
 								<button
@@ -115,7 +121,8 @@
 				{/if}
 			</div>
 			<p class="text-xs text-muted-foreground">
-				Exactly as in game. Must be level 10+ and logged out at least once, or Blizzard pretends you don't exist.
+				Exactly as in game. Must be level 10+ and logged out at least once, or Blizzard pretends you
+				don't exist.
 			</p>
 			{#if error}<p class="text-sm text-destructive">{error}</p>{/if}
 			<Button type="submit" disabled={busy || name.trim().length < 3}>
@@ -132,14 +139,21 @@
 					{#each mine.data.claims as c (c.id)}
 						<li class="wow-frame flex items-center justify-between gap-3 rounded-lg p-3">
 							<div class="min-w-0">
-								<div class="truncate font-semibold" style="color: {classColor(c.preview.classId)}">{c.name}</div>
+								<div class="truncate font-semibold" style="color: {classColor(c.preview.classId)}">
+									{c.name}
+								</div>
 								<div class="text-xs text-muted-foreground">
-									Level {c.preview.level} {c.preview.race} {c.preview.className} · sent {ago(c.createdAt)}
+									Level {c.preview.level}
+									{c.preview.race}
+									{c.preview.className} · sent {ago(c.createdAt)}
 								</div>
 							</div>
 							<div class="flex shrink-0 items-center gap-2">
 								<Badge variant={STATUS[c.status].variant}>{STATUS[c.status].label}</Badge>
-								{#if c.status === 'accepted'}<a href="/c/{c.slug}" class="text-sm text-primary hover:underline">view</a>{/if}
+								{#if c.status === 'accepted'}<a
+										href="/c/{c.slug}"
+										class="text-sm text-primary hover:underline">view</a
+									>{/if}
 							</div>
 						</li>
 					{/each}

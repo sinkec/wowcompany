@@ -143,7 +143,8 @@ export const FIELD_LABELS: Record<string, string> = {
 	runs: 'Dungeon runs list (dungeon, party, duration, who snitched)',
 	runDetails: 'Dungeon run meter (damage, healing, bosses, spells, awards)',
 	runDeaths: 'Dungeon run deaths (counts + last 10 hits before the floor)',
-	runLoot: 'Dungeon run loot (who grabbed what)'
+	runLoot: 'Dungeon run loot (who grabbed what)',
+	calendar: 'Company events on the calendar (and who is coming)'
 };
 
 /** Začetek 7-dnevnega okna, zaokrožen na uro (stabilni argumenti -> Convex lahko predpomni poizvedbo). */

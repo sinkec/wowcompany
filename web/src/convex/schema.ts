@@ -367,13 +367,43 @@ export default defineSchema({
 		players: v.array(bossDetailPlayer)
 	}).index('by_run_and_index', ['runId', 'index']),
 
+	// Koledar (lib/calendar.ts): prazniki iz igre (addon C_Calendar → Companion) in naši dogodki
+	// (Guild Master). `going` = kdo pride (član + njegov glavni junak ob prijavi).
+	calendarEvents: defineTable({
+		source: v.union(v.literal('game'), v.literal('company')),
+		key: v.string(),
+		title: v.string(),
+		description: v.string(),
+		kind: v.string(),
+		startAt: v.number(),
+		endAt: v.number(),
+		location: v.optional(v.string()),
+		createdBy: v.optional(v.string()),
+		going: v.optional(
+			v.array(v.object({ userId: v.string(), name: v.string(), slug: v.optional(v.string()) }))
+		),
+		/** naš dogodek: objavi v Discord (ob shranjevanju) + opomnik uro prej */
+		discord: v.optional(v.boolean()),
+		announcedAt: v.optional(v.number()),
+		remindedAt: v.optional(v.number()),
+		reminderJob: v.optional(v.id('_scheduled_functions')),
+		updatedAt: v.number()
+	})
+		.index('by_key', ['key'])
+		.index('by_startAt', ['startAt'])
+		.index('by_source_and_startAt', ['source', 'startAt']),
+
 	// Vsebina naslovnice (lib/siteContent.ts): šale junakov in povezave na skupnost. Svoj dokument,
 	// da settings (bere ga skoraj vsaka poizvedba) ostane majhen.
 	siteContent: defineTable({
 		key: v.literal('main'),
 		quips: v.array(v.string()),
 		convos: v.array(v.array(v.string())),
-		socials: v.array(v.object({ kind: v.string(), url: v.string(), label: v.optional(v.string()) }))
+		socials: v.array(
+			v.object({ kind: v.string(), url: v.string(), label: v.optional(v.string()) })
+		),
+		/** ime ekipe pred "WowCompany" v glavi strani (npr. "Ajmer Central") */
+		teamName: v.optional(v.string())
 	}).index('by_key', ['key']),
 
 	// Diagnostika addona (opt-in v addonu, pošlje Companion): tehnično poročilo brez imen, za razvoj.

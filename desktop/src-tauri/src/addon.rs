@@ -72,6 +72,30 @@ pub struct AddonExport {
     /// Item details by item id (`v1|ITEM|…`).
     #[serde(skip)]
     pub items: std::collections::BTreeMap<u32, wowrun::summary::ItemDetail>,
+    /// The in-game calendar's holidays (`v1|CALWIN|…`, `v1|CAL|…`), for the portal's calendar.
+    #[serde(skip)]
+    pub calendar: Option<AddonCalendar>,
+}
+
+/// Holidays and system notices of this month and the next (never player or guild events).
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddonCalendar {
+    /// Window the addon read (UTC ms): events in it that are missing here were cancelled.
+    pub from: i64,
+    pub to: i64,
+    pub events: Vec<AddonCalEvent>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddonCalEvent {
+    pub start_at: i64,
+    pub end_at: i64,
+    /// `holiday` or `system`
+    pub kind: String,
+    pub title: String,
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -201,6 +225,29 @@ pub fn parse_export(text: &str) -> AddonExport {
                     },
                 );
             }
+            Some("CALWIN") if f.len() >= 4 => {
+                if let (Some(from), Some(to)) = (secs_to_ms(f[2]), secs_to_ms(f[3])) {
+                    out.calendar.get_or_insert_with(Default::default).from = from;
+                    out.calendar.get_or_insert_with(Default::default).to = to;
+                }
+            }
+            Some("CAL") if f.len() >= 7 => {
+                let Some(start_at) = secs_to_ms(f[2]) else { continue };
+                let kind = f[4].trim();
+                if kind != "holiday" && kind != "system" {
+                    continue;
+                }
+                let cal = out.calendar.get_or_insert_with(Default::default);
+                if cal.events.len() < 200 {
+                    cal.events.push(AddonCalEvent {
+                        start_at,
+                        end_at: secs_to_ms(f[3]).unwrap_or(start_at),
+                        kind: kind.to_string(),
+                        title: f[5].trim().chars().take(80).collect(),
+                        description: f[6..].join(" ").trim().chars().take(600).collect(),
+                    });
+                }
+            }
             Some("CHAR") if f.len() >= 10 => out.chars.push(AddonChar {
                 name: f[2].trim().to_string(),
                 level: f[3].trim().parse().unwrap_or(0),
@@ -318,6 +365,7 @@ const BUNDLED: &[(&str, &str)] = &[
     ("Logging.lua", include_str!("../../../addon/WowCompany/Logging.lua")),
     ("Meter.lua", include_str!("../../../addon/WowCompany/Meter.lua")),
     ("Export.lua", include_str!("../../../addon/WowCompany/Export.lua")),
+    ("Calendar.lua", include_str!("../../../addon/WowCompany/Calendar.lua")),
     ("Summary.lua", include_str!("../../../addon/WowCompany/Summary.lua")),
     ("Window.lua", include_str!("../../../addon/WowCompany/Window.lua")),
     ("Options.lua", include_str!("../../../addon/WowCompany/Options.lua")),
@@ -691,9 +739,17 @@ WowCompanyDB = {
         let sv = r#"WowCompanyDB = {
 ["export"] = {
 "v1|ITEM|2084|30|25|Two-Hand|Weapon|Two-Handed Swords|7137|Binds when equipped|Binds when equipped~24 - 36 Damage  Speed 3.20~+8 Strength",
+"v1|CALWIN|1793487600|1798758000",
+"v1|CAL|1794700800|1794960000|holiday|Darkmoon Faire|Games and prizes",
+"v1|CAL|1794700800|1794700800|player|Secret raid|",
 },
 }"#;
         let e = parse_export(sv);
+        let cal = e.calendar.as_ref().expect("calendar");
+        assert_eq!((cal.from, cal.to), (1_793_487_600_000, 1_798_758_000_000));
+        assert_eq!(cal.events.len(), 1, "player events are never taken");
+        assert_eq!(cal.events[0].title, "Darkmoon Faire");
+        assert_eq!(cal.events[0].end_at, 1_794_960_000_000);
         let it = e.items.get(&2084).expect("item");
         assert_eq!(it.ilvl, Some(30));
         assert_eq!(it.slot.as_deref(), Some("Two-Hand"));

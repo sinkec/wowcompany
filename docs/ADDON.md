@@ -356,3 +356,11 @@ Addon: `luac -p` na vseh `.lua` (sintaksa) – delovanja v igri lokalno ni mogo�
 - Seja "Overall" traja od prijave (npr. ~6,5 h) → `amountPerSecond` je tam razredčen, ni DPS boja.
 - `CHAT_MSG_LOOT` ima povezavo predmeta (itemId, barva kakovosti `nIQ2`).
 - Izven skupine `UnitIsGroupLeader` vrže napako (pcall).
+
+### 4.5 Koledar iz igre (addon 0.6.8, 17. 11. 2026)
+
+`Calendar.lua`: ob `PLAYER_ENTERING_WORLD` `C_Calendar.OpenCalendar()`, ob `CALENDAR_UPDATE_EVENT_LIST` (največ na
+10 min) in ob odjavi prebere ta in naslednji mesec (`SetAbsMonth` na današnji mesec – ne, če je odprto okno koledarja).
+Vzame samo `calendarType` HOLIDAY in SYSTEM; opis praznika iz `GetHolidayInfo`. Časi v koledarju so realm čas:
+odmik = `GetCurrentCalendarTime()` (kot UTC) − `GetServerTime()`, zaokrožen na 15 min. **Nepreverjeno v igri:** ali
+Forever vrača praznike in ali `endTime` pri večdnevnem prazniku res pomeni konec praznika.

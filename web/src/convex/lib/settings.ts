@@ -54,11 +54,15 @@ export const DEFAULT_SETTINGS = {
 /** Dungeon Runs (Companion): seznam, analiza, smrti. Samo splet – Discord objave runov pridejo v C7. */
 export const RUN_FIELDS = ['runs', 'runDetails', 'runDeaths', 'runLoot'];
 
+/** Koledar: naši dogodki in kdo pride (prazniki iz igre so vedno javni). */
+export const EVENT_FIELDS = ['calendar'];
+
 /** Vsa polja, ki jih lahko admin vklopi (splet ali Discord). */
 export const ALL_FIELDS = [
 	...ALL_SUMMARY_FIELDS,
 	...DETAIL_SECTIONS.filter((f) => !ALL_SUMMARY_FIELDS.includes(f)),
-	...RUN_FIELDS
+	...RUN_FIELDS,
+	...EVENT_FIELDS
 ];
 
 export async function getSettings(ctx: QueryCtx) {

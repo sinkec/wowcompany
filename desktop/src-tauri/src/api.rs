@@ -174,6 +174,11 @@ impl Api {
         self.upload_records_like("/companion/diagnostics", token, json)
     }
 
+    /// In-game calendar holidays (`POST /companion/calendar`). `Ok` carries no data.
+    pub fn upload_calendar(&self, token: &str, json: &str) -> Upload {
+        self.upload_records_like("/companion/calendar", token, json)
+    }
+
     /// Personal records of the log owner (`POST /companion/records`). `Ok` carries no data.
     pub fn upload_records(&self, token: &str, json: &str) -> Upload {
         self.upload_records_like("/companion/records", token, json)

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { errText } from '#lib/errors.js';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { useConvexClient, useQuery } from 'convex-svelte';
@@ -102,11 +103,7 @@
 	}
 
 	// ---------------- characters
-	const msg = (e: unknown) =>
-		(e as Error).message
-			.replace(/^.*ConvexError:\s*/, '')
-			.replace(/\s+at .*$/s, '')
-			.replace(/^Uncaught Error:\s*/, '');
+	const msg = errText;
 	async function setMain(id: Id<'players'>, name: string) {
 		try {
 			await client.mutation(api.profile.setMain, { playerId: id });

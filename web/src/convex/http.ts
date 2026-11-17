@@ -3,7 +3,14 @@ import nacl from 'tweetnacl';
 import { internal } from './_generated/api.js';
 import { httpAction } from './_generated/server.js';
 import { authComponent, createAuth } from './auth.js';
-import { linkPoll, linkStart, uploadDiagnostics, uploadRecords, uploadRun } from './companionHttp.js';
+import {
+	linkPoll,
+	linkStart,
+	uploadCalendar,
+	uploadDiagnostics,
+	uploadRecords,
+	uploadRun
+} from './companionHttp.js';
 
 const http = httpRouter();
 
@@ -85,5 +92,6 @@ http.route({ path: '/companion/link/poll', method: 'POST', handler: linkPoll });
 http.route({ path: '/companion/runs', method: 'POST', handler: uploadRun });
 http.route({ path: '/companion/records', method: 'POST', handler: uploadRecords });
 http.route({ path: '/companion/diagnostics', method: 'POST', handler: uploadDiagnostics });
+http.route({ path: '/companion/calendar', method: 'POST', handler: uploadCalendar });
 
 export default http;

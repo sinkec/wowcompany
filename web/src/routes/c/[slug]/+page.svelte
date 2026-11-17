@@ -52,7 +52,9 @@
 		s?.kills != null && s?.deaths != null ? s.kills / Math.max(1, s.deaths) : null
 	);
 
-	let tab = $state('gear');
+	const TABS = ['gear', 'talents', 'runs', 'logs', 'progress', 'prof', 'all'];
+	// ?tab= odpre zavihek (povezave iz Discorda, lestvic …)
+	let tab = $state(((t) => (t && TABS.includes(t) ? t : 'gear'))(page.url.searchParams.get('tab')));
 	let statFilter = $state('');
 	const statGroups = $derived.by(() => {
 		const list = (d?.allStats ?? null) as StatLine[] | null;
@@ -150,10 +152,10 @@
 
 <div class="space-y-6">
 	<a
-		href="/"
+		href="/heroes"
 		class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
 	>
-		<ArrowLeft class="size-4" /> back to the tavern
+		<ArrowLeft class="size-4" /> back to the heroes
 	</a>
 
 	{#if q.isLoading}

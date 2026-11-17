@@ -27,9 +27,13 @@
 	import Stethoscope from '@lucide/svelte/icons/stethoscope';
 	import House from '@lucide/svelte/icons/house';
 	import Plus from '@lucide/svelte/icons/plus';
+	import CalendarDays from '@lucide/svelte/icons/calendar-days';
+	import EventsAdmin from '#lib/components/admin/EventsAdmin.svelte';
+	import TeamName from '#lib/components/admin/TeamName.svelte';
 	import { SOCIAL_KINDS, parseConvos, parseQuips } from '#convex/lib/siteContent.js';
 	import Archive from '@lucide/svelte/icons/archive';
 	import { onMount } from 'svelte';
+	import { attempt } from '#lib/errors.js';
 	import { api } from '#convex/_generated/api.js';
 	import type { Id } from '#convex/_generated/dataModel.js';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
@@ -39,7 +43,7 @@
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { FIELD_LABELS, ago, classColor, fmt } from '#lib/wow.js';
 	import { POST_FIELDS } from '#convex/lib/discordEmbed.js';
-	import { RUN_FIELDS } from '#convex/lib/settings.js';
+	import { EVENT_FIELDS, RUN_FIELDS } from '#convex/lib/settings.js';
 
 	const auth = useAuth();
 	const client = useConvexClient();
@@ -50,26 +54,7 @@
 
 	const pendingCount = $derived(claims.data?.pending.length ?? 0);
 
-	async function run<T>(p: Promise<T>, ok?: string) {
-		try {
-			const r = await p;
-			if (ok) toast.success(ok);
-			return r;
-		} catch (e) {
-			toast.error(errText(e));
-		}
-	}
-	/** Besedilo napake brez Convexovega ovoja (ConvexError nosi sporočilo v `data`). */
-	function errText(e: unknown) {
-		const data = (e as { data?: unknown }).data;
-		if (typeof data === 'string') return data;
-		return ((e as Error).message ?? 'Something broke.')
-			.replace(/^\[CONVEX[^\]]*\]\s*/, '')
-			.replace(/^\[Request ID: [^\]]*\]\s*/, '')
-			.replace(/^Server Error\s*/, '')
-			.replace(/^Uncaught (ConvexError|Error):\s*/, '')
-			.replace(/\s+at .*$/s, '');
-	}
+	const run = attempt;
 
 	const decide = (claimId: Id<'claims'>, accept: boolean, name: string) =>
 		run(
@@ -114,9 +99,13 @@
 		target === 'discordFields'
 			? [
 					'lastLogin',
-					...(ov.data?.fields ?? []).filter((f) => f !== 'lastLogin' && !RUN_FIELDS.includes(f)),
+					...(ov.data?.fields ?? []).filter(
+						(f) => f !== 'lastLogin' && !RUN_FIELDS.includes(f) && !EVENT_FIELDS.includes(f)
+					),
 					// dungeon runi (Companion): objava runa + /parses, neodvisno od objav sej
-					...RUN_FIELDS
+					...RUN_FIELDS,
+					// koledar: objave dogodkov, opomniki, /events (neodvisno od obojega zgoraj)
+					...EVENT_FIELDS
 				]
 			: (ov.data?.fields ?? []);
 	const sessionsOn = $derived(ov.data?.settings.discordFields.includes('lastLogin') ?? false);
@@ -207,7 +196,8 @@
 		runs: 'Post dungeon runs (master switch for run posts)',
 		runDetails: 'Run numbers, Company Parses and /parses',
 		runDeaths: 'Deaths in run posts',
-		runLoot: 'Dice (need/greed) in run posts'
+		runLoot: 'Dice (need/greed) in run posts',
+		calendar: 'Event announcements, reminders and our events in /events'
 	};
 	const runsOn = $derived(ov.data?.settings.discordFields.includes('runs') ?? false);
 	const VIS_COLUMNS: { target: Target; title: string; note: string }[] = [
@@ -231,6 +221,7 @@
 		| 'web'
 		| 'news'
 		| 'home'
+		| 'events'
 		| 'seasons'
 		| 'discord'
 		| 'discord-posts'
@@ -252,6 +243,7 @@
 			items: [
 				{ key: 'web', label: 'Who sees what', icon: Eye },
 				{ key: 'home', label: 'Home page', icon: House },
+				{ key: 'events', label: 'Events', icon: CalendarDays },
 				{ key: 'news', label: 'News', icon: Newspaper },
 				{ key: 'seasons', label: 'Parse seasons', icon: Trophy }
 			]
@@ -669,6 +661,7 @@
 											{@const master =
 												col.target === 'discordFields' && (f === 'lastLogin' || f === 'runs')}
 											{@const isRun = RUN_FIELDS.includes(f)}
+											{@const isEvent = EVENT_FIELDS.includes(f)}
 											{#if col.target === 'discordFields' && f === 'runs'}
 												<h3 class="eyebrow mt-5 mb-2 text-primary">Dungeon runs (Companion)</h3>
 												<p class="mb-2 text-xs text-muted-foreground">
@@ -676,12 +669,16 @@
 													Independent of the session posts above.
 												</p>
 											{/if}
+											{#if col.target === 'discordFields' && f === 'calendar'}
+												<h3 class="eyebrow mt-5 mb-2 text-primary">Calendar</h3>
+											{/if}
 											<label
 												class="flex items-center justify-between gap-3 py-2 text-sm {master
 													? 'mb-2 rounded-md border border-primary/50 bg-primary/10 px-3 font-semibold'
 													: 'border-b border-border/40 last:border-0'} {col.target ===
 													'discordFields' &&
 												!master &&
+												!isEvent &&
 												(isRun ? !runsOn : !sessionsOn)
 													? 'opacity-50'
 													: ''}"
@@ -690,7 +687,7 @@
 													{(col.target === 'discordFields' && DISCORD_LABELS[f]) ||
 														FIELD_LABELS[f] ||
 														f}
-													{#if col.target === 'discordFields' && !master && !isRun && !POST_FIELDS.includes(f)}
+													{#if col.target === 'discordFields' && !master && !isRun && !isEvent && !POST_FIELDS.includes(f)}
 														<span
 															class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground"
 															>slash commands only</span
@@ -995,8 +992,10 @@
 										</div>
 										<p class="text-sm text-muted-foreground">
 											Lets people type <code>/roster</code>, <code>/hero</code>,
-											<code>/leaderboard</code> in Discord. No always-online bot — Discord calls this
-											site over HTTP when someone uses a command.
+											<code>/leaderboard</code>, <code>/parses</code>, <code>/events</code> and
+											<code>/news</code> in Discord. After an update with new commands, press
+											<b>Register commands</b> again. No always-online bot — Discord calls this site over
+											HTTP when someone uses a command.
 										</p>
 
 										{#if st.bot.configured}
@@ -1282,8 +1281,13 @@
 					</div>
 				{/if}
 
+				{#if view === 'events'}
+					<EventsAdmin discordOn={ov.data?.settings.discordFields.includes('calendar') ?? false} />
+				{/if}
+
 				{#if view === 'home'}
 					<div class="max-w-3xl space-y-4">
+						<TeamName current={siteAdmin.data?.teamName ?? null} />
 						<section class="panel space-y-3">
 							<div>
 								<h3 class="card-title">Community links</h3>

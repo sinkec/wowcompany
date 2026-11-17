@@ -1,11 +1,19 @@
 // Vsebina naslovnice: šale v heroju in povezave na skupnost (lib/siteContent.ts).
 import { ConvexError, v } from 'convex/values';
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server.js';
+import {
+	internalQuery,
+	mutation,
+	query,
+	type MutationCtx,
+	type QueryCtx
+} from './_generated/server.js';
 import { requireAdmin } from './lib/access.js';
 import {
 	DEFAULT_CONVOS,
 	DEFAULT_QUIPS,
+	brandName,
 	cleanSocials,
+	cleanTeamName,
 	parseConvos,
 	parseQuips,
 	type Social
@@ -20,16 +28,24 @@ async function content(ctx: QueryCtx | MutationCtx) {
 		doc,
 		quips: doc?.quips ?? DEFAULT_QUIPS,
 		convos: (doc?.convos ?? DEFAULT_CONVOS) as string[][],
-		socials: (doc?.socials ?? []) as Social[]
+		socials: (doc?.socials ?? []) as Social[],
+		teamName: doc?.teamName ?? null
 	};
 }
+
+/** Polno ime strani za Discord in e-pošto ("Ajmer Central WowCompany"). */
+export async function siteBrand(ctx: QueryCtx) {
+	return brandName((await content(ctx)).teamName);
+}
+
+export const brand = internalQuery({ args: {}, handler: (ctx) => siteBrand(ctx) });
 
 /** Javno: naslovnica (šale + povezave). */
 export const home = query({
 	args: {},
 	handler: async (ctx) => {
 		const c = await content(ctx);
-		return { quips: c.quips, convos: c.convos, socials: c.socials };
+		return { quips: c.quips, convos: c.convos, socials: c.socials, teamName: c.teamName };
 	}
 });
 
@@ -43,6 +59,7 @@ export const forAdmin = query({
 			quips: c.quips,
 			convos: c.convos,
 			socials: c.socials,
+			teamName: c.teamName,
 			defaults: { quips: DEFAULT_QUIPS, convos: DEFAULT_CONVOS }
 		};
 	}
@@ -50,7 +67,7 @@ export const forAdmin = query({
 
 async function upsert(
 	ctx: MutationCtx,
-	patch: { quips?: string[]; convos?: string[][]; socials?: Social[] }
+	patch: { quips?: string[]; convos?: string[][]; socials?: Social[]; teamName?: string }
 ) {
 	const { doc, quips, convos, socials } = await content(ctx);
 	if (doc) await ctx.db.patch('siteContent', doc._id, patch);
@@ -82,5 +99,15 @@ export const saveSocials = mutation({
 		const clean = cleanSocials(socials);
 		await upsert(ctx, { socials: clean });
 		return clean.length;
+	}
+});
+
+export const saveTeamName = mutation({
+	args: { teamName: v.string() },
+	handler: async (ctx, a) => {
+		await requireAdmin(ctx);
+		const teamName = cleanTeamName(a.teamName);
+		await upsert(ctx, { teamName });
+		return brandName(teamName);
 	}
 });

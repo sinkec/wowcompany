@@ -15,6 +15,7 @@ globals = {
 -- game API the addon reads (verified in WoW Forever by the self-test, see ADDON.md §4.1)
 read_globals = {
     "C_TooltipInfo",
+    "C_Calendar", "C_DateAndTime", "CalendarFrame",
     "Settings", "InterfaceOptions_AddCategory", "InterfaceOptionsFrame_OpenToCategory",
     "IsShiftKeyDown", "LE_PARTY_CATEGORY_INSTANCE",
     "BackdropTemplateMixin",

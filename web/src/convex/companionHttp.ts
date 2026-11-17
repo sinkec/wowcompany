@@ -218,3 +218,40 @@ export const uploadDiagnostics = httpAction(async (ctx, req) => {
 		return errorResponse(e);
 	}
 });
+
+/** POST /companion/calendar – prazniki iz igre (addon C_Calendar) za okno {from, to}. */
+export const uploadCalendar = httpAction(async (ctx, req) => {
+	const auth = req.headers.get('authorization') ?? '';
+	const m = /^Bearer (wcc_[A-Za-z0-9_-]{20,})$/.exec(auth);
+	if (!m) return json({ error: 'missing or malformed device token', code: 'unauthorized' }, 401);
+	const body = await readJson(req, 128 * 1024);
+	if (body instanceof Response) return body;
+	if (
+		!isObj(body) ||
+		typeof body.from !== 'number' ||
+		typeof body.to !== 'number' ||
+		!Array.isArray(body.events)
+	)
+		return json({ error: 'need from, to, events[]' }, 400);
+	const events = (body.events as unknown[])
+		.filter(isObj)
+		.slice(0, 300)
+		.map((e) => ({
+			title: String(e.title ?? ''),
+			description: String(e.description ?? ''),
+			kind: String(e.kind ?? ''),
+			startAt: Number(e.startAt),
+			endAt: Number(e.endAt)
+		}));
+	try {
+		const r = await ctx.runMutation(internal.calendar.ingestGame, {
+			tokenHash: await sha256hex(m[1]),
+			from: body.from,
+			to: body.to,
+			events
+		});
+		return json(r, 200);
+	} catch (e) {
+		return errorResponse(e);
+	}
+});

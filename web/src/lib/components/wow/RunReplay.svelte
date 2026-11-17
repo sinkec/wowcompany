@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { errText } from '#lib/errors.js';
 	// Replay runa: zemljevid iz poti partyja (combat log x/y vsaki 2 s – Companion v0.1.12+), igralci
 	// z avatarjem in imenom, trak časovnice (vleci / play / pavza / hitrost) in statistika v izbranem
 	// trenutku. Zemljevid nariše sam party: hodniki = kjer so hodili (Blizzard slik dungeonov nima).
@@ -516,7 +517,7 @@
 			toast.success('Map uploaded. Now line it up with the paths.');
 			setTimeout(startEdit, 600);
 		} catch (err) {
-			toast.error((err as Error).message);
+			toast.error(errText(err));
 		} finally {
 			uploading = false;
 		}
