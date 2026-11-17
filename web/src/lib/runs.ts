@@ -13,14 +13,7 @@ export const fmtNum = (n: number | null | undefined) =>
 export const fmtRate = (n: number | null | undefined) =>
 	n == null ? '—' : n >= 100 ? Math.round(n).toLocaleString('en-US') : n.toFixed(1);
 
-const dtfmt = new Intl.DateTimeFormat('en-GB', {
-	weekday: 'short',
-	day: 'numeric',
-	month: 'short',
-	hour: '2-digit',
-	minute: '2-digit'
-});
-export const fmtWhen = (ms: number) => dtfmt.format(new Date(ms));
+// fmtWhen (datum in ura runa) je v lib/datetime.svelte.ts – po uporabnikovih nastavitvah časa.
 
 /** Kako se je run končal – z obvezno mero cinizma. */
 export const END_REASON: Record<string, string> = {

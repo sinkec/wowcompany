@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { fmtDate } from '#lib/datetime.svelte.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
@@ -81,7 +82,7 @@
 					<p class="section-lead {archive.daysLeft <= 7 ? 'text-destructive' : ''}">
 						{#if archive.purging}Being deleted right now.
 						{:else}Deleted in <b>{archive.daysLeft}</b> day{archive.daysLeft === 1 ? '' : 's'}
-							({new Date(archive.deleteAt).toLocaleDateString()}). {archive.daysLeft <= 7
+							({fmtDate(archive.deleteAt)}). {archive.daysLeft <= 7
 								? 'Download it now if you want to keep anything.'
 								: ''}{/if}
 					</p>
@@ -149,7 +150,7 @@
 									<span
 										><b class="text-primary">{r.zone}</b>
 										<span class="text-xs text-muted-foreground"
-											>{new Date(r.startedAt).toLocaleDateString()} · {fmtDuration(r.durationMs)} · bosses
+											>{fmtDate(r.startedAt)} · {fmtDuration(r.durationMs)} · bosses
 											{r.bossesKilled}{r.bossesTotal ? `/${r.bossesTotal}` : ''}</span
 										></span
 									>

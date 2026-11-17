@@ -124,6 +124,10 @@ export default defineSchema({
 		firstName: v.string(),
 		lastName: v.string(),
 		mainSlug: v.optional(v.string()),
+		/** Settings → Account → Time & date (lib/timePrefs.ts) */
+		timeZone: v.optional(v.string()),
+		hour12: v.optional(v.boolean()),
+		dateFormat: v.optional(v.string()),
 		updatedAt: v.number()
 	}).index('by_user', ['userId']),
 

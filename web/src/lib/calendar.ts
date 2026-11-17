@@ -23,23 +23,14 @@ export const KIND_DOT: Record<string, string> = {
 	system: 'bg-muted-foreground'
 };
 
-const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
-const dayMonth = new Intl.DateTimeFormat('en-GB', {
-	weekday: 'short',
-	day: 'numeric',
-	month: 'short'
-});
-export const fmtTime = (ms: number) => time.format(ms);
-export const fmtDay = (ms: number) => dayMonth.format(ms);
+// datumi in ure po uporabnikovih nastavitvah (pas, 12h/24h, oblika datuma)
+export { fmtTime, fmtDay } from '#lib/datetime.svelte.js';
+import { addDays, dayStart, fmtDay, fmtTime } from '#lib/datetime.svelte.js';
 
 const DAY = 86_400_000;
-export const startOfDay = (ms: number) => {
-	const d = new Date(ms);
-	d.setHours(0, 0, 0, 0);
-	return d.getTime();
-};
+export const startOfDay = dayStart;
 
-/** "Sat 22 Nov · 20:00–23:00", več dni: "Sat 22 Nov – Tue 25 Nov". */
+/** "Sat 22.11.2026 · 20:00–23:00", več dni: "Sat 22.11.2026 – Tue 25.11.2026". */
 export function fmtSpan(e: { startAt: number; endAt: number }) {
 	// večer čez polnoč (npr. 21:00–01:00) je še vedno en večer
 	if (e.endAt - e.startAt >= 20 * 3_600_000) return `${fmtDay(e.startAt)} – ${fmtDay(e.endAt - 1)}`;
@@ -62,4 +53,4 @@ export const hourNow = () => Math.floor(Date.now() / 3_600_000) * 3_600_000;
 
 /** Ali dogodek pade na dan, ki se začne ob `day` (konec točno ob polnoči ne šteje v naslednji dan). */
 export const onDayOf = (e: { startAt: number; endAt: number }, day: number) =>
-	e.startAt < day + DAY && (e.endAt > day || e.startAt >= day);
+	e.startAt < addDays(day, 1) && (e.endAt > day || e.startAt >= day);

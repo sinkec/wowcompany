@@ -1,4 +1,5 @@
 // Uporabniške nastavitve: profil (ime, priimek, glavni junak) in lastni junaki (alti).
+import { DATE_FORMATS, validTimeZone } from './lib/timePrefs.js';
 import { ConvexError, v } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel.js';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server.js';
@@ -32,26 +33,28 @@ export const mine = query({
 			.take(50);
 		// junaki starega realma so v /archive, tu samo aktivni realm
 		const characters = await Promise.all(
-			players.filter((p) => !p.archived).map(async (p) => {
-				const s = await ctx.db
-					.query('summaries')
-					.withIndex('by_player', (q) => q.eq('playerId', p._id))
-					.unique();
-				return {
-					id: p._id,
-					slug: p.slug,
-					name: p.displayName,
-					active: p.active,
-					addedAt: p.addedAt,
-					level: s?.level ?? null,
-					classId: s?.classId ?? null,
-					className: s?.className ?? null,
-					race: s?.race ?? null,
-					avatar: s?.avatar ?? null,
-					ilvl: s?.ilvlEquipped ?? null,
-					lastLogin: s?.lastLogin ?? null
-				};
-			})
+			players
+				.filter((p) => !p.archived)
+				.map(async (p) => {
+					const s = await ctx.db
+						.query('summaries')
+						.withIndex('by_player', (q) => q.eq('playerId', p._id))
+						.unique();
+					return {
+						id: p._id,
+						slug: p.slug,
+						name: p.displayName,
+						active: p.active,
+						addedAt: p.addedAt,
+						level: s?.level ?? null,
+						classId: s?.classId ?? null,
+						className: s?.className ?? null,
+						race: s?.race ?? null,
+						avatar: s?.avatar ?? null,
+						ilvl: s?.ilvlEquipped ?? null,
+						lastLogin: s?.lastLogin ?? null
+					};
+				})
 		);
 		const claims = await ctx.db
 			.query('claims')
@@ -94,11 +97,12 @@ async function upsertProfile(
 	if (existing) {
 		await ctx.db.patch('profiles', existing._id, { ...patch, updatedAt: Date.now() });
 	} else {
+		const rest = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
 		await ctx.db.insert('profiles', {
+			...rest,
 			userId,
 			firstName: patch.firstName ?? '',
 			lastName: patch.lastName ?? '',
-			...(patch.mainSlug ? { mainSlug: patch.mainSlug } : {}),
 			updatedAt: Date.now()
 		});
 	}
@@ -122,6 +126,23 @@ export const updateName = mutation({
 			.withIndex('by_user', (q) => q.eq('userId', viewer.user._id))
 			.unique();
 		if (role) await ctx.db.patch('roles', role._id, { name: `${firstName} ${lastName}`.trim() });
+		return null;
+	}
+});
+
+export const setTimePrefs = mutation({
+	args: { timeZone: v.union(v.string(), v.null()), hour12: v.boolean(), dateFormat: v.string() },
+	handler: async (ctx, a) => {
+		const viewer = await requireViewer(ctx);
+		if (a.timeZone !== null && !validTimeZone(a.timeZone))
+			throw new ConvexError('Unknown time zone. Even Azeroth has fewer.');
+		if (!(DATE_FORMATS as readonly string[]).includes(a.dateFormat))
+			throw new ConvexError('Unknown date format.');
+		await upsertProfile(ctx, viewer.user._id, {
+			timeZone: a.timeZone ?? undefined,
+			hour12: a.hour12,
+			dateFormat: a.dateFormat
+		});
 		return null;
 	}
 });

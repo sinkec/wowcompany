@@ -4,7 +4,8 @@
 	import { useQuery } from 'convex-svelte';
 	import { api } from '#convex/_generated/api.js';
 	import Locked from '#lib/components/wow/Locked.svelte';
-	import { ROLE_LABEL, fmtDuration, fmtRate, fmtWhen, parseColor, parseQuip } from '#lib/runs.js';
+	import { ROLE_LABEL, fmtDuration, fmtRate, parseColor, parseQuip } from '#lib/runs.js';
+	import { fmtWhen } from '#lib/datetime.svelte.js';
 	import * as Table from '#lib/components/ui/table/index.js';
 	import SortHead from '#lib/components/table/SortHead.svelte';
 	import SeasonPicker from './SeasonPicker.svelte';

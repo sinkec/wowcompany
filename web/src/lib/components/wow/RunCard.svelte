@@ -7,7 +7,8 @@
 	import Megaphone from '@lucide/svelte/icons/megaphone';
 	import type { RunListItem } from '#convex/lib/runsView.js';
 	import { classColor } from '#lib/wow.js';
-	import { durationQuip, fmtDuration, fmtWhen, resultBadge } from '#lib/runs.js';
+	import { durationQuip, fmtDuration, resultBadge } from '#lib/runs.js';
+	import { fmtWhen } from '#lib/datetime.svelte.js';
 
 	let { run, highlight }: { run: RunListItem; highlight?: string } = $props();
 	const badge = $derived(resultBadge(run.result));

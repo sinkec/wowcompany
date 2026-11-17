@@ -31,6 +31,10 @@
   `Select` prek `components/form/SimpleSelect.svelte`, `Textarea`, `Checkbox`, `Collapsible`, `Slider` (replay);
   potrditve `ask()` (`lib/confirm.svelte.ts`) + `ConfirmHost` v layoutu namesto `confirm()`/`prompt()`.
   Brez Prettierja čez `components/ui` (vendor datoteke).
+  **Čas in datum:** Settings → Account → Time & date (`profiles.timeZone/hour12/dateFormat`, `profile.setTimePrefs`,
+  `lib/timePrefs.ts`); vse oblikovanje gre skozi `lib/datetime.svelte.ts` (`fmtWhen`, `fmtDate`, `fmtTime`,
+  `fromParts`, `dayStart`, `addDays` – pravilno ob poletnem času); layout naloži nastavitve iz `auth.me.prefs`.
+  Izbira časa dogodka: `components/form/DateTimePicker.svelte` (shadcn Popover + Calendar, ura po 15 min).
   Namigi: `components/wow/Tip.svelte` (shadcn Tooltip, Provider v layoutu) namesto `title=`; kartice = shadcn `Card`
   z našim okvirjem (`ui/card/card.svelte` uporablja `.wow-frame`, brez vsiljene postavitve); `wow-frame` kot razred
   ostane samo na semantičnih elementih (povezave-kartice, obrazci, seznami, figure, article). Office: `Alert`.

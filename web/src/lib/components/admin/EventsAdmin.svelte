@@ -18,6 +18,8 @@
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
 	import SimpleSelect from '#lib/components/form/SimpleSelect.svelte';
+	import DateTimePicker from '#lib/components/form/DateTimePicker.svelte';
+	import { fromParts, partsOf } from '#lib/datetime.svelte.js';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import {
 		EVENT_KINDS,
@@ -34,25 +36,18 @@
 	const client = useConvexClient();
 	const data = useQuery(api.calendar.forAdmin, { from: hourNow() });
 
-	// datetime-local <-> ms (lokalni čas brskalnika)
-	const toLocal = (ms: number) => {
-		const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60_000);
-		return d.toISOString().slice(0, 16);
-	};
-	const fromLocal = (s: string) => (s ? new Date(s).getTime() : NaN);
+	// naslednji večer ob 20:00 v uporabnikovem pasu (danes, če je še pred 19:00)
 	function nextEvening() {
-		const d = new Date();
-		d.setDate(d.getDate() + (d.getHours() >= 19 ? 1 : 0));
-		d.setHours(20, 0, 0, 0);
-		return d.getTime();
+		const p = partsOf(Date.now());
+		return fromParts(p.y, p.m, p.d + (p.h >= 19 ? 1 : 0), 20, 0);
 	}
 
 	type Form = {
 		id?: Id<'calendarEvents'>;
 		title: string;
 		kind: string;
-		start: string;
-		end: string;
+		start: number;
+		end: number;
 		location: string;
 		description: string;
 		discord: boolean;
@@ -62,8 +57,8 @@
 		return {
 			title: '',
 			kind: 'dungeon',
-			start: toLocal(s),
-			end: toLocal(s + 3 * 3600_000),
+			start: s,
+			end: s + 3 * 3600_000,
 			location: '',
 			description: '',
 			discord: true
@@ -77,26 +72,14 @@
 			id: e.id as Id<'calendarEvents'>,
 			title: e.title,
 			kind: e.kind,
-			start: toLocal(e.startAt),
-			end: toLocal(e.endAt),
+			start: e.startAt,
+			end: e.endAt,
 			location: e.location ?? '',
 			description: e.description,
 			discord: e.discord
 		};
 		document.getElementById('event-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}
-	// začetek premaknjen: konec se premakne z njim (ista dolžina)
-	let lastStart = $state(blank().start);
-	$effect(() => {
-		const s = fromLocal(form.start);
-		const prev = fromLocal(lastStart);
-		if (form.start !== lastStart && Number.isFinite(s) && Number.isFinite(prev)) {
-			const len = fromLocal(form.end) - prev;
-			if (Number.isFinite(len) && len >= 0) form.end = toLocal(s + len);
-		}
-		lastStart = form.start;
-	});
-
 	async function save(e: SubmitEvent) {
 		e.preventDefault();
 		saving = true;
@@ -105,8 +88,8 @@
 				...(form.id ? { id: form.id } : {}),
 				title: form.title,
 				kind: form.kind,
-				startAt: fromLocal(form.start),
-				endAt: fromLocal(form.end),
+				startAt: form.start,
+				endAt: form.end,
 				description: form.description,
 				...(form.location.trim() ? { location: form.location } : {}),
 				discord: form.discord
@@ -174,16 +157,26 @@
 				/>
 			</div>
 		</div>
-		<div class="grid gap-3 sm:grid-cols-3">
-			<label class="space-y-1 text-sm">
+		<div class="grid gap-3 md:grid-cols-2">
+			<div class="space-y-1 text-sm">
 				<span class="text-muted-foreground">Starts</span>
-				<Input type="datetime-local" bind:value={form.start} required />
-			</label>
-			<label class="space-y-1 text-sm">
+				<!-- premik začetka premakne tudi konec (ista dolžina) -->
+				<DateTimePicker
+					label="Starts"
+					bind:value={
+						() => form.start,
+						(v) => {
+							form.end += v - form.start;
+							form.start = v;
+						}
+					}
+				/>
+			</div>
+			<div class="space-y-1 text-sm">
 				<span class="text-muted-foreground">Ends</span>
-				<Input type="datetime-local" bind:value={form.end} required />
-			</label>
-			<label class="space-y-1 text-sm">
+				<DateTimePicker label="Ends" bind:value={form.end} />
+			</div>
+			<label class="space-y-1 text-sm md:col-span-2">
 				<span class="text-muted-foreground">Where (optional)</span>
 				<Input bind:value={form.location} maxlength={60} placeholder="Westfall, meet at the inn" />
 			</label>
@@ -216,7 +209,7 @@
 		</div>
 	</form>
 
-	<Card.Root class="p-5 space-y-3">
+	<Card.Root class="space-y-3 p-5">
 		<div class="flex items-end justify-between gap-2">
 			<h3 class="card-title">Coming up</h3>
 			<a href="/calendar" class="text-sm text-primary hover:underline">Open the calendar →</a>
@@ -283,7 +276,7 @@
 		{/if}
 	</Card.Root>
 
-	<Card.Root class="p-5 space-y-1 text-sm">
+	<Card.Root class="space-y-1 p-5 text-sm">
 		<h3 class="card-title">In-game holidays</h3>
 		<p class="text-muted-foreground">
 			{#if data.data?.gameCount}

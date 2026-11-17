@@ -1,3 +1,4 @@
+import { prefsOf } from './lib/timePrefs.js';
 import { createClient, type AuthFunctions, type CreateAuth } from '@convex-dev/better-auth';
 import { convex } from '@convex-dev/better-auth/plugins';
 import { components, internal } from './_generated/api.js';
@@ -81,6 +82,7 @@ export const me = query({
 			email: viewer.user.email,
 			image: viewer.user.image ?? null,
 			role: viewer.role,
+			prefs: prefsOf(profile),
 			main: mainPlayer
 				? {
 						slug: mainPlayer.slug,

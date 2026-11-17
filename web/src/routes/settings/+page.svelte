@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TimePrefs from '#lib/components/settings/TimePrefs.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import { ask } from '#lib/confirm.svelte.js';
@@ -43,7 +44,7 @@
 			icon: MonitorSmartphone,
 			hint: 'PCs that snitch your runs'
 		},
-		{ key: 'account', label: 'Account', icon: UserCog, hint: 'Name, email, the exit' }
+		{ key: 'account', label: 'Account', icon: UserCog, hint: 'Name, time & date, the exit' }
 	] as const;
 	type Key = (typeof SECTIONS)[number]['key'];
 	const tab = $derived<Key>(
@@ -236,7 +237,7 @@
 
 			<div class="min-w-0 space-y-6">
 				{#if tab === 'overview'}
-					<Card.Root class="p-5 relative isolate overflow-hidden">
+					<Card.Root class="relative isolate overflow-hidden p-5">
 						{#if main && renderFromAvatar(main.avatar)}
 							<img
 								src={renderFromAvatar(main.avatar)}
@@ -290,7 +291,7 @@
 						</div>
 					</Card.Root>
 
-					<Card.Root class="p-5 space-y-3">
+					<Card.Root class="space-y-3 p-5">
 						<div>
 							<h2 class="card-title">
 								{stepsLeft ? `Getting set up · ${stepsLeft} to go` : 'All set. Go play.'}
@@ -513,6 +514,7 @@
 							</span>
 						</div>
 					</form>
+					<TimePrefs />
 					<Card.Root class="space-y-4 p-5">
 						<h2 class="section-title">Account</h2>
 						<dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[10rem_1fr]">

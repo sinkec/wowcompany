@@ -21,22 +21,8 @@
 	import { classColor, iconFallback } from '#lib/wow.js';
 	import RunReplay from '#lib/components/wow/RunReplay.svelte';
 	import ItemLink from '#lib/components/wow/ItemLink.svelte';
-	import {
-		ACTIVE_QUIP,
-		END_REASON,
-		deathQuip,
-		durationQuip,
-		fmtDuration,
-		fmtMoney,
-		fmtNum,
-		fmtRate,
-		fmtWhen,
-		lootColor,
-		QUALITY_NAME,
-		RECORD_KINDS,
-		RECORD_LABEL,
-		resultBadge
-	} from '#lib/runs.js';
+	import { ACTIVE_QUIP, END_REASON, deathQuip, durationQuip, fmtDuration, fmtMoney, fmtNum, fmtRate, lootColor, QUALITY_NAME, RECORD_KINDS, RECORD_LABEL, resultBadge } from '#lib/runs.js';
+	import { fmtWhen } from '#lib/datetime.svelte.js';
 
 	const id = $derived(page.params.id ?? '');
 	const q = useQuery(api.runs.get, () => ({ id }));

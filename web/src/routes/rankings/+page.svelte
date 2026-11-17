@@ -6,7 +6,8 @@
 	import Trophy from '@lucide/svelte/icons/trophy';
 	import { api } from '#convex/_generated/api.js';
 	import Locked from '#lib/components/wow/Locked.svelte';
-	import { fmtDuration, fmtMoney, fmtNum, fmtRate, fmtWhen } from '#lib/runs.js';
+	import { fmtDuration, fmtMoney, fmtNum, fmtRate } from '#lib/runs.js';
+	import { fmtWhen } from '#lib/datetime.svelte.js';
 	import { classColor } from '#lib/wow.js';
 
 	import { page } from '$app/state';

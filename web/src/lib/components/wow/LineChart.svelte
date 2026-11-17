@@ -2,6 +2,7 @@
 	// Ena serija na graf (naslov jo poimenuje, brez legende): stopničasta črta s polnilom v prelivu,
 	// crosshair + tooltip (Chart.js, barve teme).
 	import type { ChartConfiguration } from 'chart.js';
+	import { fmtDate, fmtDateTime } from '#lib/datetime.svelte.js';
 	import ChartCanvas from './ChartCanvas.svelte';
 	import { alpha, baseOptions, chartTheme, crosshair, resolveColor } from '#lib/chart.js';
 
@@ -19,13 +20,6 @@
 		empty?: string;
 	} = $props();
 
-	const dfmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
-	const dtfmt = new Intl.DateTimeFormat('en-GB', {
-		day: 'numeric',
-		month: 'short',
-		hour: '2-digit',
-		minute: '2-digit'
-	});
 
 	const config = $derived.by((): ChartConfiguration<'line'> => {
 		const t = chartTheme();
@@ -67,7 +61,7 @@
 						...base.plugins.tooltip,
 						displayColors: false,
 						callbacks: {
-							title: (items) => dtfmt.format(items[0].parsed.x ?? 0),
+							title: (items) => fmtDateTime(items[0].parsed.x ?? 0),
 							label: (item) => format(item.parsed.y ?? 0)
 						}
 					}
@@ -81,7 +75,7 @@
 						ticks: {
 							...base.scales.x.ticks,
 							maxTicksLimit: 6,
-							callback: (v) => dfmt.format(Number(v))
+							callback: (v) => fmtDate(Number(v))
 						}
 					},
 					y: {

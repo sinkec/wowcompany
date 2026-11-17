@@ -4,10 +4,10 @@
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import Users from '@lucide/svelte/icons/users';
 	import type { CalendarEvent } from '#convex/calendar.js';
+	import { monthShort, partsOf } from '#lib/datetime.svelte.js';
 	import { KIND_EMOJI, KIND_TONE, fmtSpan, whenLabel } from '#lib/calendar.js';
 
 	let { events, loading = false }: { events: CalendarEvent[]; loading?: boolean } = $props();
-	const month = new Intl.DateTimeFormat('en-GB', { month: 'short' });
 </script>
 
 {#if loading}
@@ -36,9 +36,9 @@
 						] ?? ''}"
 					>
 						<span class="text-[0.6rem] font-semibold tracking-wider uppercase"
-							>{month.format(e.startAt)}</span
+							>{monthShort(e.startAt)}</span
 						>
-						<span class="font-display text-base font-bold">{new Date(e.startAt).getDate()}</span>
+						<span class="font-display text-base font-bold">{partsOf(e.startAt).d}</span>
 					</div>
 					<div class="min-w-0 flex-1">
 						<p class="truncate text-sm font-semibold group-hover:text-primary">

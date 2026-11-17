@@ -16,7 +16,8 @@
 	import TalentTree from '#lib/components/wow/TalentTree.svelte';
 	import Locked from '#lib/components/wow/Locked.svelte';
 	import RunCard from '#lib/components/wow/RunCard.svelte';
-	import { RECORD_KINDS, RECORD_LABEL, fmtNum, fmtWhen } from '#lib/runs.js';
+	import { RECORD_KINDS, RECORD_LABEL, fmtNum } from '#lib/runs.js';
+	import { fmtWhen } from '#lib/datetime.svelte.js';
 	import type { Item, Profession, StatLine, TalentTree as Tree } from '#lib/types.js';
 	import {
 		COUNTER_LABELS,

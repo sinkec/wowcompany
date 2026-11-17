@@ -30,31 +30,33 @@
 		whenLabel
 	} from '#lib/calendar.js';
 	import { errText } from '#lib/errors.js';
+	import { MONTH_NAMES, addDays, fromParts, partsOf } from '#lib/datetime.svelte.js';
 
 	const client = useConvexClient();
 	const me = useQuery(api.auth.me, {});
 
-	// ---- mesec iz URL (?m=2026-11), privzeto današnji
-	const monthOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+	// ---- mesec iz URL (?m=2026-11), privzeto današnji; dnevi v uporabnikovem časovnem pasu
+	const pad = (n: number) => String(n).padStart(2, '0');
+	const monthOf = (ms: number) => {
+		const p = partsOf(ms);
+		return `${p.y}-${pad(p.m)}`;
+	};
 	const current = $derived.by(() => {
 		const m = /^(\d{4})-(\d{2})$/.exec(page.url.searchParams.get('m') ?? '');
-		return m ? new Date(Number(m[1]), Number(m[2]) - 1, 1) : new Date(new Date().setDate(1));
+		if (m) return { y: Number(m[1]), m: Number(m[2]) };
+		const p = partsOf(Date.now());
+		return { y: p.y, m: p.m };
 	});
-	const first = $derived(new Date(current.getFullYear(), current.getMonth(), 1));
-	const next = $derived(new Date(current.getFullYear(), current.getMonth() + 1, 1));
+	const first = $derived(fromParts(current.y, current.m, 1));
+	const next = $derived(fromParts(current.y, current.m + 1, 1));
 	// mreža od ponedeljka pred 1. do nedelje po zadnjem dnevu
-	const gridStart = $derived(startOfDay(first.getTime() - ((first.getDay() + 6) % 7) * 86_400_000));
-	const weeks = $derived(Math.ceil(((next.getTime() - gridStart) / 86_400_000 + 0.5) / 7));
-	const days = $derived(
-		Array.from({ length: weeks * 7 }, (_, i) => {
-			const d = new Date(gridStart);
-			d.setDate(d.getDate() + i);
-			return d.getTime();
-		})
-	);
+	const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+	const gridStart = $derived(addDays(first, -WEEKDAYS.indexOf(partsOf(first).weekday)));
+	const weeks = $derived(Math.ceil(Math.round((next - gridStart) / 86_400_000) / 7));
+	const days = $derived(Array.from({ length: weeks * 7 }, (_, i) => addDays(gridStart, i)));
 	const range = useQuery(api.calendar.range, () => ({
 		from: gridStart,
-		to: days.at(-1)! + 86_400_000
+		to: addDays(days.at(-1)!, 1)
 	}));
 	const events = $derived(range.data?.events ?? []);
 
@@ -68,9 +70,8 @@
 			);
 
 	function goMonth(delta: number) {
-		const d = new Date(current.getFullYear(), current.getMonth() + delta, 1);
 		const u = new URL(page.url.href);
-		u.searchParams.set('m', monthOf(d));
+		u.searchParams.set('m', monthOf(fromParts(current.y, current.m + delta, 15)));
 		u.searchParams.delete('event');
 		goto(u, { replace: true, reset: false });
 	}
@@ -93,9 +94,9 @@
 	);
 	$effect(() => {
 		const hit = linked.data?.find((e) => e.id === eventId);
-		if (hit && monthOf(new Date(hit.startAt)) !== monthOf(current)) {
+		if (hit && monthOf(hit.startAt) !== monthOf(first)) {
 			const u = new URL(page.url.href);
-			u.searchParams.set('m', monthOf(new Date(hit.startAt)));
+			u.searchParams.set('m', monthOf(hit.startAt));
 			goto(u, { replace: true, reset: false });
 		}
 	});
@@ -127,11 +128,8 @@
 		busy = false;
 	}
 
-	const monthName = $derived(
-		new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(first)
-	);
-	const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-	const inMonth = (day: number) => new Date(day).getMonth() === first.getMonth();
+	const monthName = $derived(`${MONTH_NAMES[current.m - 1]} ${current.y}`);
+	const inMonth = (day: number) => partsOf(day).m === current.m;
 </script>
 
 <svelte:head><title>Calendar — WowCompany</title></svelte:head>
@@ -190,21 +188,21 @@
 							class="relative inline-grid size-6 place-items-center rounded-full text-xs tabular-nums {day ===
 							today
 								? 'bg-primary font-bold text-primary-foreground'
-								: ''}">{new Date(day).getDate()}</span
+								: ''}">{partsOf(day).d}</span
 						>
 						<div class="relative mt-0.5 space-y-0.5">
 							{#each list.slice(0, 3) as e (e.id)}
 								<Tip as="div" text={e.title} class="w-full">
-								<button
-									class="flex w-full items-center gap-1 truncate rounded border px-1 py-px text-left text-[0.68rem] leading-tight {KIND_TONE[
-										e.kind
-									]} {e.id === eventId ? 'ring-1 ring-primary' : ''}"
-									aria-label={e.title}
-									onclick={() => pick(e)}
-								>
-									<span class="hidden sm:inline" aria-hidden="true">{KIND_EMOJI[e.kind]}</span>
-									<span class="truncate">{e.title}</span>
-								</button>
+									<button
+										class="flex w-full items-center gap-1 truncate rounded border px-1 py-px text-left text-[0.68rem] leading-tight {KIND_TONE[
+											e.kind
+										]} {e.id === eventId ? 'ring-1 ring-primary' : ''}"
+										aria-label={e.title}
+										onclick={() => pick(e)}
+									>
+										<span class="hidden sm:inline" aria-hidden="true">{KIND_EMOJI[e.kind]}</span>
+										<span class="truncate">{e.title}</span>
+									</button>
 								</Tip>
 							{/each}
 							{#if list.length > 3}
@@ -293,7 +291,7 @@
 					{/if}
 				</article>
 			{:else}
-				<Card.Root class="p-5 space-y-3">
+				<Card.Root class="space-y-3 p-5">
 					<h2 class="card-title">{fmtDay(selectedDay)}</h2>
 					{#if dayEvents.length}
 						<ul class="space-y-2">
@@ -318,7 +316,7 @@
 				</Card.Root>
 			{/if}
 
-			<Card.Root class="p-5 space-y-2 text-xs text-muted-foreground">
+			<Card.Root class="space-y-2 p-5 text-xs text-muted-foreground">
 				<p class="font-semibold text-foreground">Legend</p>
 				<ul class="grid grid-cols-2 gap-1.5">
 					{#each ['dungeon', 'raid', 'pvp', 'leveling', 'social', 'holiday'] as k (k)}
