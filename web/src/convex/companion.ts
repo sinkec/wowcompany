@@ -737,50 +737,55 @@ export const cleanupLinks = internalMutation({
 	}
 });
 
+/** Izbriše run z vsemi podatki (rekordi, parsi, replay …). Uporabljata ga CLI in Office (runDeletion.ts). */
+export async function removeRun(ctx: MutationCtx, runId: Id<'runs'>) {
+	for await (const p of ctx.db
+		.query('runParticipants')
+		.withIndex('by_run', (q) => q.eq('runId', runId))) {
+		await ctx.db.delete('runParticipants', p._id);
+	}
+	for await (const d of ctx.db
+		.query('runDetails')
+		.withIndex('by_run', (q) => q.eq('runId', runId))) {
+		await ctx.db.delete('runDetails', d._id);
+	}
+	// rekordi iz tega runa izginejo z njim (prejšnji rekord junaka se ne obnovi – pride z naslednjim runom)
+	for await (const r of ctx.db
+		.query('heroRecords')
+		.withIndex('by_run', (q) => q.eq('runId', runId))) {
+		await ctx.db.delete('heroRecords', r._id);
+	}
+	const removed: Doc<'parses'>[] = [];
+	for await (const p of ctx.db.query('parses').withIndex('by_run', (q) => q.eq('runId', runId))) {
+		removed.push(p);
+		await ctx.db.delete('parses', p._id);
+	}
+	await updatePools(ctx, removed, []);
+	for await (const b of ctx.db
+		.query('runBossDetails')
+		.withIndex('by_run_and_index', (q) => q.eq('runId', runId))) {
+		await ctx.db.delete('runBossDetails', b._id);
+	}
+	for await (const r of ctx.db.query('runReplay').withIndex('by_run', (q) => q.eq('runId', runId))) {
+		await ctx.db.delete('runReplay', r._id);
+	}
+	for await (const c of ctx.db.query('clears').withIndex('by_run', (q) => q.eq('runId', runId))) {
+		await ctx.db.delete('clears', c._id);
+	}
+	for await (const g of ctx.db
+		.query('runProgress')
+		.withIndex('by_run_and_slug', (q) => q.eq('runId', runId))) {
+		await ctx.db.delete('runProgress', g._id);
+	}
+	if (await ctx.db.get('runs', runId)) await ctx.db.delete('runs', runId);
+}
+
 /** Admin/CLI: izbriši run z vsemi podatki (`bunx convex run companion:deleteRun '{"runId":"…"}'`). */
 export const deleteRun = internalMutation({
 	args: { runId: v.id('runs') },
 	returns: v.null(),
 	handler: async (ctx, { runId }) => {
-		for await (const p of ctx.db
-			.query('runParticipants')
-			.withIndex('by_run', (q) => q.eq('runId', runId))) {
-			await ctx.db.delete('runParticipants', p._id);
-		}
-		for await (const d of ctx.db
-			.query('runDetails')
-			.withIndex('by_run', (q) => q.eq('runId', runId))) {
-			await ctx.db.delete('runDetails', d._id);
-		}
-		// rekordi iz tega runa izginejo z njim (prejšnji rekord junaka se ne obnovi – pride z naslednjim runom)
-		for await (const r of ctx.db
-			.query('heroRecords')
-			.withIndex('by_run', (q) => q.eq('runId', runId))) {
-			await ctx.db.delete('heroRecords', r._id);
-		}
-		const removed: Doc<'parses'>[] = [];
-		for await (const p of ctx.db.query('parses').withIndex('by_run', (q) => q.eq('runId', runId))) {
-			removed.push(p);
-			await ctx.db.delete('parses', p._id);
-		}
-		await updatePools(ctx, removed, []);
-		for await (const b of ctx.db
-			.query('runBossDetails')
-			.withIndex('by_run_and_index', (q) => q.eq('runId', runId))) {
-			await ctx.db.delete('runBossDetails', b._id);
-		}
-		for await (const r of ctx.db.query('runReplay').withIndex('by_run', (q) => q.eq('runId', runId))) {
-			await ctx.db.delete('runReplay', r._id);
-		}
-		for await (const c of ctx.db.query('clears').withIndex('by_run', (q) => q.eq('runId', runId))) {
-			await ctx.db.delete('clears', c._id);
-		}
-		for await (const g of ctx.db
-			.query('runProgress')
-			.withIndex('by_run_and_slug', (q) => q.eq('runId', runId))) {
-			await ctx.db.delete('runProgress', g._id);
-		}
-		if (await ctx.db.get('runs', runId)) await ctx.db.delete('runs', runId);
+		await removeRun(ctx, runId);
 		return null;
 	}
 });

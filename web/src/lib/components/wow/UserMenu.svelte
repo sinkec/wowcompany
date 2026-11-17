@@ -18,7 +18,11 @@
 	const auth = useAuth();
 	const me = useQuery(api.auth.me, () => (auth.isAuthenticated ? {} : 'skip'));
 	const claims = useQuery(api.claims.listForAdmin, () => (me.data?.role === 'admin' ? {} : 'skip'));
-	const pending = $derived(claims.data?.pending.length ?? 0);
+	const deletions = useQuery(api.runDeletion.pending, () =>
+		me.data?.role === 'admin' ? {} : 'skip'
+	);
+	// prošnje za članstvo + prošnje za izbris runa
+	const pending = $derived((claims.data?.pending.length ?? 0) + (deletions.data?.length ?? 0));
 	const isMember = $derived(me.data?.role === 'admin' || me.data?.role === 'member');
 
 	let busy = $state(false);

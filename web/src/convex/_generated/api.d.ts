@@ -54,6 +54,7 @@ import type * as poll from "../poll.js";
 import type * as profile from "../profile.js";
 import type * as realms from "../realms.js";
 import type * as roster from "../roster.js";
+import type * as runDeletion from "../runDeletion.js";
 import type * as runs from "../runs.js";
 import type * as seasons from "../seasons.js";
 import type * as site from "../site.js";
@@ -111,6 +112,7 @@ declare const fullApi: ApiFromModules<{
   profile: typeof profile;
   realms: typeof realms;
   roster: typeof roster;
+  runDeletion: typeof runDeletion;
   runs: typeof runs;
   seasons: typeof seasons;
   site: typeof site;

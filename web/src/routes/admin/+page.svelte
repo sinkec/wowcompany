@@ -33,6 +33,7 @@
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import EventsAdmin from '#lib/components/admin/EventsAdmin.svelte';
 	import HeroesAdmin from '#lib/components/admin/HeroesAdmin.svelte';
+	import RunDeletionRequests from '#lib/components/admin/RunDeletionRequests.svelte';
 	import SimpleSelect from '#lib/components/form/SimpleSelect.svelte';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
@@ -59,7 +60,8 @@
 	const ov = useQuery(api.admin.overview, () => (isAdmin ? {} : 'skip'));
 	const claims = useQuery(api.claims.listForAdmin, () => (isAdmin ? {} : 'skip'));
 
-	const pendingCount = $derived(claims.data?.pending.length ?? 0);
+	const deletions = useQuery(api.runDeletion.pending, () => (isAdmin ? {} : 'skip'));
+	const pendingCount = $derived((claims.data?.pending.length ?? 0) + (deletions.data?.length ?? 0));
 
 	const run = attempt;
 
@@ -484,7 +486,10 @@
 
 				<!-- PETITIONS -->
 				{#if view === 'petitions'}<div class="space-y-6">
-						{#if !claims.data?.pending.length}
+						<RunDeletionRequests rows={deletions.data ?? []} />
+						{#if !claims.data?.pending.length && deletions.data?.length}
+							<!-- samo prošnje za izbris -->
+						{:else if !claims.data?.pending.length}
 							<p class="wow-frame rounded-lg p-8 text-center text-muted-foreground italic">
 								No petitions. Nobody wants to join. Can't imagine why.
 							</p>

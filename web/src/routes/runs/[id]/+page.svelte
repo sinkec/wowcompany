@@ -1,4 +1,5 @@
 <script lang="ts">
+	import RunDeleteControl from '#lib/components/runs/RunDeleteControl.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import Tip from '#lib/components/wow/Tip.svelte';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
@@ -21,7 +22,21 @@
 	import { classColor, iconFallback } from '#lib/wow.js';
 	import RunReplay from '#lib/components/wow/RunReplay.svelte';
 	import ItemLink from '#lib/components/wow/ItemLink.svelte';
-	import { ACTIVE_QUIP, END_REASON, deathQuip, durationQuip, fmtDuration, fmtMoney, fmtNum, fmtRate, lootColor, QUALITY_NAME, RECORD_KINDS, RECORD_LABEL, resultBadge } from '#lib/runs.js';
+	import {
+		ACTIVE_QUIP,
+		END_REASON,
+		deathQuip,
+		durationQuip,
+		fmtDuration,
+		fmtMoney,
+		fmtNum,
+		fmtRate,
+		lootColor,
+		QUALITY_NAME,
+		RECORD_KINDS,
+		RECORD_LABEL,
+		resultBadge
+	} from '#lib/runs.js';
 	import { fmtWhen } from '#lib/datetime.svelte.js';
 
 	const id = $derived(page.params.id ?? '');
@@ -307,12 +322,15 @@
 >
 
 <div class="space-y-6">
-	<a
-		href="/runs"
-		class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-	>
-		<ArrowLeft class="size-4" /> All runs
-	</a>
+	<div class="flex flex-wrap items-center justify-between gap-2">
+		<a
+			href="/runs"
+			class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+		>
+			<ArrowLeft class="size-4" /> All runs
+		</a>
+		{#if run}<RunDeleteControl runId={run.id} zone={run.zone} />{/if}
+	</div>
 
 	{#if q.isLoading}
 		<div class="h-48 animate-pulse rounded-lg bg-muted"></div>

@@ -340,12 +340,18 @@ export default defineSchema({
 		score: v.number(),
 		/** kdaj je bil run objavljen v Discord (objava gre enkrat, 5 min po prvem uploadu) */
 		discordPostedAt: v.optional(v.number()),
+		/** član prosi za izbris runa; izbriše ga šele Guild Master (Office → Community → Petitions) */
+		deleteRequest: v.optional(
+			v.object({ userId: v.string(), name: v.string(), reason: v.string(), at: v.number() })
+		),
+		deleteRequestedAt: v.optional(v.number()),
 		createdAt: v.number(),
 		updatedAt: v.number()
 	})
 		.index('by_run_key', ['runKey'])
 		.index('by_started_at', ['startedAt'])
-		.index('by_archived_and_started_at', ['archived', 'startedAt']),
+		.index('by_archived_and_started_at', ['archived', 'startedAt'])
+		.index('by_delete_requested_at', ['deleteRequestedAt']),
 
 	// Analiza runa (en dokument na run, ~5–100 KB; bere se samo na strani runa).
 	runDetails: defineTable({
