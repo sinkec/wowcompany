@@ -7,6 +7,18 @@
 | [ADDON.md](ADDON.md) | addon `WowCompany`: §1 stanje, §4.1 dejstva o Forever API-ju |
 | [STATS.md](STATS.md) | v0.3: statistika po vzoru Warcraft Logs + Details!, Company Parses, sezone, preureditev repozitorija |
 
+## Novo 18. 11. 2026 (ponoči) – ZAČNI TUKAJ
+
+- Probe (addon 0.6.9): **addon v dungeonu NE dobi lastne pozicije** (ADDON.md §4.6) → strežnik zdaj replay vseh
+  snemalcev istega runa združi (`lib/replayMerge.ts`).
+- Addon 0.7.0 `Party.lua`: kdo snema v partyju (ADDON.md §4.7) – nepreverjeno v igri z drugim članom.
+- Brisanje runa: član prosi, Guild Master potrdi (`runDeletion.ts`, Office → Petitions).
+- /runs: 5/10/20 na stran + strani (`runs.page`, `components/table/Pager.svelte`), kartica s sliko dungeona
+  (`DungeonImage.svelte`); koledar: kljukice vrst (igra privzeto izklopljena); naslovnica: vrste dogodkov v
+  Office → Website → Home page (`siteContent.homeEventKinds`).
+- Companion 0.1.21 izdan (edina izdaja). Odprto: prvi skupni run (📡 število ob lučki), Register commands +
+  Calendar stikalo v Office.
+
 ## Novo 17. 11. 2026 (zvečer)
 
 **Odprto (stanje ob zaključku, zadnji commit na `main`, vse pushano):**
