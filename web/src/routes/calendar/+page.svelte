@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
+	import Tip from '#lib/components/wow/Tip.svelte';
 	// Koledar: mesec v mreži (pon–ned), ob strani izbrani dogodek ali dan. Naši dogodki (Guild Master,
 	// Office → Website → Events) + prazniki iz igre (addon → Companion). Člani se prijavijo.
 	import { useConvexClient, useQuery } from 'convex-svelte';
@@ -160,7 +162,7 @@
 
 	<div class="grid gap-6 lg:grid-cols-[1fr_20rem]">
 		<!-- mesec -->
-		<div class="wow-frame overflow-hidden rounded-lg">
+		<Card.Root class="overflow-hidden">
 			<div class="grid grid-cols-7 border-b border-border/60 bg-muted/30">
 				{#each WEEKDAYS as w (w)}
 					<div class="px-2 py-1.5 text-center text-xs font-semibold text-muted-foreground">{w}</div>
@@ -192,16 +194,18 @@
 						>
 						<div class="relative mt-0.5 space-y-0.5">
 							{#each list.slice(0, 3) as e (e.id)}
+								<Tip as="div" text={e.title} class="w-full">
 								<button
 									class="flex w-full items-center gap-1 truncate rounded border px-1 py-px text-left text-[0.68rem] leading-tight {KIND_TONE[
 										e.kind
 									]} {e.id === eventId ? 'ring-1 ring-primary' : ''}"
-									title={e.title}
+									aria-label={e.title}
 									onclick={() => pick(e)}
 								>
 									<span class="hidden sm:inline" aria-hidden="true">{KIND_EMOJI[e.kind]}</span>
 									<span class="truncate">{e.title}</span>
 								</button>
+								</Tip>
 							{/each}
 							{#if list.length > 3}
 								<span class="block px-1 text-[0.65rem] text-muted-foreground"
@@ -212,7 +216,7 @@
 					</div>
 				{/each}
 			</div>
-		</div>
+		</Card.Root>
 
 		<!-- izbrano -->
 		<aside class="space-y-4">
@@ -289,7 +293,7 @@
 					{/if}
 				</article>
 			{:else}
-				<section class="panel space-y-3">
+				<Card.Root class="p-5 space-y-3">
 					<h2 class="card-title">{fmtDay(selectedDay)}</h2>
 					{#if dayEvents.length}
 						<ul class="space-y-2">
@@ -311,10 +315,10 @@
 					{:else}
 						<p class="text-sm text-muted-foreground italic">Nothing that day. Go farm something.</p>
 					{/if}
-				</section>
+				</Card.Root>
 			{/if}
 
-			<section class="panel space-y-2 text-xs text-muted-foreground">
+			<Card.Root class="p-5 space-y-2 text-xs text-muted-foreground">
 				<p class="font-semibold text-foreground">Legend</p>
 				<ul class="grid grid-cols-2 gap-1.5">
 					{#each ['dungeon', 'raid', 'pvp', 'leveling', 'social', 'holiday'] as k (k)}
@@ -323,7 +327,7 @@
 						</li>
 					{/each}
 				</ul>
-			</section>
+			</Card.Root>
 		</aside>
 	</div>
 </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import { errText } from '#lib/errors.js';
 	import { page } from '$app/state';
 	import { useConvexClient, useQuery } from 'convex-svelte';
@@ -64,7 +65,7 @@
 	{#if auth.isLoading}
 		<div class="h-40 animate-pulse rounded-lg bg-muted"></div>
 	{:else if !auth.isAuthenticated}
-		<div class="wow-frame flex flex-col items-center gap-4 rounded-lg p-10 text-center">
+		<Card.Root class="flex flex-col items-center gap-4 p-10 text-center">
 			<MonitorSmartphone class="size-10 text-primary/70" />
 			<p>Sign in first. The app needs to know whose corpse it's uploading.</p>
 			<Button
@@ -74,10 +75,10 @@
 						callbackURL: code ? `/link?code=${encodeURIComponent(code)}` : '/link'
 					})}>Sign in with Google</Button
 			>
-		</div>
+		</Card.Root>
 	{:else}
 		{#if code}
-			<section class="wow-frame space-y-4 rounded-lg p-6">
+			<Card.Root class="space-y-4 p-6">
 				{#if link.isLoading || me.isLoading}
 					<div class="flex items-center gap-2 text-muted-foreground">
 						<Loader class="size-4 animate-spin" /> Consulting the spirits…
@@ -127,7 +128,7 @@
 						<Button variant="outline" disabled={busy} onclick={() => decide(false)}>Deny</Button>
 					</div>
 				{/if}
-			</section>
+			</Card.Root>
 		{/if}
 
 		<section class="space-y-3">

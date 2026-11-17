@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	// Zavihek Logs na strani junaka: Company Parses po bossih (docs/STATS.md §6).
 	import { useQuery } from 'convex-svelte';
 	import { api } from '#convex/_generated/api.js';
@@ -53,31 +54,31 @@
 {:else if d}
 	<div class="flex flex-wrap items-end justify-between gap-3">
 		<div class="flex flex-wrap gap-3">
-			<div class="wow-frame rounded-lg px-4 py-2">
+			<Card.Root class="px-4 py-2">
 				<div class="eyebrow">Best Perf. Avg</div>
 				<div class="text-2xl font-bold tabular-nums" style="color: {parseColor(d.bestPerfAvg)}">
 					{pctText(d.bestPerfAvg)}
 				</div>
-			</div>
-			<div class="wow-frame rounded-lg px-4 py-2">
+			</Card.Root>
+			<Card.Root class="px-4 py-2">
 				<div class="eyebrow">Median Perf. Avg</div>
 				<div class="text-2xl font-bold tabular-nums" style="color: {parseColor(d.medianPerfAvg)}">
 					{pctText(d.medianPerfAvg)}
 				</div>
-			</div>
+			</Card.Root>
 		</div>
 		<SeasonPicker seasons={d.seasons} current={d.season} onpick={(n) => (season = n)} />
 	</div>
 
 	{#if !d.encounters.length}
-		<div class="wow-frame rounded-lg p-6 text-center text-sm text-muted-foreground">
+		<Card.Root class="p-6 text-center text-sm text-muted-foreground">
 			No boss kills on file this season. Parses come from dungeon runs recorded by the
 			<a href="/link" class="text-primary hover:underline">Companion</a> – kill something first.
-		</div>
+		</Card.Root>
 	{/if}
 
 	{#each zones as [zone, list] (zone)}
-		<section class="wow-frame overflow-hidden rounded-lg">
+		<Card.Root class="overflow-hidden">
 			<h3 class="border-b border-border/50 px-4 py-2 text-sm font-semibold text-primary">{zone}</h3>
 			<Table.Root>
 				<Table.Header>
@@ -205,7 +206,7 @@
 					{/each}
 				</Table.Body>
 			</Table.Root>
-		</section>
+		</Card.Root>
 	{/each}
 	<p class="text-xs text-muted-foreground">
 		Company Parses: each kill against every other tracked hero's best on the same boss and role,

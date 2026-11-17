@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import { errText } from '#lib/errors.js';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { useAuth } from '@mmailaender/convex-better-auth-svelte/svelte';
@@ -72,13 +73,13 @@
 	{#if auth.isLoading}
 		<div class="h-40 animate-pulse rounded-lg bg-muted"></div>
 	{:else if !auth.isAuthenticated}
-		<div class="wow-frame flex flex-col items-center gap-4 rounded-lg p-10 text-center">
+		<Card.Root class="flex flex-col items-center gap-4 p-10 text-center">
 			<ScrollText class="size-10 text-primary/70" />
 			<p>Sign in first. We need to know who to blame.</p>
 			<Button onclick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/join' })}
 				>Sign in with Google</Button
 			>
-		</div>
+		</Card.Root>
 	{:else}
 		{#if mine.data?.role}
 			<p class="rounded-md border border-primary/40 bg-primary/10 p-3 text-sm">

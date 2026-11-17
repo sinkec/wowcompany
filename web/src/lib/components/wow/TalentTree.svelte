@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import * as HoverCard from '#lib/components/ui/hover-card/index.js';
 	import type { TalentTree } from '#lib/types.js';
 	import { iconFallback } from '#lib/wow.js';
@@ -6,7 +7,7 @@
 	let { tree, top = false }: { tree: TalentTree; top?: boolean } = $props();
 </script>
 
-<section class="wow-frame rounded-lg p-4 {top ? 'ring-1 ring-primary/60' : ''}">
+<Card.Root class="p-4 {top ? 'ring-1 ring-primary/60' : ''}">
 	<div class="mb-3 flex items-baseline justify-between gap-2">
 		<h3 class="font-display text-lg font-semibold {top ? 'text-primary' : ''}">{tree.name}</h3>
 		<span class="font-display text-2xl font-bold tabular-nums {tree.spent ? '' : 'text-muted-foreground'}">{tree.spent}</span>
@@ -46,4 +47,4 @@
 			{/each}
 		</ul>
 	{/if}
-</section>
+</Card.Root>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import { page } from '$app/state';
 	import { useQuery } from 'convex-svelte';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
@@ -162,13 +163,13 @@
 		<Skeleton class="h-56 rounded-lg" />
 		<Skeleton class="h-96 rounded-lg" />
 	{:else if !c}
-		<div class="wow-frame flex flex-col items-center gap-3 rounded-lg p-12 text-center">
+		<Card.Root class="flex flex-col items-center gap-3 p-12 text-center">
 			<Ghost class="size-12 text-primary/70" />
 			<h1 class="text-2xl font-bold">Nobody here by that name</h1>
 			<p class="text-muted-foreground">
 				Either they quit, got kicked, or never existed. Rest in pixels.
 			</p>
-		</div>
+		</Card.Root>
 	{:else}
 		<!-- header -->
 		<header class="wow-frame relative overflow-hidden rounded-lg">
@@ -224,7 +225,7 @@
 			<!-- quick tiles -->
 			<section class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
 				{#each [{ l: 'Item level', v: s.ilvlEquipped, sub: s.ilvlAverage != null ? `best owned ${s.ilvlAverage}` : '' }, { l: 'Things murdered', v: s.kills, sub: c.week?.kills ? `+${fmt(c.week.kills)} this week` : '' }, { l: 'Deaths', v: s.deaths, sub: kd != null ? `K/D ${fmt(kd, 1)} · ${kdQuip(kd)}` : '' }, { l: 'Quests', v: s.quests, sub: c.week?.quests ? `+${fmt(c.week.quests)} this week` : 'unpaid labor' }, { l: 'Honorable kills', v: s.honorableKills, sub: 'honor is relative' }, { l: 'Health', v: stats ? n('health') : null, sub: stats ? `${fmt(n('power'))} ${stats.powerType ?? ''}` : '' }] as t (t.l)}
-					<div class="wow-frame rounded-lg p-3">
+					<Card.Root class="p-3">
 						<div class="text-xs text-muted-foreground">{t.l}</div>
 						<div class="stat-value">
 							{#if t.v == null}<Locked compact />{:else}{fmt(t.v)}{/if}
@@ -232,7 +233,7 @@
 						{#if t.sub}<div class="text-xs leading-snug text-muted-foreground italic">
 								{t.sub}
 							</div>{/if}
-					</div>
+					</Card.Root>
 				{/each}
 			</section>
 
@@ -257,7 +258,7 @@
 				<Tabs.Content value="runs" class="mt-4 space-y-3">
 					<!-- osebni rekordi (tudi open world) so neodvisni od tega, ali ima junak kak run -->
 					{#if heroRuns.data?.records?.length}
-						<section class="wow-frame rounded-lg p-4">
+						<Card.Root class="p-4">
 							<h3 class="text-sm font-semibold text-primary">Personal Records</h3>
 							<p class="text-xs text-muted-foreground italic">
 								biggest numbers ever caught on a combat log, dungeons and open world. screenshots or
@@ -300,17 +301,17 @@
 									{/if}
 								{/each}
 							</div>
-						</section>
+						</Card.Root>
 					{/if}
 					{#if heroRuns.data?.locked}
 						<Locked what="their dungeon runs (and how often they died in them)" />
 					{:else if heroRuns.data && !heroRuns.data.runs.length}
-						<div class="wow-frame rounded-lg p-6 text-center text-sm text-muted-foreground">
+						<Card.Root class="p-6 text-center text-sm text-muted-foreground">
 							No recorded dungeon runs. Either they never set foot in one, or nobody in their party
 							runs the
 							<a href="/link" class="text-primary hover:underline">Companion</a>. The dead tell no
 							tales.
-						</div>
+						</Card.Root>
 					{:else}
 						{#each heroRuns.data?.runs ?? [] as run (run.id)}
 							<RunCard {run} highlight={slug} />
@@ -320,7 +321,7 @@
 
 				<!-- gear + stats -->
 				<Tabs.Content value="gear" class="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
-					<section class="wow-frame rounded-lg p-4">
+					<Card.Root class="p-4">
 						{#if equipment}
 							<div class="grid gap-x-6 sm:grid-cols-2">
 								<div>
@@ -340,9 +341,9 @@
 						{:else}
 							<Locked what="what they're wearing (probably rags)" />
 						{/if}
-					</section>
+					</Card.Root>
 
-					<section class="wow-frame space-y-4 rounded-lg p-4 text-sm">
+					<Card.Root class="space-y-4 p-4 text-sm">
 						{#if stats}
 							{#each statPanel as g (g.h)}
 								<div>
@@ -362,7 +363,7 @@
 						{:else}
 							<Locked what="their pathetic stats" />
 						{/if}
-					</section>
+					</Card.Root>
 				</Tabs.Content>
 
 				<!-- talents -->
@@ -399,10 +400,10 @@
 								{#if pts}
 									<LineChart title={ch.t} points={pts} color={ch.col} />
 								{:else}
-									<div class="wow-frame rounded-lg p-4">
+									<Card.Root class="p-4">
 										<div class="card-title mb-2">{ch.t}</div>
 										<Locked what="this chart" />
-									</div>
+									</Card.Root>
 								{/if}
 							{/each}
 						</div>
@@ -411,7 +412,7 @@
 					{/if}
 
 					<div class="grid gap-4 lg:grid-cols-[1fr_340px]">
-						<section class="wow-frame rounded-lg p-4">
+						<Card.Root class="p-4">
 							<h3 class="mb-3 text-sm font-semibold text-primary">Fun Facts Nobody Asked For</h3>
 							{#if d?.counters}
 								<dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -427,7 +428,7 @@
 							{:else}
 								<Locked what="the embarrassing numbers" />
 							{/if}
-						</section>
+						</Card.Root>
 						<GossipFeed
 							events={feed.data ?? []}
 							title="Recent Shenanigans"
@@ -438,7 +439,7 @@
 
 				<!-- professions -->
 				<Tabs.Content value="prof" class="mt-4">
-					<section class="wow-frame rounded-lg p-4">
+					<Card.Root class="p-4">
 						{#if professions}
 							<div class="grid gap-6 md:grid-cols-2">
 								{#each [true, false] as primary (primary)}
@@ -466,7 +467,7 @@
 						{:else}
 							<Locked what="their career choices" />
 						{/if}
-					</section>
+					</Card.Root>
 				</Tabs.Content>
 
 				<!-- all stats -->
@@ -479,7 +480,7 @@
 						/>
 						<div class="columns-1 gap-4 md:columns-2 lg:columns-3">
 							{#each statGroups as [cat, rows] (cat)}
-								<section class="wow-frame mb-4 break-inside-avoid rounded-lg p-3">
+								<Card.Root class="mb-4 break-inside-avoid p-3">
 									<h3 class="eyebrow mb-1 text-primary">
 										{cat}
 									</h3>
@@ -490,7 +491,7 @@
 											>
 										</div>
 									{/each}
-								</section>
+								</Card.Root>
 							{:else}
 								<p class="text-sm text-muted-foreground italic">
 									Nothing matches. Unlike their gear.

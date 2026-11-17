@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Tip from './Tip.svelte';
 	// Povezave na skupnost (Discord, Facebook …), ki jih Guild Master nastavi v Office → Website → Home page.
 	// pojmenovani uvozi: v paket gredo samo te ikone, ne vseh ~3000
 	import {
@@ -45,11 +46,11 @@
 {#if socials.length}
 	<div class="flex flex-wrap items-center gap-2">
 		{#each socials as s, i (i)}
+			<Tip text={label(s)}>
 			<a
 				href={s.url}
 				target="_blank"
 				rel="noopener noreferrer"
-				title={label(s)}
 				aria-label={label(s)}
 				class={variant === 'buttons'
 					? 'inline-flex h-11 items-center gap-2 rounded-md border border-border/70 bg-background/50 px-4 text-sm font-semibold backdrop-blur transition hover:border-primary/60 hover:bg-accent/60'
@@ -64,6 +65,7 @@
 				{/if}
 				{#if variant === 'buttons'}<span>{label(s)}</span>{/if}
 			</a>
+			</Tip>
 		{/each}
 	</div>
 {/if}

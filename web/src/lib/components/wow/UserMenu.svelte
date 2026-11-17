@@ -54,7 +54,7 @@
 {/if}
 
 {#if me.data?.role === 'admin'}
-	<a href="/admin" class="{linkCls} relative text-primary" title="Guild Master's Office">
+	<a href="/admin" class="{linkCls} relative text-primary" aria-label="Guild Master's Office">
 		<Crown class="size-4" /><span class="hidden md:inline">Office</span>
 		{#if pending}<span
 				class="grid size-5 place-items-center rounded-full bg-destructive text-[11px] font-bold text-white"

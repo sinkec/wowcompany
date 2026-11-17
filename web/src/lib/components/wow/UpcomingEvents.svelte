@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	// Naslednji dogodki (naslovnica): naši + prazniki iz igre, z datumom v "listku" in kdo pride.
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import Users from '@lucide/svelte/icons/users';
@@ -22,13 +23,13 @@
 			{#each [1, 2, 3] as i (i)}<div class="h-16 animate-pulse rounded-lg bg-muted"></div>{/each}
 		</div>
 	{:else if !events.length}
-		<div class="wow-frame flex flex-col items-center gap-2 rounded-lg p-8 text-center">
+		<Card.Root class="flex flex-col items-center gap-2 p-8 text-center">
 			<CalendarDays class="size-8 text-primary/70" />
 			<p class="text-sm text-muted-foreground">
 				Nothing planned. The Guild Master is "thinking about it". In-game holidays show up once
 				someone logs in with the Companion running.
 			</p>
-		</div>
+		</Card.Root>
 	{:else}
 		<ul class="space-y-2">
 			{#each events as e (e.id)}

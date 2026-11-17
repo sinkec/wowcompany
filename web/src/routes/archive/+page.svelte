@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	// Arhiv starih realmov (samo člani, samo branje): junaki, runi, lestvice. Po 30 dneh izbris.
@@ -71,10 +72,8 @@
 		</ToggleGroup.Root>
 
 		{#if archive}
-			<section
-				class="panel flex flex-wrap items-center justify-between gap-3 {archive.daysLeft <= 7
-					? 'border-destructive/70'
-					: ''}"
+			<Card.Root
+			 class="p-5 flex flex-wrap items-center justify-between gap-3 {archive.daysLeft <= 7 ? 'border-destructive/70' : ''}"
 			>
 				<div>
 					<div class="eyebrow">Archived {ago(archive.archivedAt)}</div>
@@ -90,7 +89,7 @@
 				<Button size="lg" disabled={!contents.data} onclick={download}
 					><Download class="size-4" /> Download (JSON)</Button
 				>
-			</section>
+			</Card.Root>
 
 			{#if contents.data}
 				{@const c = contents.data}
@@ -98,7 +97,7 @@
 					<h2 class="section-title">Heroes ({c.heroes.length})</h2>
 					<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 						{#each c.heroes as h (h.slug)}
-							<div class="panel flex items-center gap-3 !p-3">
+							<Card.Root class="p-5 flex items-center gap-3 !p-3">
 								{#if h.avatar}<img
 										src={h.avatar}
 										alt=""
@@ -118,7 +117,7 @@
 										{#if h.deaths != null}· {fmt(h.deaths)} deaths{/if}
 									</div>
 								</div>
-							</div>
+							</Card.Root>
 						{/each}
 					</div>
 				</section>

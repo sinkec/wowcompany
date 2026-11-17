@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import { ask } from '#lib/confirm.svelte.js';
 	import { errText } from '#lib/errors.js';
@@ -203,14 +204,14 @@
 	{#if auth.isLoading || (auth.isAuthenticated && q.isLoading)}
 		<div class="h-64 animate-pulse rounded-lg bg-muted"></div>
 	{:else if !auth.isAuthenticated || !me}
-		<div class="wow-frame flex flex-col items-center gap-4 rounded-lg p-10 text-center">
+		<Card.Root class="flex flex-col items-center gap-4 p-10 text-center">
 			<UserCog class="size-10 text-primary/70" />
 			<p>Sign in first. We can't let strangers rename themselves into someone else.</p>
 			<Button
 				onclick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/settings' })}
 				>Sign in with Google</Button
 			>
-		</div>
+		</Card.Root>
 	{:else}
 		<div class="grid gap-6 md:grid-cols-[14rem_1fr]">
 			<!-- sub-nav -->
@@ -235,7 +236,7 @@
 
 			<div class="min-w-0 space-y-6">
 				{#if tab === 'overview'}
-					<section class="panel relative isolate overflow-hidden">
+					<Card.Root class="p-5 relative isolate overflow-hidden">
 						{#if main && renderFromAvatar(main.avatar)}
 							<img
 								src={renderFromAvatar(main.avatar)}
@@ -287,9 +288,9 @@
 								><Trophy class="size-4" /> Rankings</Button
 							>
 						</div>
-					</section>
+					</Card.Root>
 
-					<section class="panel space-y-3">
+					<Card.Root class="p-5 space-y-3">
 						<div>
 							<h2 class="card-title">
 								{stepsLeft ? `Getting set up · ${stepsLeft} to go` : 'All set. Go play.'}
@@ -317,9 +318,9 @@
 								</li>
 							{/each}
 						</ul>
-					</section>
+					</Card.Root>
 				{:else if tab === 'characters'}
-					<section class="wow-frame space-y-3 rounded-lg p-5">
+					<Card.Root class="space-y-3 p-5">
 						<div>
 							<h2 class="section-title">Main hero</h2>
 							<p class="text-sm text-muted-foreground">
@@ -361,7 +362,7 @@
 								{/each}
 							</ToggleGroup.Root>
 						{/if}
-					</section>
+					</Card.Root>
 					<section class="space-y-3">
 						<div class="flex flex-wrap items-end justify-between gap-2">
 							<div>
@@ -375,7 +376,7 @@
 						</div>
 						{#each me.characters as c (c.id)}
 							{@const isMain = me.profile.mainSlug === c.slug}
-							<div class="wow-frame flex flex-wrap items-center gap-4 rounded-lg p-4">
+							<Card.Root class="flex flex-wrap items-center gap-4 p-4">
 								{#if c.avatar}
 									<img
 										src={c.avatar}
@@ -420,7 +421,7 @@
 										onclick={() => remove(c.id, c.name)}>Remove</Button
 									>
 								</div>
-							</div>
+							</Card.Root>
 						{/each}
 					</section>
 
@@ -468,7 +469,7 @@
 						{/if}
 					</form>
 				{:else if tab === 'devices'}
-					<section class="wow-frame space-y-4 rounded-lg p-5">
+					<Card.Root class="space-y-4 p-5">
 						<div class="flex flex-wrap items-end justify-between gap-2">
 							<div>
 								<h2 class="section-title">Companion devices</h2>
@@ -482,7 +483,7 @@
 							>
 						</div>
 						<DevicesList />
-					</section>
+					</Card.Root>
 				{:else}
 					<form onsubmit={saveName} class="wow-frame space-y-4 rounded-lg p-5">
 						<div>
@@ -512,7 +513,7 @@
 							</span>
 						</div>
 					</form>
-					<section class="wow-frame space-y-4 rounded-lg p-5">
+					<Card.Root class="space-y-4 p-5">
 						<h2 class="section-title">Account</h2>
 						<dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[10rem_1fr]">
 							<dt class="text-muted-foreground">Signed in as</dt>
@@ -538,7 +539,7 @@
 							<a href="/privacy" class="text-primary hover:underline">Privacy</a>.
 						</p>
 						<Button variant="outline" onclick={signOut}>Log out</Button>
-					</section>
+					</Card.Root>
 				{/if}
 			</div>
 		</div>

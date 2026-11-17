@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	// Prenos WowCompany Companion: zadnja izdaja "companion-v*" z GitHub Releases (javni API, brez žetona).
 	import { onMount } from 'svelte';
@@ -54,7 +55,7 @@
 	);
 </script>
 
-<section id="download" class="wow-frame space-y-4 rounded-lg p-5">
+<Card.Root id="download" class="space-y-4 p-5">
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div>
 			<h2 class="section-title">Get the app</h2>
@@ -211,4 +212,4 @@
 			</div>
 		</div>
 	{/if}
-</section>
+</Card.Root>

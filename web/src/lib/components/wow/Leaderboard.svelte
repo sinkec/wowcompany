@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import type { RosterEntry } from '#lib/types.js';
 	import { classColor, fmt } from '#lib/wow.js';
 	import Locked from './Locked.svelte';
@@ -34,7 +35,7 @@
 	const medals = ['🥇', '🥈', '🥉'];
 </script>
 
-<section class="wow-frame rounded-lg p-4">
+<Card.Root class="p-4">
 	<h3 class="text-sm font-semibold text-primary">{title}</h3>
 	{#if note}<p class="text-xs text-muted-foreground italic">{note}</p>{/if}
 	{#if hidden}
@@ -45,7 +46,7 @@
 		<ol class="mt-3 space-y-2">
 			{#each rows as { c, v }, i (c.slug)}
 				<li>
-					<a href="/c/{c.slug}" class="group block" title="{c.displayName}: {format(v)}">
+					<a href="/c/{c.slug}" class="group block" aria-label="{c.displayName}: {format(v)}">
 						<div class="flex items-baseline justify-between gap-2 text-sm">
 							<span class="truncate">
 								<span class="inline-block w-5 text-center">{medals[i] ?? i + 1}</span>
@@ -61,4 +62,4 @@
 			{/each}
 		</ol>
 	{/if}
-</section>
+</Card.Root>

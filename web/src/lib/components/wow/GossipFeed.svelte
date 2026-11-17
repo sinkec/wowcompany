@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import type { FeedEvent } from '#lib/types.js';
 	import { sessionHeadline } from '#convex/lib/humor.js';
 	import Locked from './Locked.svelte';
@@ -16,7 +17,7 @@
 	const headline = (e: FeedEvent) => sessionHeadline(e, [...e.id].reduce((a, c) => a + c.charCodeAt(0), 0));
 </script>
 
-<section class="wow-frame rounded-lg p-4 {klass}">
+<Card.Root class="p-4 {klass}">
 	{#if showTitle}<h3 class="mb-3 text-sm font-semibold text-primary">{title}</h3>{/if}
 	{#if locked}
 		<Locked what="who did what in the tavern" />
@@ -58,4 +59,4 @@
 			{/each}
 		</ul>
 	{/if}
-</section>
+</Card.Root>

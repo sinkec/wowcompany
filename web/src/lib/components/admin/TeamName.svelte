@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	// Ime ekipe pred "WowCompany" (glava strani, naslov zavihka, Discord noge).
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
@@ -24,7 +25,7 @@
 	}
 </script>
 
-<section class="panel space-y-3">
+<Card.Root class="p-5 space-y-3">
 	<div>
 		<h3 class="card-title">Company name</h3>
 		<p class="section-lead">
@@ -54,4 +55,4 @@
 		</span>
 		<span class="ml-auto text-xs text-muted-foreground">{brandName(preview)}</span>
 	</div>
-</section>
+</Card.Root>

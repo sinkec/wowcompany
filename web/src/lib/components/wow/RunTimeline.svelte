@@ -267,7 +267,7 @@
 						variant="outline"
 						size="sm"
 						class="gap-2 text-xs aria-pressed:bg-transparent data-[state=off]:opacity-40"
-						title={hidden[p.slug] ? 'Show' : 'Hide'}
+						aria-label="{hidden[p.slug] ? 'Show' : 'Hide'} {names[p.slug] ?? p.slug}"
 						bind:pressed={() => !hidden[p.slug], (on) => (hidden = { ...hidden, [p.slug]: !on })}
 					>
 						<span class="size-2.5 rounded-full" style="background: {c}"></span>

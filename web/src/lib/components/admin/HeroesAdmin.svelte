@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	// Office → Community → Heroes: dodaj junaka neposredno + seznam (sortiranje po stolpcih, izgon).
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
@@ -63,7 +64,7 @@
 			>{adding ? 'Asking Blizzard…' : 'Add'}</Button
 		>
 	</form>
-	<div class="wow-frame overflow-hidden rounded-lg">
+	<Card.Root class="overflow-hidden">
 		<Table.Root>
 			<Table.Header>
 				<Table.Row class="text-xs uppercase hover:bg-transparent">
@@ -129,5 +130,5 @@
 				{/each}
 			</Table.Body>
 		</Table.Root>
-	</div>
+	</Card.Root>
 </div>

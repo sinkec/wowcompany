@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
+	import Tip from '#lib/components/wow/Tip.svelte';
 	// Lestvice slave in sramote + sestava druščine (iz rosterja in rekordov dungeon runov).
 	import { useQuery } from 'convex-svelte';
 	import Medal from '@lucide/svelte/icons/medal';
@@ -226,15 +228,16 @@
 
 		<!-- class mix -->
 		{#if classes.length}
-			<section class="panel">
+			<Card.Root class="p-5">
 				<h3 class="card-title">Party Composition</h3>
 				<p class="section-lead mb-3 italic">a raid leader's nightmare</p>
 				<div class="flex h-3 gap-0.5 overflow-hidden rounded-full">
 					{#each classes as cl (cl.name)}
-						<div
+						<Tip
+							as="div"
 							style="flex: {cl.n}; background: {classColor(cl.id)}"
-							title="{cl.name}: {cl.n}"
-						></div>
+							text="{cl.name}: {cl.n}"
+						/>
 					{/each}
 				</div>
 				<ul class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -245,7 +248,7 @@
 						</li>
 					{/each}
 				</ul>
-			</section>
+			</Card.Root>
 		{/if}
 	{/if}
 </div>

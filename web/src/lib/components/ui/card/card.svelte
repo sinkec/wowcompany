@@ -11,11 +11,12 @@
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & { size?: "default" | "sm" } = $props();
 </script>
 
+<!-- WowCompany: okvir iz layout.css (.wow-frame), brez vsiljene postavitve – kartice na strani nosijo svoj odmik/flex. -->
 <div
 	bind:this={ref}
 	data-slot="card"
 	data-size={size}
-	class={cn("ring-foreground/10 bg-card text-card-foreground gap-(--card-spacing) overflow-hidden rounded-xl py-(--card-spacing) text-sm shadow-xs ring-1 [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl group/card flex flex-col", className)}
+	class={cn("wow-frame text-card-foreground rounded-lg [--card-spacing:--spacing(6)] data-[size=sm]:[--card-spacing:--spacing(4)] group/card", className)}
 	{...restProps}
 >
 	{@render children?.()}

@@ -31,6 +31,9 @@
   `Select` prek `components/form/SimpleSelect.svelte`, `Textarea`, `Checkbox`, `Collapsible`, `Slider` (replay);
   potrditve `ask()` (`lib/confirm.svelte.ts`) + `ConfirmHost` v layoutu namesto `confirm()`/`prompt()`.
   Brez Prettierja čez `components/ui` (vendor datoteke).
+  Namigi: `components/wow/Tip.svelte` (shadcn Tooltip, Provider v layoutu) namesto `title=`; kartice = shadcn `Card`
+  z našim okvirjem (`ui/card/card.svelte` uporablja `.wow-frame`, brez vsiljene postavitve); `wow-frame` kot razred
+  ostane samo na semantičnih elementih (povezave-kartice, obrazci, seznami, figure, article). Office: `Alert`.
 - **Skupno:** `lib/errors.ts` (`errText`, `attempt`) namesto kopij po straneh; hero stran bere `?tab=`.
 
 ## ZAČNI TUKAJ – stanje 16. 11. 2026 (dopoldne)

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { useQuery } from 'convex-svelte';
 	import Skull from '@lucide/svelte/icons/skull';
@@ -100,15 +101,15 @@
 			{#each Array(3) as _, i (i)}<Skeleton class="h-44 rounded-lg" />{/each}
 		</div>
 	{:else if roster.error}
-		<div class="wow-frame rounded-lg p-6 text-destructive">
+		<Card.Root class="p-6 text-destructive">
 			The server died. Again. ({roster.error.message})
-		</div>
+		</Card.Root>
 	{:else if players.length === 0}
-		<div class="wow-frame flex flex-col items-center gap-3 rounded-lg p-12 text-center">
+		<Card.Root class="flex flex-col items-center gap-3 p-12 text-center">
 			<Skull class="size-12 text-primary/70" />
 			<h2 class="section-title">No heroes yet</h2>
 			<p class="text-muted-foreground">Even the Scourge has more friends than this.</p>
-		</div>
+		</Card.Root>
 	{:else}
 		<!--
 			Roster + Tavern Gossip: roster ima fiksno višino (2 × 2 kartici ali 8 vrstic), več junakov = listanje/iskanje.
@@ -151,10 +152,10 @@
 							aria-label="View"
 							bind:value={() => view, (v) => v && setView(v as View)}
 						>
-							<ToggleGroup.Item value="cards" aria-label="Cards" title="Cards"
+							<ToggleGroup.Item value="cards" aria-label="Cards"
 								><LayoutGrid class="size-4" /></ToggleGroup.Item
 							>
-							<ToggleGroup.Item value="list" aria-label="List" title="List"
+							<ToggleGroup.Item value="list" aria-label="List"
 								><List class="size-4" /></ToggleGroup.Item
 							>
 						</ToggleGroup.Root>

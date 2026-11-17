@@ -4,6 +4,7 @@
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
+	import Tip from '#lib/components/wow/Tip.svelte';
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { cn } from '#lib/utils.js';
 	import type { SortDir, TableSort } from '#lib/sort.svelte.js';
@@ -32,9 +33,9 @@
 	class={cn(align === 'right' && 'text-right', align === 'center' && 'text-center', cls)}
 	aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
 >
+	<Tip text={title}>
 	<button
 		type="button"
-		{title}
 		class={cn(
 			'-mx-1 inline-flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
 			align === 'right' && 'flex-row-reverse',
@@ -49,4 +50,5 @@
 			<ChevronsUpDown class="size-3.5 opacity-40" />
 		{/if}
 	</button>
+	</Tip>
 </Table.Head>

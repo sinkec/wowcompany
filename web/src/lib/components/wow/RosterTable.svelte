@@ -3,6 +3,7 @@
 </script>
 
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	// Kompakten pogled seznama: ena vrstica na junaka. Sortira stran (sort.apply pred listanjem).
 	import * as Table from '#lib/components/ui/table/index.js';
 	import SortHead from '#lib/components/table/SortHead.svelte';
@@ -26,7 +27,7 @@
 	const head = 'h-[34px] text-[11px] tracking-wider text-muted-foreground uppercase';
 </script>
 
-<div class="wow-frame h-full overflow-hidden rounded-lg">
+<Card.Root class="h-full overflow-hidden">
 	<Table.Root>
 		<Table.Header class="bg-background/40" onclick={() => onsort?.()}>
 			<Table.Row class="hover:bg-transparent">
@@ -115,4 +116,4 @@
 			{/each}
 		</Table.Body>
 	</Table.Root>
-</div>
+</Card.Root>

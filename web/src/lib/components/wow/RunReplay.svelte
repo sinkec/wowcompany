@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
+	import Tip from './Tip.svelte';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
 	import { Slider } from '#lib/components/ui/slider/index.js';
 	import { Toggle } from '#lib/components/ui/toggle/index.js';
@@ -538,7 +540,7 @@
 {:else}
 	<div class="grid gap-4 lg:grid-cols-[1fr_20rem]">
 		<!-- zemljevid -->
-		<section class="panel relative isolate overflow-hidden !p-0">
+		<Card.Root class="p-5 relative isolate overflow-hidden !p-0">
 			{#if artOk}
 				<img
 					src={dungeonTile(zone)}
@@ -566,7 +568,7 @@
 								variant: 'outline',
 								size: 'sm'
 							})} h-7 cursor-pointer px-2 text-xs"
-							title="Screenshot of the in-game map (M) of this dungeon"
+							aria-label="Upload a screenshot of the in-game map (M) of this dungeon"
 						>
 							<MapIcon class="size-3" />
 							{uploading ? 'Uploading…' : dm.data ? 'New map' : 'Add map image'}
@@ -775,7 +777,8 @@
 			<div class="space-y-2 border-t border-border/50 bg-background/60 px-4 py-3 backdrop-blur">
 				<div class="relative h-2">
 					{#each segments.filter((s) => s.kind === 'boss') as s (s.startMs)}
-						<div
+						<Tip
+							as="div"
 							class="absolute inset-y-0 rounded-sm {s.result === 'kill'
 								? 'bg-primary/60'
 								: 'bg-destructive/60'}"
@@ -783,15 +786,16 @@
 								0.4,
 								((s.endMs - s.startMs) / durationMs) * 100
 							)}%"
-							title={s.name}
-						></div>
+							text={s.name}
+						/>
 					{/each}
 					{#each deaths as d, i (i)}
-						<div
+						<Tip
+							as="div"
 							class="absolute -top-0.5 h-3 w-0.5 bg-destructive"
 							style="left: {(d.atMs / durationMs) * 100}%"
-							title="{names[d.slug] ?? d.slug} died"
-						></div>
+							text="{names[d.slug] ?? d.slug} died"
+						/>
 					{/each}
 				</div>
 				<Slider
@@ -829,11 +833,11 @@
 					>
 				</div>
 			</div>
-		</section>
+		</Card.Root>
 
 		<!-- analitika v trenutku t -->
 		<aside class="space-y-4">
-			<section class="panel space-y-2">
+			<Card.Root class="p-5 space-y-2">
 				<div class="eyebrow">At {clock(t)} · damage per second</div>
 				{#each stats as s (s.slug)}
 					{@const c = classColor(classes[s.slug] ?? undefined)}
@@ -856,8 +860,8 @@
 						</div>
 					</div>
 				{/each}
-			</section>
-			<section class="panel space-y-1.5">
+			</Card.Root>
+			<Card.Root class="p-5 space-y-1.5">
 				<div class="eyebrow">What just happened</div>
 				{#each events as e, i (i)}
 					<button
@@ -878,13 +882,13 @@
 				{:else}
 					<p class="text-sm text-muted-foreground italic">Nothing yet. They're still buffing.</p>
 				{/each}
-			</section>
+			</Card.Root>
 		</aside>
 	</div>
 
 	<!-- grafi skozi čas, povezani s trakom: kazalec teče s predvajanjem, vlečenje po grafu premakne replay -->
 	{#if timeline}
-		<section class="panel mt-4 space-y-2">
+		<Card.Root class="p-5 mt-4 space-y-2">
 			<div class="flex flex-wrap items-baseline justify-between gap-2">
 				<h3 class="card-title">Over time</h3>
 				<span class="text-xs text-muted-foreground">drag across a chart to scrub the replay</span>
@@ -897,6 +901,6 @@
 				cursorMs={t}
 				onseek={(ms) => ((t = Math.min(durationMs, ms)), (playing = false))}
 			/>
-		</section>
+		</Card.Root>
 	{/if}
 {/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import { ask } from '#lib/confirm.svelte.js';
 	// Office → Website → Events: naši dogodki na koledarju (nov, uredi, briši) + stanje praznikov iz igre.
 	// Discord: objava ob shranjevanju in opomnik uro prej (če je kljukica in polje "calendar" za Discord).
@@ -215,7 +216,7 @@
 		</div>
 	</form>
 
-	<section class="panel space-y-3">
+	<Card.Root class="p-5 space-y-3">
 		<div class="flex items-end justify-between gap-2">
 			<h3 class="card-title">Coming up</h3>
 			<a href="/calendar" class="text-sm text-primary hover:underline">Open the calendar →</a>
@@ -280,9 +281,9 @@
 				</Collapsible.Content>
 			</Collapsible.Root>
 		{/if}
-	</section>
+	</Card.Root>
 
-	<section class="panel space-y-1 text-sm">
+	<Card.Root class="p-5 space-y-1 text-sm">
 		<h3 class="card-title">In-game holidays</h3>
 		<p class="text-muted-foreground">
 			{#if data.data?.gameCount}
@@ -294,5 +295,5 @@
 				sends it here after the next logout or <code>/reload</code>.
 			{/if}
 		</p>
-	</section>
+	</Card.Root>
 </div>

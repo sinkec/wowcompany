@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Tip from '#lib/components/wow/Tip.svelte';
 	import './layout.css';
 	import { createSvelteAuthClient } from '@mmailaender/convex-better-auth-svelte/svelte';
 	import { authClient } from '#lib/auth-client.js';
@@ -10,6 +11,7 @@
 	import MainNav from '#lib/components/layout/MainNav.svelte';
 	import Brand from '#lib/components/layout/Brand.svelte';
 	import ConfirmHost from '#lib/components/layout/ConfirmHost.svelte';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import { brandName } from '#convex/lib/siteContent.js';
 	import { GITHUB_URL } from '#lib/site.js';
 	import type { LayoutProps } from './$types';
@@ -36,17 +38,18 @@
 	/>
 </svelte:head>
 
+<Tooltip.Provider delayDuration={250}>
 <header class="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
 	<div class="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4">
 		<Brand {team} />
 		<MainNav archive={!!archives.data?.length} />
 
 		<div class="ml-auto flex items-center gap-1.5">
+			<Tip text="Source code on GitHub" side="bottom">
 			<a
 				href={GITHUB_URL}
 				target="_blank"
 				rel="noopener noreferrer"
-				title="Source code on GitHub"
 				aria-label="GitHub"
 				class="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
 			>
@@ -56,6 +59,7 @@
 					/></svg
 				>
 			</a>
+			</Tip>
 			<UserMenu />
 		</div>
 	</div>
@@ -86,6 +90,8 @@
 		<a href="/terms" class="hover:text-foreground hover:underline">Terms</a>
 	</p>
 </footer>
+
+</Tooltip.Provider>
 
 <Toaster theme="dark" richColors position="bottom-right" />
 <ConfirmHost />

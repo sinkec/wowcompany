@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
 	import { usePaginatedQuery, useQuery } from 'convex-svelte';
 	import Swords from '@lucide/svelte/icons/swords';
 	import { api } from '#convex/_generated/api.js';
@@ -35,7 +36,7 @@
 			{#each [1, 2, 3] as i (i)}<div class="h-32 animate-pulse rounded-lg bg-muted"></div>{/each}
 		</div>
 	{:else if !runs.results.length}
-		<div class="wow-frame flex flex-col items-center gap-3 rounded-lg p-10 text-center">
+		<Card.Root class="flex flex-col items-center gap-3 p-10 text-center">
 			<p class="text-5xl">🕯️</p>
 			<p class="font-display text-xl text-primary">No runs yet</p>
 			<p class="max-w-md text-sm text-muted-foreground">
@@ -43,7 +44,7 @@
 				before the log started. Install it, type <code class="text-primary">/combatlog</code>, go
 				get murdered properly.
 			</p>
-		</div>
+		</Card.Root>
 	{:else}
 		<div class="space-y-3">
 			{#each runs.results as run (run.id)}

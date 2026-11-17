@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
+	import Tip from '#lib/components/wow/Tip.svelte';
 	// Company lestvice (docs/STATS.md W5): po dungeonu in bossu najboljši DPS/HPS + najhitrejši cleari.
 	import { useQuery } from 'convex-svelte';
 	import Trophy from '@lucide/svelte/icons/trophy';
@@ -59,7 +61,7 @@
 		{/snippet}
 
 		{#if d.speed.length}
-			<section class="wow-frame rounded-lg p-4">
+			<Card.Root class="p-4">
 				<h2 class="card-title">Speed demons</h2>
 				<p class="text-xs text-muted-foreground italic">
 					fastest full clears. skipping the trash is a lifestyle.
@@ -88,11 +90,11 @@
 						</div>
 					{/each}
 				</div>
-			</section>
+			</Card.Root>
 		{/if}
 
 		{#if d.value.length}
-			<section class="wow-frame rounded-lg p-4">
+			<Card.Root class="p-4">
 				<h2 class="card-title">Best value</h2>
 				<p class="text-xs text-muted-foreground italic">
 					average experience and coin per hour inside, from whoever had the Companion running. time
@@ -118,11 +120,11 @@
 						{/each}
 					</Table.Body>
 				</Table.Root>
-			</section>
+			</Card.Root>
 		{/if}
 
 		{#if d.mashers.length}
-			<section class="wow-frame rounded-lg p-4">
+			<Card.Root class="p-4">
 				<h2 class="card-title">Keyboard Hall of Shame</h2>
 				<p class="text-xs text-muted-foreground italic">
 					button presses before the spell was ready, per hour inside. only counts whoever had the
@@ -136,14 +138,14 @@
 						<span class="text-xs text-muted-foreground">mashes/h · {fmtNum(m.spam)} total</span>
 					</div>
 				{/each}
-			</section>
+			</Card.Root>
 		{/if}
 
 		{#if !d.boards.length}
-			<div class="wow-frame rounded-lg p-10 text-center text-sm text-muted-foreground">
+			<Card.Root class="p-10 text-center text-sm text-muted-foreground">
 				No boss kills this season yet. The ladder is empty, the throne is open, the bosses are
 				laughing.
-			</div>
+			</Card.Root>
 		{/if}
 
 		{#each d.boards as z (z.zone)}
@@ -151,13 +153,13 @@
 			<section class="space-y-3">
 				<h2 class="section-title">{z.zone}</h2>
 				{#if stars.length}
-					<div
-						class="wow-frame flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-lg px-4 py-2 text-sm"
+					<Card.Root
+					 class="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-2 text-sm"
 					>
-						<span
-							class="eyebrow"
-							title="Each boss: 120 points for the company's best, the rest in proportion. Summed over the dungeon."
-							>All-Stars</span
+						<Tip
+							class="eyebrow cursor-help"
+							text="Each boss: 120 points for the company's best, the rest in proportion. Summed over the dungeon."
+							>All-Stars</Tip
 						>
 						{#each stars.slice(0, 8) as h, i (h.slug)}
 							<span class="flex items-baseline gap-1">
@@ -166,11 +168,11 @@
 								<span class="text-primary tabular-nums">{h.points.toFixed(1)}</span>
 							</span>
 						{/each}
-					</div>
+					</Card.Root>
 				{/if}
 				<div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
 					{#each z.bosses as b (b.encounterId + ':' + b.difficultyId)}
-						<div class="wow-frame rounded-lg p-4">
+						<Card.Root class="p-4">
 							<h3 class="font-semibold">{b.encounter}</h3>
 							{#each [{ title: 'Damage', list: b.dps, unit: 'dps' }, { title: 'Healing', list: b.heal, unit: 'hps' }] as board (board.title)}
 								{#if board.list.length}
@@ -181,19 +183,22 @@
 										<div class="flex items-baseline gap-2 text-sm">
 											<span class="w-5 text-xs">{MEDAL[i] ?? `${i + 1}.`}</span>
 											<span class="min-w-0 flex-1 truncate">{@render who(e.slug)}</span>
-											<a
-												href="/runs/{e.runId}?tab=bosses"
-												class="tabular-nums hover:text-primary hover:underline"
-												title="{fmtWhen(e.at)} · {fmtDuration(e.durationMs)}{e.ilvl
+											<Tip
+												text="{fmtWhen(e.at)} · {fmtDuration(e.durationMs)}{e.ilvl
 													? ` · ilvl ${e.ilvl}`
-													: ''}">{fmtRate(e.value)}</a
+													: ''}"
+												><a
+													href="/runs/{e.runId}?tab=bosses"
+													class="tabular-nums hover:text-primary hover:underline"
+													>{fmtRate(e.value)}</a
+												></Tip
 											>
 											<span class="text-xs text-muted-foreground">{board.unit}</span>
 										</div>
 									{/each}
 								{/if}
 							{/each}
-						</div>
+						</Card.Root>
 					{/each}
 				</div>
 			</section>

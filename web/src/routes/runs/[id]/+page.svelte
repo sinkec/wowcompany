@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
+	import Tip from '#lib/components/wow/Tip.svelte';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
 	import SortHead from '#lib/components/table/SortHead.svelte';
@@ -328,16 +330,16 @@
 	{:else if q.data?.locked}
 		<Locked what="our dungeon runs (and the bodies we left behind)" />
 	{:else if !run}
-		<div class="wow-frame rounded-lg p-10 text-center">
+		<Card.Root class="p-10 text-center">
 			<p class="text-5xl">👻</p>
 			<p class="mt-2 font-display text-xl text-primary">This run doesn't exist</p>
 			<p class="text-sm text-muted-foreground">
 				Either it never happened or someone deleted the evidence. We don't judge. Much.
 			</p>
-		</div>
+		</Card.Root>
 	{:else}
 		<!-- HEADER -->
-		<section class="wow-frame space-y-4 rounded-lg p-5">
+		<Card.Root class="space-y-4 p-5">
 			<div class="flex flex-wrap items-start gap-4">
 				<div class="min-w-0 flex-1 space-y-1">
 					<div class="flex flex-wrap items-center gap-2">
@@ -363,12 +365,13 @@
 					</div>
 					<p class="text-xs text-muted-foreground italic">{durationQuip(run.durationMs)}</p>
 					{#if run.combatMs}
-						<p
-							class="text-xs text-muted-foreground"
-							title="DPS and HPS use this time, like Details!"
+						<Tip
+							as="div"
+							class="w-fit cursor-help text-xs text-muted-foreground"
+							text="DPS and HPS use this time, like Details!"
 						>
 							{fmtDuration(run.combatMs)} actually fighting
-						</p>
+						</Tip>
 					{/if}
 				</div>
 			</div>
@@ -383,9 +386,10 @@
 							Multiple witnesses. No alibi possible.
 						</div>{/if}
 				</div>
-				<div
+				<Tip
+					as="div"
 					class="rounded-md border border-border/50 bg-background/30 p-3"
-					title="The combat log doesn't record the group leader."
+					text={run.leader ? null : "The combat log doesn't record the group leader."}
 				>
 					<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
 						<Crown class="size-3.5" /> Party leader
@@ -394,7 +398,7 @@
 					{#if !run.leader}<div class="text-xs text-muted-foreground">
 							The combat log refuses to name names. Coming with the addon.
 						</div>{/if}
-				</div>
+				</Tip>
 				<div class="rounded-md border border-border/50 bg-background/30 p-3">
 					<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
 						<Skull class="size-3.5" /> Body count
@@ -417,20 +421,20 @@
 							style="color: {classColor(p.classId ?? undefined)}">{p.name}</a
 						>
 					{:else}
-						<span
+						<Tip
 							class="rounded-md border border-dashed border-border/60 px-2.5 py-1 text-sm text-muted-foreground"
-							title="Not tracked on the portal. A tourist.">{p.name}</span
+							text="Not tracked on the portal. A tourist.">{p.name}</Tip
 						>
 					{/if}
 				{/each}
 			</div>
-		</section>
+		</Card.Root>
 
 		<!-- AWARDS -->
 		{#if run.awards?.length || run.failAwards?.length}
 			<section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 				{#each [...(run.awards ?? []), ...(run.failAwards ?? [])] as a (a.key)}
-					<div class="wow-frame rounded-lg p-4">
+					<Card.Root class="p-4">
 						<div class="flex items-center gap-2 font-display font-semibold text-primary">
 							<Trophy class="size-4" />
 							{a.title}
@@ -442,7 +446,7 @@
 							{names[a.slug] ?? a.slug}
 						</div>
 						<p class="text-xs text-muted-foreground">{a.detail}</p>
-					</div>
+					</Card.Root>
 				{/each}
 			</section>
 		{/if}
@@ -470,7 +474,7 @@
 				<!-- METER -->
 				<Tabs.Content value="meter" class="mt-4 space-y-4">
 					{#if players.length}
-						<div class="wow-frame overflow-x-auto rounded-lg">
+						<Card.Root class="overflow-x-auto">
 							<Table.Root class="w-full min-w-[760px] text-sm">
 								<Table.Header class="text-xs text-muted-foreground">
 									<Table.Row class="border-b border-border/50">
@@ -506,7 +510,7 @@
 											key="deaths"
 											align="right"
 											class="px-3"
-											title="Deaths">☠</SortHead
+											title="Deaths">☠<span class="sr-only">Deaths</span></SortHead
 										>
 										<SortHead
 											sort={meterSort}
@@ -530,9 +534,9 @@
 													class="font-semibold whitespace-nowrap"
 													style="color: {classColor(p.classId ?? undefined)}">{p.name}</span
 												>
-												{#if p.recorder}<span
+												{#if p.recorder}<Tip
 														class="ml-1 text-[10px] text-muted-foreground"
-														title="Uploaded this run">📣</span
+														text="Uploaded this run">📣</Tip
 													>{/if}
 											</Table.Cell>
 											<Table.Cell class="px-3 py-2">
@@ -593,9 +597,8 @@
 											<Table.Cell class="px-3 py-2 text-right text-muted-foreground tabular-nums"
 												>{p.critPct}%</Table.Cell
 											>
-											<Table.Cell
-												class="px-3 py-2 text-right text-muted-foreground tabular-nums"
-												title={ACTIVE_QUIP(active)}>{active}%</Table.Cell
+											<Table.Cell class="px-3 py-2 text-right text-muted-foreground tabular-nums"
+												><Tip text={ACTIVE_QUIP(active)}>{active}%</Tip></Table.Cell
 											>
 										</Table.Row>
 									{/each}
@@ -616,7 +619,7 @@
 									</Table.Row>
 								</Table.Footer>
 							</Table.Root>
-						</div>
+						</Card.Root>
 						<p class="text-xs text-muted-foreground">
 							{#if run.combatMs}
 								DPS/HPS over the {fmtDuration(run.combatMs)} the party actually fought (like Details!
@@ -636,7 +639,7 @@
 					{#if habits.length || spellBoard.length || (run.enemyHeals ?? []).length}
 						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 							{#each habits as h (h.title)}
-								<div class="wow-frame rounded-lg p-4">
+								<Card.Root class="p-4">
 									<div class="eyebrow">{h.title}</div>
 									<div class="mt-1 text-2xl font-bold text-primary tabular-nums">{h.value}</div>
 									<div class="mt-1 text-sm">
@@ -647,12 +650,12 @@
 										>
 										<span class="text-muted-foreground">· {h.note}</span>
 									</div>
-								</div>
+								</Card.Root>
 							{/each}
 						</div>
 						<div class="grid gap-3 lg:grid-cols-2">
 							{#if spellBoard.length}
-								<section class="wow-frame rounded-lg p-4">
+								<Card.Root class="p-4">
 									<h3 class="card-title">Damage by spell (whole party)</h3>
 									<ul class="mt-2 space-y-1 text-sm">
 										{#each spellBoard as sp (sp.key)}
@@ -669,10 +672,10 @@
 											</li>
 										{/each}
 									</ul>
-								</section>
+								</Card.Root>
 							{/if}
 							{#if (run.enemyHeals ?? []).length}
-								<section class="wow-frame rounded-lg p-4">
+								<Card.Root class="p-4">
 									<h3 class="card-title">Mobs that healed themselves</h3>
 									<p class="section-lead">
 										Kill the healer first. Every time. Apparently not this time.
@@ -686,20 +689,20 @@
 											</li>
 										{/each}
 									</ul>
-								</section>
+								</Card.Root>
 							{/if}
 						</div>
 					{/if}
 					{#if !records.length}
-						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
+						<Card.Root class="p-6 text-sm text-muted-foreground">
 							No big numbers on file. This run was recorded by an older Companion — update the app
 							and the next one will name and shame the biggest crit.
-						</div>
+						</Card.Root>
 					{:else}
 						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 							{#each bestRecords as { kind, best } (kind)}
 								{#if best}
-									<div class="wow-frame rounded-lg p-4">
+									<Card.Root class="p-4">
 										<div class="eyebrow">
 											{RECORD_LABEL[kind].title}
 										</div>
@@ -724,12 +727,12 @@
 										<div class="mt-1 text-xs text-muted-foreground italic">
 											{RECORD_LABEL[kind].quip} · at {fmtDuration(best.atMs)}
 										</div>
-									</div>
+									</Card.Root>
 								{/if}
 							{/each}
 						</div>
 
-						<section class="wow-frame overflow-x-auto rounded-lg p-4">
+						<Card.Root class="overflow-x-auto p-4">
 							<Table.Root class="w-full text-sm">
 								<Table.Header>
 									<Table.Row class="text-left text-xs text-muted-foreground">
@@ -752,32 +755,34 @@
 											>
 											{#each RECORD_KINDS as kind (kind)}
 												{@const r = recordOf(p.slug, kind)}
-												<Table.Cell
-													class="py-1.5 pl-3 text-right tabular-nums"
-													title={r
-														? `${r.spell}${r.unit ? ` ${RECORD_LABEL[kind].prep} ${r.unit}` : ''} · at ${fmtDuration(r.atMs)}`
-														: ''}
-												>
+												<Table.Cell class="py-1.5 pl-3 text-right tabular-nums">
+													<Tip
+														as="div"
+														text={r
+															? `${r.spell}${r.unit ? ` ${RECORD_LABEL[kind].prep} ${r.unit}` : ''} · at ${fmtDuration(r.atMs)}`
+															: null}
+													>
 													{#if r}{fmtNum(r.amount)}
 														<span class="block text-xs text-muted-foreground">{r.spell}</span>
 													{:else}<span class="text-muted-foreground">—</span>{/if}
+												</Tip>
 												</Table.Cell>
 											{/each}
 										</Table.Row>
 									{/each}
 								</Table.Body>
 							</Table.Root>
-						</section>
+						</Card.Root>
 					{/if}
 				</Tabs.Content>
 
 				<!-- BOSSES -->
 				<Tabs.Content value="bosses" class="mt-4 space-y-3">
 					{#if !bossSegs.length}
-						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
+						<Card.Root class="p-6 text-sm text-muted-foreground">
 							No boss fights detected. Either they only killed trash, or the game didn't log the
 							encounters. Trash is still murder, technically.
-						</div>
+						</Card.Root>
 					{/if}
 					{#if bossSegs.length && !bossSegs.some( (s) => s.players.some((p) => p.hasDetail || p.spells?.length) )}
 						<p class="text-xs text-muted-foreground">
@@ -793,7 +798,7 @@
 						{@const segDur = Math.max(1, (s.endMs - s.startMs) / 1000)}
 						{@const sp = [...s.players].sort((a, b) => b.damage - a.damage)}
 						{@const segMax = Math.max(1, ...sp.map((x) => x.damage))}
-						<section class="wow-frame rounded-lg p-4">
+						<Card.Root class="p-4">
 							<div class="flex flex-wrap items-center gap-2">
 								<h3 class="font-display text-lg font-semibold text-primary">{s.name}</h3>
 								<span
@@ -997,12 +1002,13 @@
 													</div>
 													<div class="flex flex-wrap gap-1">
 														{#each gearOf(p.slug) as g, gi (gi)}
-															<div
+															<Tip
+																as="div"
 																class="relative size-8 overflow-hidden rounded border bg-muted"
 																style="border-color: {itemOf.get(g.itemId)?.quality != null
 																	? lootColor(itemOf.get(g.itemId)?.quality)
 																	: 'var(--border)'}"
-																title="{itemOf.get(g.itemId)?.name ??
+																text="{itemOf.get(g.itemId)?.name ??
 																	`Item ${g.itemId}`} · ilvl {g.ilvl}"
 															>
 																{#if iconOf.get(g.itemId)}<img
@@ -1016,7 +1022,7 @@
 																	class="absolute right-0 bottom-0 bg-background/80 px-0.5 text-[9px] leading-none tabular-nums"
 																	>{g.ilvl}</span
 																>
-															</div>
+															</Tip>
 														{/each}
 													</div>
 												</div>
@@ -1078,20 +1084,20 @@
 									{/if}
 								{/each}
 							</div>
-						</section>
+						</Card.Root>
 					{/each}
 				</Tabs.Content>
 
 				<!-- DEATHS -->
 				<Tabs.Content value="deaths" class="mt-4 space-y-3">
 					{#if !run.deaths?.length}
-						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
+						<Card.Root class="p-6 text-sm text-muted-foreground">
 							Zero deaths. Either they're good, or the healer was carrying hard. Our money's on the
 							healer.
-						</div>
+						</Card.Root>
 					{/if}
 					{#each run.deaths ?? [] as d, i (i)}
-						<section class="wow-frame rounded-lg p-4">
+						<Card.Root class="p-4">
 							<div class="flex flex-wrap items-baseline gap-2">
 								<span class="text-lg">⚰️</span>
 								<span
@@ -1131,22 +1137,22 @@
 											</span>
 											<span>
 												{#if r.hp != null && r.maxHp}
-													<span
-														class="block h-1.5 overflow-hidden rounded bg-muted"
-														title="{fmtNum(r.hp)} / {fmtNum(r.maxHp)} HP"
+													<Tip
+														class="flex h-1.5 overflow-hidden rounded bg-muted"
+														text="{fmtNum(r.hp)} / {fmtNum(r.maxHp)} HP"
 													>
 														<span
 															class="block h-full bg-emerald-500/80"
 															style="width: {pct(r.hp, r.maxHp)}%"
 														></span>
-													</span>
+													</Tip>
 												{/if}
 											</span>
 										</div>
 									{/each}
 								</div>
 							{/if}
-						</section>
+						</Card.Root>
 					{/each}
 				</Tabs.Content>
 
@@ -1156,7 +1162,7 @@
 						{@const hours = Math.max(run.durationMs, 60_000) / 3_600_000}
 						<div class="grid gap-3 md:grid-cols-2">
 							{#each run.progress as g (g.slug)}
-								<div class="wow-frame space-y-2 rounded-lg p-4 text-sm">
+								<Card.Root class="space-y-2 p-4 text-sm">
 									<div class="flex items-baseline justify-between gap-2">
 										<span
 											class="font-semibold"
@@ -1217,19 +1223,19 @@
 											Skill-ups: {g.skills.map((k) => `${k.skill} ${k.from}→${k.to}`).join(' · ')}
 										</div>
 									{/if}
-								</div>
+								</Card.Root>
 							{/each}
 						</div>
 					{/if}
 					{#if !loot.length}
-						<div class="wow-frame rounded-lg p-6 text-sm text-muted-foreground">
+						<Card.Root class="p-6 text-sm text-muted-foreground">
 							No loot recorded. Either nobody had <code class="text-primary">/chatlog</code> on, or this
 							party walked past every corpse without looting. Animals.
-						</div>
+						</Card.Root>
 					{:else}
 						<div class="flex flex-wrap gap-2">
 							{#each lootBy as g (g.slug ?? g.name)}
-								<div class="wow-frame rounded-lg px-3 py-2 text-sm">
+								<Card.Root class="px-3 py-2 text-sm">
 									<span
 										class="font-semibold"
 										style="color: {classColor(classes[g.slug ?? ''] ?? undefined)}">{g.name}</span
@@ -1240,7 +1246,7 @@
 									{#if g.best >= 0}<span class="ml-1 text-xs" style="color: {lootColor(g.best)}"
 											>· best: {QUALITY_NAME[g.best] ?? '?'}</span
 										>{/if}
-								</div>
+								</Card.Root>
 							{/each}
 						</div>
 						{#if rolls.length}
@@ -1248,7 +1254,7 @@
 							{#if dice.length > 1}
 								<div class="flex flex-wrap gap-2 text-sm">
 									{#each dice as d, i (d.slug)}
-										<div class="wow-frame rounded-lg px-3 py-2">
+										<Card.Root class="px-3 py-2">
 											<span
 												class="font-semibold"
 												style="color: {classColor(classes[d.slug] ?? undefined)}">{d.name}</span
@@ -1265,11 +1271,11 @@
 											{#if i === dice.length - 1}<span class="ml-1 text-xs text-destructive"
 													>· cursed dice</span
 												>{/if}
-										</div>
+										</Card.Root>
 									{/each}
 								</div>
 							{/if}
-							<div class="wow-frame overflow-hidden rounded-lg">
+							<Card.Root class="overflow-hidden">
 								<Table.Root class="w-full text-sm">
 									<Table.Header class="text-xs text-muted-foreground">
 										<Table.Row class="border-b border-border/50">
@@ -1301,10 +1307,7 @@
 												<Table.Cell class="px-3 py-1.5">
 													<div class="flex flex-wrap gap-x-3 gap-y-0.5">
 														{#each sortedEntries(r) as e (e.slug)}
-															<span
-																class={e.choice === 'pass' ? 'text-muted-foreground' : ''}
-																title={CHOICE[e.choice]}
-															>
+															<span class={e.choice === 'pass' ? 'text-muted-foreground' : ''}>
 																<span
 																	class={r.winner === e.slug ? 'font-bold' : ''}
 																	style="color: {e.choice === 'pass'
@@ -1325,10 +1328,10 @@
 										{/each}
 									</Table.Body>
 								</Table.Root>
-							</div>
+							</Card.Root>
 							<h3 class="eyebrow pt-2 text-primary">Everything looted</h3>
 						{/if}
-						<div class="wow-frame overflow-hidden rounded-lg">
+						<Card.Root class="overflow-hidden">
 							<Table.Root class="w-full text-sm">
 								<Table.Header class="text-xs text-muted-foreground">
 									<Table.Row class="border-b border-border/50">
@@ -1379,7 +1382,7 @@
 									{/each}
 								</Table.Body>
 							</Table.Root>
-						</div>
+						</Card.Root>
 						<p class="text-xs text-muted-foreground">
 							From the uploader's <code>/chatlog</code>.{#if !rolls.length}
 								No need/greed rolls on file — recorded by an older Companion, or nobody rolled.{/if}
@@ -1392,14 +1395,14 @@
 				<!-- TIMELINE -->
 				<Tabs.Content value="timeline" class="mt-4">
 					{#if run.timeline}
-						<section class="wow-frame rounded-lg p-4">
+						<Card.Root class="p-4">
 							<RunTimeline
 								timeline={run.timeline}
 								segments={run.segments ?? []}
 								{names}
 								{classes}
 							/>
-						</section>
+						</Card.Root>
 					{/if}
 				</Tabs.Content>
 
@@ -1441,17 +1444,17 @@
 						{/each}
 					</ToggleGroup.Root>
 					{#if spellPlayer?.combat}
-						<section class="wow-frame space-y-2 rounded-lg p-4">
+						<Card.Root class="space-y-2 p-4">
 							<h3 class="font-display font-semibold text-primary">
 								Whole run, grouped like the game's Combat Log Config
 							</h3>
 							<CombatLogPanel combat={spellPlayer.combat} secs={run.durationMs / 1000} />
-						</section>
+						</Card.Root>
 					{/if}
 					{#if spellPlayer}
 						<div class="grid gap-4 lg:grid-cols-2">
 							{#each [['Damage', spellPlayer.topDamage, spellPlayer.damage], ['Healing', spellPlayer.topHealing, spellPlayer.healing]] as const as [label, list, total] (label)}
-								<section class="wow-frame rounded-lg p-4">
+								<Card.Root class="p-4">
 									<h3 class="mb-2 font-display font-semibold text-primary">{label}</h3>
 									{#if !list.length}
 										<p class="text-sm text-muted-foreground italic">
@@ -1488,7 +1491,7 @@
 												: 0}% crit
 										</div>
 									{/each}
-								</section>
+								</Card.Root>
 							{/each}
 						</div>
 					{/if}

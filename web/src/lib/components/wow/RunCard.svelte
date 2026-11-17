@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Tip from './Tip.svelte';
 	// Ena vrstica v seznamu runov (/runs in zavihek na strani junaka).
 	import Skull from '@lucide/svelte/icons/skull';
 	import Clock from '@lucide/svelte/icons/clock';
@@ -69,13 +70,13 @@
 			<Megaphone class="size-3.5" /> Snitched by
 			<b class="text-foreground">{run.recordedBy.map((r) => r.name).join(', ')}</b>
 		</span>
-		<span
-			class="flex items-center gap-1"
-			title="The combat log doesn't say who leads the group. Coming with the addon."
+		<Tip
+			class="items-center gap-1"
+			text={run.leader ? null : "The combat log doesn't say who leads the group. The addon does."}
 		>
 			<Crown class="size-3.5" /> Leader
 			<b class="text-foreground">{run.leader ?? 'unknown (nobody admits it)'}</b>
-		</span>
+		</Tip>
 		{#if run.totalDeaths != null}
 			<span class="flex items-center gap-1"
 				><Skull class="size-3.5" />

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
+	import Tip from '#lib/components/wow/Tip.svelte';
 	import { ask } from '#lib/confirm.svelte.js';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { useAuth } from '@mmailaender/convex-better-auth-svelte/svelte';
@@ -42,6 +44,7 @@
 	import { api } from '#convex/_generated/api.js';
 	import type { Id } from '#convex/_generated/dataModel.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
@@ -414,15 +417,15 @@
 {#if auth.isLoading || (auth.isAuthenticated && me.isLoading)}
 	<div class="h-60 animate-pulse rounded-lg bg-muted"></div>
 {:else if !isAdmin}
-	<div
-		class="wow-frame mx-auto flex max-w-lg flex-col items-center gap-3 rounded-lg p-12 text-center"
+	<Card.Root
+	 class="mx-auto flex max-w-lg flex-col items-center gap-3 p-12 text-center"
 	>
 		<ShieldAlert class="size-12 text-destructive" />
 		<h1 class="text-2xl font-bold">Guild Master only</h1>
 		<p class="text-muted-foreground">
 			You are not the Guild Master. The guards have been notified. They don't care, but still.
 		</p>
-	</div>
+	</Card.Root>
 {:else}
 	<div class="space-y-6">
 		<section>
@@ -461,16 +464,16 @@
 
 			<div class="min-w-0 space-y-4">
 				{#if realmState.data && !realmState.data.realm && view !== 'realm'}
-					<button
-						class="flex w-full items-center gap-3 rounded-lg border border-primary/60 bg-primary/10 p-3 text-left text-sm"
-						onclick={() => go('realm')}
-					>
-						<Globe class="size-5 text-primary" />
-						<span
-							><b>Choose your realm first.</b> One realm per company – heroes from other realms are turned
-							away.</span
-						>
-					</button>
+					<Alert.Root class="border-primary/60 bg-primary/10">
+						<Globe class="text-primary" />
+						<Alert.Title>Choose your realm first.</Alert.Title>
+						<Alert.Description>
+							One realm per company – heroes from other realms are turned away.
+						</Alert.Description>
+						<Alert.Action>
+							<Button size="sm" onclick={() => go('realm')}>Pick realm</Button>
+						</Alert.Action>
+					</Alert.Root>
 				{/if}
 				{#if viewLabel}
 					<div>
@@ -549,7 +552,7 @@
 						</p>
 						<div class="grid gap-4">
 							{#each VIS_COLUMNS.filter((c) => c.target === (view === 'web' ? 'publicFields' : 'discordFields')) as col (col.target)}
-								<section class="wow-frame rounded-lg p-4">
+								<Card.Root class="p-4">
 									<div class="flex flex-wrap items-start justify-between gap-2">
 										<div>
 											<h2 class="card-title">{col.title}</h2>
@@ -640,7 +643,7 @@
 											</span>
 										</div>
 									{/if}
-								</section>
+								</Card.Root>
 							{/each}
 						</div>
 					</div>{/if}
@@ -651,7 +654,7 @@
 							{@const st = ov.data.settings}
 							{@const est = ov.data.estimate}
 							{#if view === 'system'}
-								<section class="wow-frame space-y-4 rounded-lg p-4">
+								<Card.Root class="space-y-4 p-4">
 									<h2 class="card-title">Blizzard polling</h2>
 									<div>
 										<div class="mb-2 text-sm">Check every</div>
@@ -713,12 +716,12 @@
 											<RefreshCw class="size-4" />
 										</Button>
 									</div>
-								</section>
+								</Card.Root>
 							{/if}
 
 							{#if view === 'seasons' && seasonState.data}
 								{@const ss = seasonState.data}
-								<section class="wow-frame space-y-3 rounded-lg p-4 lg:col-span-2">
+								<Card.Root class="space-y-3 p-4 lg:col-span-2">
 									<h2 class="card-title">Parse seasons</h2>
 									<p class="text-xs text-muted-foreground">
 										Company Parses are ranked per season. Big patch, new gear, everyone suddenly
@@ -774,11 +777,11 @@
 											History: {ss.seasons.map((x) => x.name).join(' · ')}
 										</p>
 									{/if}
-								</section>
+								</Card.Root>
 							{/if}
 
 							{#if view === 'system'}
-								<section class="wow-frame space-y-3 rounded-lg p-4">
+								<Card.Root class="space-y-3 p-4">
 									<h2 class="card-title">Convex free tier budget (rough estimate)</h2>
 									<p class="text-xs text-muted-foreground">
 										{ov.data.activePlayers} heroes · {fmt(est.runsPerMonth)} poll runs / month. Real numbers
@@ -801,7 +804,7 @@
 											</div>
 										</div>
 									{/each}
-								</section>
+								</Card.Root>
 							{/if}
 						{/if}
 					</div>{/if}
@@ -820,7 +823,7 @@
 							<div class="grid gap-4">
 								<!-- webhook -->
 								{#if view === 'discord'}
-									<section class="wow-frame space-y-3 rounded-lg p-4">
+									<Card.Root class="space-y-3 p-4">
 										<div class="flex items-center justify-between gap-2">
 											<h2 class="card-title">Messenger Raven</h2>
 											{#if st.webhook.configured}
@@ -899,11 +902,11 @@
 													>{webhookCheck}</span
 												>{/if}
 										</div>
-									</section>
+									</Card.Root>
 								{/if}
 								<!-- app / slash commands -->
 								{#if view === 'discord-bot'}
-									<section class="wow-frame space-y-3 rounded-lg p-4">
+									<Card.Root class="space-y-3 p-4">
 										<div class="flex items-center justify-between gap-2">
 											<h2 class="card-title">Discord Bot (slash commands)</h2>
 											{#if st.bot.configured && st.bot.publicKeySet}
@@ -1057,7 +1060,7 @@
 												</div>
 											</li>
 										</ol>
-									</section>
+									</Card.Root>
 								{/if}
 							</div>
 						{/if}
@@ -1104,7 +1107,7 @@
 						</p>
 						{#if realmState.data}
 							{@const rs = realmState.data}
-							<section class="panel space-y-4">
+							<Card.Root class="p-5 space-y-4">
 								<div>
 									<div class="eyebrow">Current realm</div>
 									<div class="section-title">{rs.realm ? rs.realm.label : 'Not chosen yet'}</div>
@@ -1135,10 +1138,10 @@
 										>
 									{/if}
 								</div>
-							</section>
+							</Card.Root>
 
 							{#if realmDialog && rs.realm}
-								<section class="panel space-y-3 border-destructive/70">
+								<Card.Root class="p-5 space-y-3 border-destructive/70">
 									<h3 class="card-title text-destructive">
 										Move the company from {rs.realm.label} to {pickLabel}?
 									</h3>
@@ -1178,11 +1181,11 @@
 											onclick={() => ((realmDialog = false), (realmConfirm = ''))}>Stay</Button
 										>
 									</div>
-								</section>
+								</Card.Root>
 							{/if}
 
 							{#if rs.archives.length}
-								<section class="panel space-y-2">
+								<Card.Root class="p-5 space-y-2">
 									<h3 class="card-title flex items-center gap-2">
 										<Archive class="size-4" /> Archives
 									</h3>
@@ -1197,7 +1200,7 @@
 									<a href="/archive" class="text-sm text-primary hover:underline"
 										>Open the archive →</a
 									>
-								</section>
+								</Card.Root>
 							{/if}
 						{/if}
 					</div>
@@ -1210,7 +1213,7 @@
 				{#if view === 'home'}
 					<div class="max-w-3xl space-y-4">
 						<TeamName current={siteAdmin.data?.teamName ?? null} />
-						<section class="panel space-y-3">
+						<Card.Root class="p-5 space-y-3">
 							<div>
 								<h3 class="card-title">Community links</h3>
 								<p class="section-lead">
@@ -1248,9 +1251,9 @@
 								>
 								<Button size="sm" onclick={saveSocials}>Save links</Button>
 							</div>
-						</section>
+						</Card.Root>
 
-						<section class="panel space-y-3">
+						<Card.Root class="p-5 space-y-3">
 							<div>
 								<h3 class="card-title">What the heroes say</h3>
 								<p class="section-lead">
@@ -1284,7 +1287,7 @@
 									>Restore built-in jokes</Button
 								>
 							</div>
-						</section>
+						</Card.Root>
 					</div>
 				{/if}
 
@@ -1321,7 +1324,7 @@
 							{/each}
 						</ul>
 						{#if diagOpen && diagReport.data}
-							<section class="panel space-y-2">
+							<Card.Root class="p-5 space-y-2">
 								<div class="flex justify-end">
 									<Button
 										size="sm"
@@ -1333,7 +1336,7 @@
 									class="wow-scroll max-h-[32rem] overflow-auto rounded-md bg-background/60 p-3 text-[11px] leading-snug">{pretty(
 										diagReport.data
 									)}</pre>
-							</section>
+							</Card.Root>
 						{/if}
 					</div>
 				{/if}
@@ -1386,15 +1389,17 @@
 												>{:else}{n.title}{/if}
 										</div>
 									</div>
+									<Tip text={n.hidden ? 'Show on the home page' : 'Hide from the home page'}>
 									<Button
 										size="sm"
 										variant="ghost"
-										title={n.hidden ? 'Show on the home page' : 'Hide from the home page'}
+										aria-label={n.hidden ? 'Show on the home page' : 'Hide from the home page'}
 										onclick={() =>
 											run(client.mutation(api.news.setHidden, { id: n.id, hidden: !n.hidden }))}
 									>
 										{#if n.hidden}<Eye class="size-4" />{:else}<EyeOff class="size-4" />{/if}
 									</Button>
+									</Tip>
 									{#if n.source === 'company'}
 										<Button
 											size="sm"
