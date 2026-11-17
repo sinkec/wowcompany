@@ -364,3 +364,12 @@ Addon: `luac -p` na vseh `.lua` (sintaksa) – delovanja v igri lokalno ni mogo�
 Vzame samo `calendarType` HOLIDAY in SYSTEM; opis praznika iz `GetHolidayInfo`. Časi v koledarju so realm čas:
 odmik = `GetCurrentCalendarTime()` (kot UTC) − `GetServerTime()`, zaokrožen na 15 min. **Nepreverjeno v igri:** ali
 Forever vrača praznike in ali `endTime` pri večdnevnem prazniku res pomeni konec praznika.
+
+### 4.6 Lastna pozicija v dungeonu – NE (preverjeno 18. 11. 2026, addon 0.6.9 probe)
+
+Ragefire Chasm, 57 vzorcev po 2 s, v boju in izven njega: `UnitPosition("player")` vrne samo ID instance
+(389), x/y/z = nil; `C_Map.GetBestMapForUnit("player")` = nil (torej tudi `GetPlayerMapPosition` nič). Enako kot
+retail od 7.1. **Addon v instanci ne more snemati poti** (tudi OpenMap v instancah ne pošilja). Pozicije v
+dungeonu ostanejo iz advanced combat loga; strežnik zdaj replay vseh snemalcev istega runa **združi**
+(`lib/replayMerge.ts`) – vsak log doda pozicije svojega snemalca, tudi daleč od ostalih. Več članov s
+Companionom in vklopljenim combat logom = popolnejši replay.

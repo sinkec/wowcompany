@@ -42,6 +42,7 @@ import type * as lib_players from "../lib/players.js";
 import type * as lib_pools from "../lib/pools.js";
 import type * as lib_profile from "../lib/profile.js";
 import type * as lib_realms from "../lib/realms.js";
+import type * as lib_replayMerge from "../lib/replayMerge.js";
 import type * as lib_runsView from "../lib/runsView.js";
 import type * as lib_same from "../lib/same.js";
 import type * as lib_settings from "../lib/settings.js";
@@ -98,6 +99,7 @@ declare const fullApi: ApiFromModules<{
   "lib/pools": typeof lib_pools;
   "lib/profile": typeof lib_profile;
   "lib/realms": typeof lib_realms;
+  "lib/replayMerge": typeof lib_replayMerge;
   "lib/runsView": typeof lib_runsView;
   "lib/same": typeof lib_same;
   "lib/settings": typeof lib_settings;

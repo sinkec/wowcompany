@@ -1,5 +1,6 @@
 // WowCompany Companion: povezava naprave, objava runov (COMPANION.md §7–8).
 // HTTP vstopne točke so v companionHttp.ts; tu so mutacije/poizvedbe.
+import { mergeReplays } from './lib/replayMerge.js';
 import { HOUR, MINUTE, RateLimiter } from '@convex-dev/rate-limiter';
 import { ConvexError, v } from 'convex/values';
 import { components, internal } from './_generated/api.js';
@@ -435,15 +436,35 @@ async function writeItemDetails(ctx: MutationCtx, s: RunSummary) {
 }
 
 /** Replay v svojo tabelo (en dokument). Novejši/boljši posnetek ga zamenja; brez replaya ostane star. */
-async function writeReplay(ctx: MutationCtx, runId: Id<'runs'>, s: RunSummary, replace: boolean) {
+/**
+ * Replay runa. Prvi snemalec ga ustvari; vsak naslednji ga DOPOLNI (lib/replayMerge.ts): njegov log ima
+ * njegove pozicije tudi daleč od ostalih. `preferNew` = boljši posnetek ima prednost na istem koraku;
+ * `oldStart` = začetek runa, na katerega je relativen obstoječi replay, `runStart` = začetek po uploadu.
+ */
+async function writeReplay(
+	ctx: MutationCtx,
+	runId: Id<'runs'>,
+	s: RunSummary,
+	preferNew: boolean,
+	oldStart: number,
+	runStart: number
+) {
 	if (!s.replay?.players.length) return;
 	const old = await ctx.db
 		.query('runReplay')
 		.withIndex('by_run', (q) => q.eq('runId', runId))
 		.unique();
-	if (old && !replace) return;
-	if (old) await ctx.db.replace('runReplay', old._id, { runId, ...s.replay });
-	else {
+	if (old) {
+		const mine = { startedAt: s.startedAt, replay: s.replay };
+		const theirs = {
+			startedAt: oldStart,
+			replay: { bucketMs: old.bucketMs, players: old.players }
+		};
+		const merged = preferNew
+			? mergeReplays(mine, theirs, runStart)
+			: mergeReplays(theirs, mine, runStart);
+		await ctx.db.replace('runReplay', old._id, { runId, ...merged });
+	} else {
 		await ctx.db.insert('runReplay', { runId, ...s.replay });
 		await ctx.db.patch('runs', runId, { hasReplay: true });
 	}
@@ -564,7 +585,7 @@ export const ingestRun = internalMutation({
 			await writeHeroRecords(ctx, runId, s, party);
 			await writeParses(ctx, runId, s, party);
 			await writeProgress(ctx, runId, s);
-			await writeReplay(ctx, runId, s, true);
+			await writeReplay(ctx, runId, s, true, s.startedAt, s.startedAt);
 			await writeItemDetails(ctx, s);
 			// Discord: enkrat, čez 5 min (drugi snemalec, dopolnitev iz addona); postRun preveri vidnost
 			await ctx.scheduler.runAfter(5 * 60_000, internal.discord.postRun, { runId });
@@ -622,8 +643,15 @@ export const ingestRun = internalMutation({
 		}
 		// pridobitve snemalca vedno (vsak snemalec ima svoje), tudi ko posnetek ni boljši
 		await writeProgress(ctx, existing._id, s);
-		// replay: boljši posnetek ga zamenja, sicer samo, če ga še ni
-		await writeReplay(ctx, existing._id, s, better);
+		// replay: vsak snemalec ga dopolni (boljši posnetek ima prednost na istem koraku)
+		await writeReplay(
+			ctx,
+			existing._id,
+			s,
+			better,
+			existing.startedAt,
+			better ? s.startedAt : existing.startedAt
+		);
 		await writeItemDetails(ctx, s);
 		return { runId: existing._id, created: false, recorderAdded: added, replaced: better };
 	}
