@@ -14,7 +14,10 @@
 	const roster = useQuery(api.players.list, { since: weekSince() });
 	const news = useQuery(api.news.list, { limit: 6 });
 	const site = useQuery(api.site.home, {});
-	const upcoming = useQuery(api.calendar.upcoming, { from: hourNow(), limit: 12 });
+	// vrste dogodkov izbere Guild Master (Office → Website → Home page), privzeto samo naši
+	const upcoming = useQuery(api.calendar.upcoming, () =>
+		site.data ? { from: hourNow(), limit: 12, kinds: site.data.homeEventKinds } : 'skip'
+	);
 	const access = useQuery(api.runs.access, {});
 	const runs = usePaginatedQuery(api.runs.list, {}, { initialNumItems: 10 });
 
@@ -77,7 +80,7 @@
 				? "That's the plan. Plans are for people who don't wipe."
 				: undefined}
 		>
-			<UpcomingEvents events={upcoming.data ?? []} loading={upcoming.isLoading} />
+			<UpcomingEvents events={upcoming.data ?? []} loading={upcoming.isLoading || !site.data} />
 		</HomePanel>
 		{#if showRuns}
 			<HomePanel

@@ -27,8 +27,12 @@
 		fmtSpan,
 		onDayOf,
 		startOfDay,
-		whenLabel
+		whenLabel,
+		ALL_KINDS,
+		DEFAULT_SHOWN_KINDS
 	} from '#lib/calendar.js';
+	import { onMount } from 'svelte';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { errText } from '#lib/errors.js';
 	import { MONTH_NAMES, addDays, fromParts, partsOf } from '#lib/datetime.svelte.js';
 
@@ -58,7 +62,25 @@
 		from: gridStart,
 		to: addDays(days.at(-1)!, 1)
 	}));
-	const events = $derived(range.data?.events ?? []);
+	// katere vrste dogodkov kažemo: kljukice v legendi (zapomni si brskalnik); privzeto brez iger
+	let shown = $state<string[]>([...DEFAULT_SHOWN_KINDS]);
+	onMount(() => {
+		try {
+			const saved = JSON.parse(localStorage.getItem('calendar-kinds') ?? 'null');
+			if (Array.isArray(saved)) shown = saved.filter((k) => ALL_KINDS.includes(k));
+		} catch {
+			/* zasebno okno */
+		}
+	});
+	function toggleKind(k: string, on: boolean) {
+		shown = on ? [...new Set([...shown, k])] : shown.filter((x) => x !== k);
+		try {
+			localStorage.setItem('calendar-kinds', JSON.stringify(shown));
+		} catch {
+			/* ni pomembno */
+		}
+	}
+	const events = $derived((range.data?.events ?? []).filter((e) => shown.includes(e.kind)));
 
 	const onDay = (day: number) =>
 		events
@@ -279,8 +301,9 @@
 								</p>
 							{/if}
 							{#if me.data?.role === 'admin'}
-								<a href="/admin?edit={e.id}#events" class="block text-xs text-primary hover:underline"
-									>Edit in the Office →</a
+								<a
+									href="/admin?edit={e.id}#events"
+									class="block text-xs text-primary hover:underline">Edit in the Office →</a
 								>
 							{/if}
 						</div>
@@ -317,11 +340,17 @@
 			{/if}
 
 			<Card.Root class="space-y-2 p-5 text-xs text-muted-foreground">
-				<p class="font-semibold text-foreground">Legend</p>
+				<p class="font-semibold text-foreground">Show</p>
 				<ul class="grid grid-cols-2 gap-1.5">
-					{#each ['dungeon', 'raid', 'pvp', 'leveling', 'social', 'holiday'] as k (k)}
-						<li class="flex items-center gap-1.5">
-							<span class="size-2 rounded-full {KIND_DOT[k]}"></span>{KIND_LABEL[k]}
+					{#each ALL_KINDS as k (k)}
+						<li>
+							<label class="flex cursor-pointer items-center gap-2 hover:text-foreground">
+								<Checkbox
+									checked={shown.includes(k)}
+									onCheckedChange={(on) => toggleKind(k, on === true)}
+								/>
+								<span class="size-2 shrink-0 rounded-full {KIND_DOT[k]}"></span>{KIND_LABEL[k]}
+							</label>
 						</li>
 					{/each}
 				</ul>

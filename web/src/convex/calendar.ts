@@ -79,12 +79,13 @@ export const range = query({
 
 /** Naslednji dogodki (naslovnica, Discord). `from` zaokroži odjemalec (predpomnjenje). */
 export const upcoming = query({
-	args: { from: v.number(), limit: v.optional(v.number()) },
-	handler: async (ctx, { from, limit }) => {
+	args: { from: v.number(), limit: v.optional(v.number()), kinds: v.optional(v.array(v.string())) },
+	handler: async (ctx, { from, limit, kinds }) => {
 		const company = await seesCompany(ctx);
 		const viewer = await getViewer(ctx);
 		const rows = (await inWindow(ctx, from, from + 45 * DAY))
 			.filter((e) => e.source === 'game' || company)
+			.filter((e) => !kinds || kinds.includes(e.kind))
 			.sort((a, b) => a.startAt - b.startAt);
 		// naši dogodki imajo prednost pred prazniki (teh je lahko veliko hkrati)
 		const n = Math.min(Math.max(limit ?? 5, 1), 20);

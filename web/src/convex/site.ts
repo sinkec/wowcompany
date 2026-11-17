@@ -8,6 +8,7 @@ import {
 	type QueryCtx
 } from './_generated/server.js';
 import { requireAdmin } from './lib/access.js';
+import { DEFAULT_SHOWN_KINDS, cleanKinds } from './lib/calendar.js';
 import {
 	DEFAULT_CONVOS,
 	DEFAULT_QUIPS,
@@ -29,7 +30,8 @@ async function content(ctx: QueryCtx | MutationCtx) {
 		quips: doc?.quips ?? DEFAULT_QUIPS,
 		convos: (doc?.convos ?? DEFAULT_CONVOS) as string[][],
 		socials: (doc?.socials ?? []) as Social[],
-		teamName: doc?.teamName ?? null
+		teamName: doc?.teamName ?? null,
+		homeEventKinds: doc?.homeEventKinds ?? DEFAULT_SHOWN_KINDS
 	};
 }
 
@@ -45,7 +47,13 @@ export const home = query({
 	args: {},
 	handler: async (ctx) => {
 		const c = await content(ctx);
-		return { quips: c.quips, convos: c.convos, socials: c.socials, teamName: c.teamName };
+		return {
+			quips: c.quips,
+			convos: c.convos,
+			socials: c.socials,
+			teamName: c.teamName,
+			homeEventKinds: c.homeEventKinds
+		};
 	}
 });
 
@@ -60,6 +68,7 @@ export const forAdmin = query({
 			convos: c.convos,
 			socials: c.socials,
 			teamName: c.teamName,
+			homeEventKinds: c.homeEventKinds,
 			defaults: { quips: DEFAULT_QUIPS, convos: DEFAULT_CONVOS }
 		};
 	}
@@ -67,7 +76,13 @@ export const forAdmin = query({
 
 async function upsert(
 	ctx: MutationCtx,
-	patch: { quips?: string[]; convos?: string[][]; socials?: Social[]; teamName?: string }
+	patch: {
+		quips?: string[];
+		convos?: string[][];
+		socials?: Social[];
+		teamName?: string;
+		homeEventKinds?: string[];
+	}
 ) {
 	const { doc, quips, convos, socials } = await content(ctx);
 	if (doc) await ctx.db.patch('siteContent', doc._id, patch);
@@ -109,5 +124,15 @@ export const saveTeamName = mutation({
 		const teamName = cleanTeamName(a.teamName);
 		await upsert(ctx, { teamName });
 		return brandName(teamName);
+	}
+});
+
+export const saveHomeEventKinds = mutation({
+	args: { kinds: v.array(v.string()) },
+	handler: async (ctx, { kinds }) => {
+		await requireAdmin(ctx);
+		const clean = cleanKinds(kinds);
+		await upsert(ctx, { homeEventKinds: clean });
+		return clean.length;
 	}
 });

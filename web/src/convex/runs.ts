@@ -47,6 +47,30 @@ export const access = query({
 });
 
 /** Seznam runov, najnovejši prvi (paginirano). */
+/** Ena stran seznama (/runs): `offset` + `size` (5–20) in skupno število (do MAX_LISTED runov). */
+const MAX_LISTED = 500;
+export const page = query({
+	args: { offset: v.number(), size: v.number() },
+	handler: async (ctx, { offset, size }) => {
+		const { allowed } = await visibility(ctx);
+		if (!allowed('runs')) return { rows: [], total: 0 };
+		const n = Math.min(Math.max(Math.floor(size), 1), 50);
+		const from = Math.max(0, Math.floor(offset));
+		// samo aktivni realm (runi starega realma so v /archive)
+		const all = await ctx.db
+			.query('runs')
+			.withIndex('by_archived_and_started_at', (q) => q.eq('archived', undefined))
+			.order('desc')
+			.take(MAX_LISTED);
+		const slice = all.slice(from, from + n);
+		const classOf = await classesFor(ctx, slice);
+		return {
+			rows: slice.map((r) => runListItem(r as RunDocLike, classOf, allowed)),
+			total: all.length
+		};
+	}
+});
+
 export const list = query({
 	args: { paginationOpts: paginationOptsValidator },
 	handler: async (ctx, { paginationOpts }) => {

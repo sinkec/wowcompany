@@ -413,7 +413,9 @@ export default defineSchema({
 			v.object({ kind: v.string(), url: v.string(), label: v.optional(v.string()) })
 		),
 		/** ime ekipe pred "WowCompany" v glavi strani (npr. "Ajmer Central") */
-		teamName: v.optional(v.string())
+		teamName: v.optional(v.string()),
+		/** vrste dogodkov v "Coming up" na naslovnici (lib/calendar.ts); manjka = samo naši */
+		homeEventKinds: v.optional(v.array(v.string()))
 	}).index('by_key', ['key']),
 
 	// Diagnostika addona (opt-in v addonu, pošlje Companion): tehnično poročilo brez imen, za razvoj.

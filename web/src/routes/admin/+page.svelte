@@ -33,6 +33,7 @@
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import EventsAdmin from '#lib/components/admin/EventsAdmin.svelte';
 	import HeroesAdmin from '#lib/components/admin/HeroesAdmin.svelte';
+	import HomeEventKinds from '#lib/components/admin/HomeEventKinds.svelte';
 	import RunDeletionRequests from '#lib/components/admin/RunDeletionRequests.svelte';
 	import SimpleSelect from '#lib/components/form/SimpleSelect.svelte';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
@@ -1218,6 +1219,7 @@
 				{#if view === 'home'}
 					<div class="max-w-3xl space-y-4">
 						<TeamName current={siteAdmin.data?.teamName ?? null} />
+						{#if siteAdmin.data}<HomeEventKinds current={siteAdmin.data.homeEventKinds} />{/if}
 						<Card.Root class="p-5 space-y-3">
 							<div>
 								<h3 class="card-title">Community links</h3>

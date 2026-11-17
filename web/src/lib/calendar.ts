@@ -1,5 +1,11 @@
 // Koledar na spletu: barve vrst dogodkov in oblike datumov (logika dogodkov je v convex/lib/calendar.ts).
-export { KIND_EMOJI, KIND_LABEL, EVENT_KINDS } from '#convex/lib/calendar.js';
+export {
+	KIND_EMOJI,
+	KIND_LABEL,
+	EVENT_KINDS,
+	ALL_KINDS,
+	DEFAULT_SHOWN_KINDS
+} from '#convex/lib/calendar.js';
 
 /** Barvni ton vrste dogodka (rob + ozadje + besedilo). Prazniki iz igre so modri, naši zlati/barvni. */
 export const KIND_TONE: Record<string, string> = {

@@ -37,7 +37,9 @@
 		<Tooltip.Content {side} class="max-w-xs text-pretty">{text}</Tooltip.Content>
 	</Tooltip.Root>
 {:else if cls || style}
-	<svelte:element this={as} class={cls} {style}>{@render children?.()}</svelte:element>
+	<svelte:element this={as} class={cn(as === 'span' && 'inline-flex', cls)} {style}
+		>{@render children?.()}</svelte:element
+	>
 {:else}
 	{@render children?.()}
 {/if}

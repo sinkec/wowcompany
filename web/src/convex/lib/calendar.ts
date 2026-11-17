@@ -4,6 +4,12 @@
 export const EVENT_KINDS = ['dungeon', 'raid', 'pvp', 'leveling', 'social', 'other'] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 export const GAME_KINDS = ['holiday', 'system'] as const;
+export const ALL_KINDS = [...EVENT_KINDS, ...GAME_KINDS] as string[];
+/** Privzeto na naslovnici in v koledarju: samo naši dogodki (prazniki iz igre so izklopljivi). */
+export const DEFAULT_SHOWN_KINDS = [...EVENT_KINDS] as string[];
+export const cleanKinds = (kinds: string[]) => [
+	...new Set(kinds.filter((k) => ALL_KINDS.includes(k)))
+];
 
 export const KIND_LABEL: Record<string, string> = {
 	dungeon: 'Dungeon',
