@@ -10,8 +10,9 @@
 ## Novo 17. 11. 2026 (zvečer)
 
 **Odprto (stanje ob zaključku, zadnji commit na `main`, vse pushano):**
-- Companion 0.1.20 je izdan (uporabnik pushal tag 17. 11. zvečer). V naslednji izdaji pride popravek `a2b2592`
-  (gumb za addon ponudi samo NOVEJŠO priloženo verzijo – 0.1.17 je ponujala vrnitev 0.6.7 → 0.6.4).
+- **Companion 0.1.21 izdan 18. 11.** (edina izdaja na GitHubu): addon 0.7.0 (kdo snema v partyju, probe pozicije),
+  popravek gumba za addon. Strežnik: replay vseh snemalcev se združi, brisanje runa s potrditvijo admina.
+  Preveriti na prvem skupnem runu: ali sporočila `WowCoParty` med addoni v dungeonu pridejo.
 - Prod Office: Discord → Slash commands → **Register commands** (`/events`, `/news`); Discord → Posts → vklopi
   **Calendar**; po želji Website → Home page → **Company name**.
 - V igri nepreverjeno: prazniki iz `C_Calendar` (ali Forever vrne HOLIDAY in pravi `endTime`), živa lastna vrstica
