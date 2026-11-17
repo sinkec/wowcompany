@@ -594,6 +594,9 @@ function Win.Refresh()
         if type(a) ~= "number" then plain = false break end
         sum, max = sum + a, math.max(max, a)
     end
+    -- per second as the game's own DPS/HPS boards count it (= the built-in meter); fallback: the row's
+    local rates = not state.records and not state.mySpells and not deferred
+        and ns.Meter.Rates(state.sessionId and nil or s.winScope, s.winKind, state.sessionId) or nil
     local first = math.max(0, math.min(state.scroll, #rows - (win.visibleBars or 1)))
     state.scroll = first
     for i = 1, (win.visibleBars or 0) do
@@ -610,7 +613,8 @@ function Win.Refresh()
                 pcall(bar.name.SetText, bar.name, src.name)
             end
             setText(bar.amount, ns.short(src.totalAmount))
-            setText(bar.per, ns.fmtRate(src.amountPerSecond))
+            local guidRate = rates and ns.plain(src.sourceGUID) and rates[ns.plain(src.sourceGUID)]
+            setText(bar.per, ns.fmtRate(guidRate or src.amountPerSecond))
             local a = ns.plain(src.totalAmount)
             bar.pct:SetText(not state.records and s.winPercent ~= false and plain and sum > 0 and type(a) == "number"
                 and string.format("%.0f%%", a / sum * 100) or "")

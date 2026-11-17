@@ -129,6 +129,11 @@ local function report()
         local fights = ns.Meter.Fights(1)
         if fights[1] and fights[1].id then
             out.source.lastFight = call(C_DamageMeter.GetCombatSessionSourceFromID, fights[1].id, damage, guid)
+            -- DPS two ways: the damage board's per-second vs the game's own Dps board
+            if type(Enum) == "table" and type(Enum.DamageMeterType) == "table" and Enum.DamageMeterType.Dps then
+                out.source.lastFightDpsBoard = call(C_DamageMeter.GetCombatSessionFromID, fights[1].id,
+                    Enum.DamageMeterType.Dps)
+            end
             out.source.lastFightDuration = call(C_DamageMeter.GetSessionDurationSeconds, enumValue(
                 "DamageMeterSessionType", "Current"))
         end

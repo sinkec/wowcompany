@@ -97,6 +97,32 @@ function Meter.Read(scopeKey, kindKey, sessionId)
     return session
 end
 
+-- The game's own per-second boards ("Dps"/"Hps" types): the built-in meter shows these as DPS/HPS,
+-- and they are not the same as `amountPerSecond` of the damage/healing board. guid -> rate (plain only).
+local RATE_TYPE = { damage = "Dps", healing = "Hps" }
+function Meter.Rates(scopeKey, kindKey, sessionId)
+    local typeName = RATE_TYPE[kindKey]
+    if not typeName or type(C_DamageMeter) ~= "table" then return nil end
+    local kind = enumValue("DamageMeterType", typeName)
+    if kind == nil then return nil end
+    local ok, session
+    if sessionId then
+        if type(C_DamageMeter.GetCombatSessionFromID) ~= "function" then return nil end
+        ok, session = pcall(C_DamageMeter.GetCombatSessionFromID, sessionId, kind)
+    else
+        local scope = scopeEnum(scopeKey)
+        if scope == nil or type(C_DamageMeter.GetCombatSessionFromType) ~= "function" then return nil end
+        ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, scope, kind)
+    end
+    if not ok or type(session) ~= "table" or type(session.combatSources) ~= "table" then return nil end
+    local out = {}
+    for _, src in ipairs(session.combatSources) do
+        local guid = type(src) == "table" and ns.plain(src.sourceGUID)
+        if guid then out[guid] = src.amountPerSecond end
+    end
+    return out
+end
+
 -- PRIVACY RULE: only you and the members of your own party are ever shown. The game's meter can
 -- also list strangers who hit the same mob in the open world – those rows are dropped. A row
 -- whose owner cannot be verified (identity hidden as a secret mid-fight) is dropped too, except

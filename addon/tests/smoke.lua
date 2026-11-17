@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.6.4" end,
+    GetAddOnMetadata = function() return "0.6.5" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -191,6 +191,8 @@ local function session(kind)
               isLocalPlayer = false, sourceGUID = "Player-1-0000000B" },
         },
     }
+    -- the game's own DPS board counts per second differently from the damage board
+    if kind == 1 then s.combatSources[1].amountPerSecond = n(80.5) end
     -- mid-fight the identity fields can be secret too
     if game.secrets then
         for _, src in ipairs(s.combatSources) do
@@ -460,7 +462,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.6%.4|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.6%.5|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -607,7 +609,11 @@ end
 ns.Window.SetDisplay("damage")
 check(widgetWith("Fizzle Boom") == nil and widgetWith("Grobos Stinkfoot") ~= nil,
     "meter window lists you, not the stranger")
-check(textOf("65.20") ~= nil, "meter: your per-second value")
+check(textOf("80.50") ~= nil and textOf("65.20") == nil,
+    "meter: per second from the game's own DPS board, like the built-in meter")
+ns.Window.SetDisplay("taken")
+check(textOf("65.20") ~= nil, "meter: boards without a DPS twin keep their own per-second")
+ns.Window.SetDisplay("damage")
 game.brokenCurrent = true
 ns.Window.Refresh()
 check(widgetWith("71170") == nil and textOf("[0:46] Damage") ~= nil,
