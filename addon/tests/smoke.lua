@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.6.6" end,
+    GetAddOnMetadata = function() return "0.6.7" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -462,7 +462,7 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.6%.6|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.6%.7|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
@@ -648,7 +648,15 @@ fire("PLAYER_REGEN_DISABLED")
 game.secrets = true
 local okNow, errNow = pcall(ns.Window.Refresh)
 check(okNow, "meter: survives secret values mid-fight" .. (okNow and "" or (": " .. tostring(errNow))))
-check(textOf(SECRET) == nil, "meter: open world, identity hidden mid-fight -> no numbers of unknown owners")
+check(textOf(SECRET) ~= nil and widgetWith("Fizzle Boom") == nil,
+    "meter: open world mid-fight -> your own row live (asked by your GUID), never the stranger")
+local myBar
+for i = 1, #frames do
+    if rawget(frames[i], "guid") == "Player-1-0000000A" and frames[i].kind == "StatusBar" and frames[i].shown then
+        myBar = frames[i]
+    end
+end
+check(myBar ~= nil, "meter: your live row can still be clicked for the spell breakdown")
 game.grouped, game.instanceType = true, "party"
 ns.Window.Refresh()
 check(textOf(SECRET) ~= nil, "meter: dungeon with the party -> secret values are passed to the UI untouched")

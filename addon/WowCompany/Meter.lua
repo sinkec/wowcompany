@@ -211,6 +211,37 @@ function Meter.Spells(scopeKey, kindKey, sessionId, guid)
     return out
 end
 
+-- Your own row asked for by your GUID (the game answers this mid-fight too, values secret but
+-- displayable). For the open world, where hidden identities would otherwise hide your row as well:
+-- it can only ever be you, never a stranger.
+function Meter.MineLive(scopeKey, kindKey, sessionId)
+    if type(C_DamageMeter) ~= "table" or type(UnitGUID) ~= "function" then return nil end
+    local guid = ns.plain(UnitGUID("player"))
+    if type(guid) ~= "string" then return nil end
+    local kind = kindEnum(kindKey)
+    local ok, src
+    if sessionId then
+        if type(C_DamageMeter.GetCombatSessionSourceFromID) ~= "function" then return nil end
+        ok, src = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionId, kind, guid)
+    else
+        local scope = scopeEnum(scopeKey)
+        if scope == nil or type(C_DamageMeter.GetCombatSessionSourceFromType) ~= "function" then return nil end
+        ok, src = pcall(C_DamageMeter.GetCombatSessionSourceFromType, scope, kind, guid)
+    end
+    if not ok or type(src) ~= "table" or src.totalAmount == nil then return nil end
+    local name = type(UnitName) == "function" and ns.plain(UnitName("player")) or nil
+    local _, class = nil, nil
+    if type(UnitClass) == "function" then _, class = UnitClass("player") end
+    return {
+        name = name or "You",
+        classFilename = class,
+        totalAmount = src.totalAmount,
+        amountPerSecond = src.amountPerSecond,
+        sourceGUID = guid,
+        isLocalPlayer = true,
+    }
+end
+
 -- The local player's row of a session; nil when it cannot be verified (a secret must not be
 -- compared, and guessing could show somebody else's numbers as yours).
 function Meter.Mine(session)

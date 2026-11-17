@@ -587,6 +587,13 @@ function Win.Refresh()
         rows = mySpellRows(s, session)
     else
         rows = ns.Meter.Visible(session, s.winKind)
+        -- mid-fight in the open world every identity is hidden, so the privacy rule hides all rows –
+        -- yours too. The game still answers for your own GUID: show that one, live.
+        if #rows == 0 and s.winKind ~= "enemies" and session and type(session.combatSources) == "table"
+            and #session.combatSources > 0 then
+            local me = ns.Meter.MineLive(state.sessionId and nil or s.winScope, s.winKind, state.sessionId)
+            if me then rows = { me } end
+        end
     end
     local sum, max, plain = 0, 0, true
     for i = 1, #rows do
