@@ -383,7 +383,7 @@ Meter: število ob lučki = koliko jih snema combat log (zeleno, rdeča 0), tool
 dungeon (po 20 s) opozorilo v chatu: nihče ne snema / nekdo ima novejši addon. Podatki samo v pomnilniku.
 Nepreverjeno v igri: ali sporočila med addoni na Forever v dungeonu pridejo (OpenMap jih uporablja za GUILD).
 
-### 4.8 Meter v odprtem svetu s partyjem (22. 11. 2026, necommitano / neizdano)
+### 4.8 Meter v odprtem svetu s partyjem (addon 0.7.1, Companion 0.1.22, 22. 11. 2026)
 
 Med bojem v odprtem svetu igra v `C_DamageMeter` skrije identitete (`sourceGUID` = secret), zato je pravilo
 zasebnosti skrilo vse razen tebe (`MineLive`). Zdaj `Meter.Visible` vrne še število skritih vrstic; če so,
