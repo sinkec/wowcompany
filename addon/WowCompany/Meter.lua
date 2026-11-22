@@ -146,7 +146,8 @@ local function isMine(src, myGuid)
     return guid ~= nil and guid == myGuid
 end
 
--- Rows of a session that may be shown (see the privacy rule), in the game's order.
+-- Rows of a session that may be shown (see the privacy rule), in the game's order, and how many
+-- player rows were dropped only because their identity is hidden (mid-fight in the open world).
 -- The "enemies" board lists mobs (damage done to them): those rows are kept, players never.
 function Meter.Visible(session, kindKey)
     local out = {}
@@ -155,6 +156,7 @@ function Meter.Visible(session, kindKey)
     local myGuid = type(UnitGUID) == "function" and ns.plain(UnitGUID("player")) or nil
     local grouped = inGroup()
     local privateInstance = grouped and ns.Logging.InDungeon()
+    local hidden = 0
     for i = 1, #sources do
         local src = sources[i]
         if type(src) == "table" then
@@ -166,10 +168,12 @@ function Meter.Visible(session, kindKey)
                 end
             elseif isMine(src, myGuid) or privateInstance or (grouped and guid ~= nil and guidInGroup(guid)) then
                 table.insert(out, src)
+            elseif guid == nil then
+                hidden = hidden + 1
             end
         end
     end
-    return out
+    return out, hidden
 end
 
 -- One player's spells in a session (Details! reads the same API on this client):
@@ -211,35 +215,66 @@ function Meter.Spells(scopeKey, kindKey, sessionId, guid)
     return out
 end
 
--- Your own row asked for by your GUID (the game answers this mid-fight too, values secret but
--- displayable). For the open world, where hidden identities would otherwise hide your row as well:
--- it can only ever be you, never a stranger.
-function Meter.MineLive(scopeKey, kindKey, sessionId)
-    if type(C_DamageMeter) ~= "table" or type(UnitGUID) ~= "function" then return nil end
-    local guid = ns.plain(UnitGUID("player"))
-    if type(guid) ~= "string" then return nil end
-    local kind = kindEnum(kindKey)
-    local ok, src
-    if sessionId then
-        if type(C_DamageMeter.GetCombatSessionSourceFromID) ~= "function" then return nil end
-        ok, src = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionId, kind, guid)
+-- The party's rows asked for one by one by GUID: you and the members of your own group (the game
+-- answers this mid-fight too, values secret but displayable). For the open world, where the game
+-- hides every identity in the session mid-fight: these GUIDs come from your own party frames, so
+-- the rows can only ever be you and your party, never a stranger on the same mob.
+local function groupUnits()
+    local units = { "player" }
+    local n = type(GetNumGroupMembers) == "function" and ns.plain(GetNumGroupMembers()) or 0
+    if type(n) ~= "number" or not inGroup() then return units end
+    local raid = type(IsInRaid) == "function" and ns.plain(IsInRaid()) == true
+    if raid then
+        units = {}
+        for i = 1, math.min(n, 40) do units[#units + 1] = "raid" .. i end
     else
-        local scope = scopeEnum(scopeKey)
-        if scope == nil or type(C_DamageMeter.GetCombatSessionSourceFromType) ~= "function" then return nil end
-        ok, src = pcall(C_DamageMeter.GetCombatSessionSourceFromType, scope, kind, guid)
+        for i = 1, math.min(n - 1, 4) do units[#units + 1] = "party" .. i end
     end
-    if not ok or type(src) ~= "table" or src.totalAmount == nil then return nil end
-    local name = type(UnitName) == "function" and ns.plain(UnitName("player")) or nil
-    local _, class = nil, nil
-    if type(UnitClass) == "function" then _, class = UnitClass("player") end
-    return {
-        name = name or "You",
-        classFilename = class,
-        totalAmount = src.totalAmount,
-        amountPerSecond = src.amountPerSecond,
-        sourceGUID = guid,
-        isLocalPlayer = true,
-    }
+    return units
+end
+
+function Meter.PartyLive(scopeKey, kindKey, sessionId)
+    if type(C_DamageMeter) ~= "table" or type(UnitGUID) ~= "function" then return {} end
+    local kind = kindEnum(kindKey)
+    local fromId, fromType = C_DamageMeter.GetCombatSessionSourceFromID, C_DamageMeter.GetCombatSessionSourceFromType
+    local scope = not sessionId and scopeEnum(scopeKey) or nil
+    if sessionId and type(fromId) ~= "function" then return {} end
+    if not sessionId and (scope == nil or type(fromType) ~= "function") then return {} end
+    local myGuid = ns.plain(UnitGUID("player"))
+    local out, seen, plain = {}, {}, true
+    for _, unit in ipairs(groupUnits()) do
+        local guid = ns.plain(UnitGUID(unit))
+        if type(guid) == "string" and not seen[guid] then
+            seen[guid] = true
+            local ok, src
+            if sessionId then ok, src = pcall(fromId, sessionId, kind, guid)
+            else ok, src = pcall(fromType, scope, kind, guid) end
+            if ok and type(src) == "table" and src.totalAmount ~= nil then
+                local name = type(UnitName) == "function" and ns.plain(UnitName(unit)) or nil
+                local class
+                if type(UnitClass) == "function" then _, class = UnitClass(unit) end
+                local row = {
+                    name = name or (guid == myGuid and "You" or "Party member"),
+                    classFilename = ns.plain(class),
+                    totalAmount = src.totalAmount,
+                    amountPerSecond = src.amountPerSecond,
+                    sourceGUID = guid,
+                    isLocalPlayer = guid == myGuid,
+                }
+                if type(ns.plain(row.totalAmount)) ~= "number" then plain = false end
+                out[#out + 1] = row
+            end
+        end
+    end
+    -- the biggest first, as the game's own meter; secret amounts cannot be compared: you first, then the party
+    if plain then
+        table.sort(out, function(a, b)
+            local x, y = ns.plain(a.totalAmount), ns.plain(b.totalAmount)
+            if x ~= y then return x > y end
+            return tostring(a.name) < tostring(b.name)
+        end)
+    end
+    return out
 end
 
 -- The local player's row of a session; nil when it cannot be verified (a secret must not be

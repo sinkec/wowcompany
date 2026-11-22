@@ -93,8 +93,8 @@ function LoggingChat(on)
     return game.chatLog
 end
 function GetInstanceInfo() return "Somewhere", game.instanceType, 1, "Normal", 5, 0, false, 43 end
-function UnitGUID() return "Player-1-0000000A" end
-function UnitName() return "Mottled Boar" end
+function UnitGUID(unit) return unit == "party1" and "Player-1-0000000B" or "Player-1-0000000A" end
+function UnitName(unit) return unit == "party1" and "Fizzle" or "Mottled Boar" end
 function UnitLevel() return 18 end
 function UnitClass() return "Mage", "MAGE", 8 end
 function GetCritChance() return 2.124300241470337 end
@@ -472,6 +472,15 @@ game.secrets = true
 game.instanceType = "none"
 check(#ns.Meter.Visible(ns.Meter.Read("current", "damage")) == 0 and ns.Meter.Mine(ns.Meter.Read("current", "damage")) == nil,
     "identity hidden mid-fight in the open world: nothing is shown, nothing is guessed")
+-- open world with a party, mid-fight: the party is asked for by its own GUIDs, the stranger never appears
+local _, hidden = ns.Meter.Visible(ns.Meter.Read("current", "damage"))
+check(hidden > 0, "open world mid-fight: hidden identities are counted")
+check(#ns.Meter.PartyLive("current", "damage") == 1, "open world alone: only you, live")
+game.grouped = true
+local live = ns.Meter.PartyLive("current", "damage")
+check(#live == 2 and live[1].isLocalPlayer and live[2].name == "Fizzle" and live[2].sourceGUID == "Player-1-0000000B",
+    "open world in a party mid-fight: you and the party member, live (secret amounts: you first)")
+game.grouped = false
 game.secrets = false
 
 -- the dungeon run: counted from the fights after walking in, shown as a banner on the Now page

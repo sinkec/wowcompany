@@ -382,3 +382,12 @@ Companionom in vklopljenim combat logom = popolnejši replay.
 Meter: število ob lučki = koliko jih snema combat log (zeleno, rdeča 0), tooltip lučke = seznam. Enkrat na
 dungeon (po 20 s) opozorilo v chatu: nihče ne snema / nekdo ima novejši addon. Podatki samo v pomnilniku.
 Nepreverjeno v igri: ali sporočila med addoni na Forever v dungeonu pridejo (OpenMap jih uporablja za GUILD).
+
+### 4.8 Meter v odprtem svetu s partyjem (22. 11. 2026, necommitano / neizdano)
+
+Med bojem v odprtem svetu igra v `C_DamageMeter` skrije identitete (`sourceGUID` = secret), zato je pravilo
+zasebnosti skrilo vse razen tebe (`MineLive`). Zdaj `Meter.Visible` vrne še število skritih vrstic; če so,
+okno vpraša `Meter.PartyLive`: za `player` + `party1..4` (ali `raid1..N`) `GetCombatSessionSourceFromType/ID` po
+GUID-u iz lastnih party enot → samo ti in tvoj party, tujec na istem mobu nikoli. Skrite vrednosti se ne
+primerjajo: vrstni red ti, nato party; ko so vrednosti navadne, po velikosti. **V igri nepreverjeno:** ali
+Forever med bojem odgovori za GUID drugega člana (za lastnega odgovori).
