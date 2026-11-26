@@ -164,6 +164,15 @@ export default defineSchema({
 		['playerId']
 	),
 
+	// Oprema iz igre (addon → Companion): Blizzard za Forever ne vrača več item levelov (lib/gameGear.ts).
+	gameGear: defineTable({
+		playerId: v.id('players'),
+		ilvl: v.number(),
+		ilvlBest: v.number(),
+		items: v.array(v.object({ slot: v.number(), itemId: v.number(), ilvl: v.union(v.number(), v.null()) })),
+		at: v.number()
+	}).index('by_player', ['playerId']),
+
 	// Zgodovina: nova vrstica samo, ko se kaj spremeni.
 	history: defineTable({
 		playerId: v.id('players'),

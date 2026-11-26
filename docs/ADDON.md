@@ -391,3 +391,15 @@ okno vpraša `Meter.PartyLive`: za `player` + `party1..4` (ali `raid1..N`) `GetC
 GUID-u iz lastnih party enot → samo ti in tvoj party, tujec na istem mobu nikoli. Skrite vrednosti se ne
 primerjajo: vrstni red ti, nato party; ko so vrednosti navadne, po velikosti. **V igri nepreverjeno:** ali
 Forever med bojem odgovori za GUID drugega člana (za lastnega odgovori).
+
+### 4.9 Item level iz igre (addon 0.7.2, Companion 0.1.23, 26. 11. 2026)
+
+Blizzardov profil za Forever like od ~23. 11. 2026 **ne vrača več** `equipped_item_level`, `average_item_level` in
+`level` pri predmetih (preverjeno na API-ju: Bonobo, Pharaun, Purr – polj ni; Sinek jih ima še iz stare prijave).
+Statični API predmetov Forever predmetov ne pozna, classic/era pa imata za isti predmet različne številke.
+Zato: addon izvozi `v1|GEAR|ime|equipped|best|reža:itemId:ilvl,…|epoch` (`GetInventoryItemLink` +
+`C_Item.GetDetailedItemLevelInfo`, `GetAverageItemLevel`; ob `PLAYER_EQUIPMENT_CHANGED`, ob odjavi/`/reload`
+na disk) → Companion `POST /companion/gear` ob spremembi (`gear-sent.json`) → strežnik `companion.ingestGear`
+(samo lastnikovi junaki, tabela `gameGear`) dopolni `summaries.ilvlEquipped/ilvlAverage` in `details.equipment`
+(ilvl + vrstica »Item Level« v tooltipu), kjer je Blizzardov 0; `poll.apply` naredi isto ob vsakem osveževanju
+(`lib/gameGear.ts` `withGameGear`). Kar Blizzard da, ima prednost. Brez addona stran kaže »–« namesto 0.

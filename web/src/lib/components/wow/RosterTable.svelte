@@ -100,7 +100,7 @@
 							{s.talentBuild}{:else}<span class="text-muted-foreground">–</span>{/if}
 					</Table.Cell>
 					<Table.Cell class="text-right tabular-nums"
-						>{#if !allowed('ilvlEquipped')}<Locked compact />{:else}{s?.ilvlEquipped ??
+						>{#if !allowed('ilvlEquipped')}<Locked compact />{:else}{s?.ilvlEquipped ||
 								'–'}{/if}</Table.Cell
 					>
 					<Table.Cell class="hidden text-right tabular-nums sm:table-cell"

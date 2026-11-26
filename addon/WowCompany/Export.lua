@@ -4,6 +4,7 @@
 --   v1|META|<addon version>|<epoch s>
 --   v1|RUN|<instance id>|<start epoch s>|<end epoch s or 0>|<zone>|<leader or empty>
 --   v1|CHAR|<name>|<level>|<class>|<crit %>|<attack power>|<armor>|<item level>|<epoch s>
+--   v1|GEAR|<name>|<equipped item level>|<best owned item level>|<slot>:<item id>:<item level>,…|<epoch s>
 --   v1|LOOT|<epoch s>|<item id>|<quality 0-6 or empty>|<count>|<item name>
 --   v1|CALWIN|… and v1|CAL|… – the in-game calendar's holidays (Calendar.lua)
 -- LOOT carries no looter: the chat log (read by the Companion) already says who took what, but
@@ -98,6 +99,46 @@ local function charLine()
     }, "|")
 end
 
+-- What you wear, with the item levels the game itself shows. The Blizzard web API stopped giving
+-- item levels for WoW Forever characters (seen 26. 11. 2026), so the portal takes them from here.
+local GEAR_SLOTS = 19 -- 1 head … 19 tabard (the inventory slot ids)
+
+local function itemLevel(link)
+    if type(C_Item) == "table" and type(C_Item.GetDetailedItemLevelInfo) == "function" then
+        local ok, lvl = pcall(C_Item.GetDetailedItemLevelInfo, link)
+        lvl = ok and ns.plain(lvl) or nil
+        if type(lvl) == "number" and lvl > 0 then return lvl end
+    end
+    if type(C_Item) == "table" and type(C_Item.GetItemInfo) == "function" then
+        local ok, _, _, _, lvl = pcall(C_Item.GetItemInfo, link)
+        lvl = ok and ns.plain(lvl) or nil
+        if type(lvl) == "number" and lvl > 0 then return lvl end
+    end
+    return nil
+end
+
+local function gearLine()
+    local name = fullName("player")
+    if not name or type(GetInventoryItemLink) ~= "function" then return nil end
+    local items = {}
+    for slot = 1, GEAR_SLOTS do
+        local ok, link = pcall(GetInventoryItemLink, "player", slot)
+        link = ok and ns.plain(link) or nil
+        local id = type(link) == "string" and tonumber(string.match(link, "item:(%d+)")) or nil
+        if id then
+            local lvl = itemLevel(link)
+            table.insert(items, slot .. ":" .. id .. ":" .. (lvl and string.format("%d", lvl) or ""))
+            Export.ItemDetails(id) -- tooltips for the portal too
+        end
+    end
+    if #items == 0 then return nil end
+    local best, equipped = number(GetAverageItemLevel)
+    local function n(v) return type(v) == "number" and string.format("%.2f", v) or "0" end
+    return table.concat({
+        "v1", "GEAR", clean(name), n(equipped), n(best), table.concat(items, ","), tostring(ns.now()),
+    }, "|")
+end
+
 -- Rewrites WowCompanyDB.export from the remembered runs and the character's current stats.
 function Export.Rebuild()
     if not ns.db then return end
@@ -127,6 +168,8 @@ function Export.Rebuild()
     end
     local char = charLine()
     if char then table.insert(lines, char) end
+    local gear = gearLine()
+    if gear then table.insert(lines, gear) end
     ns.db.export = lines
 end
 
@@ -165,6 +208,13 @@ ns.on("ZONE_CHANGED_NEW_AREA", sync)
 ns.on("GROUP_ROSTER_UPDATE", sync)
 ns.on("PARTY_LEADER_CHANGED", sync)
 ns.on("PLAYER_LOGOUT", sync) -- also fires on /reload, right before the game saves
+-- new gear: rebuild once the swapping is over (a set swap fires this for every slot)
+local gearTimer
+ns.on("PLAYER_EQUIPMENT_CHANGED", function()
+    if gearTimer or type(C_Timer) ~= "table" or type(C_Timer.After) ~= "function" then return end
+    gearTimer = true
+    C_Timer.After(2, function() gearTimer = nil Export.Rebuild() end)
+end)
 ns.onReady(function()
     ns.db.runs = type(ns.db.runs) == "table" and ns.db.runs or {}
     ns.db.loot = type(ns.db.loot) == "table" and ns.db.loot or {}

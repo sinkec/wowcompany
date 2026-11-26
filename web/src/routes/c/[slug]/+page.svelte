@@ -225,11 +225,11 @@
 		{#if s}
 			<!-- quick tiles -->
 			<section class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-				{#each [{ l: 'Item level', v: s.ilvlEquipped, sub: s.ilvlAverage != null ? `best owned ${s.ilvlAverage}` : '' }, { l: 'Things murdered', v: s.kills, sub: c.week?.kills ? `+${fmt(c.week.kills)} this week` : '' }, { l: 'Deaths', v: s.deaths, sub: kd != null ? `K/D ${fmt(kd, 1)} · ${kdQuip(kd)}` : '' }, { l: 'Quests', v: s.quests, sub: c.week?.quests ? `+${fmt(c.week.quests)} this week` : 'unpaid labor' }, { l: 'Honorable kills', v: s.honorableKills, sub: 'honor is relative' }, { l: 'Health', v: stats ? n('health') : null, sub: stats ? `${fmt(n('power'))} ${stats.powerType ?? ''}` : '' }] as t (t.l)}
+				{#each [{ l: 'Item level', v: s.ilvlEquipped, unknown: s.ilvlEquipped === 0, sub: s.ilvlEquipped === 0 ? 'Blizzard stopped telling. The WowCompany addon knows.' : s.ilvlAverage ? `best owned ${s.ilvlAverage}` : '' }, { l: 'Things murdered', v: s.kills, sub: c.week?.kills ? `+${fmt(c.week.kills)} this week` : '' }, { l: 'Deaths', v: s.deaths, sub: kd != null ? `K/D ${fmt(kd, 1)} · ${kdQuip(kd)}` : '' }, { l: 'Quests', v: s.quests, sub: c.week?.quests ? `+${fmt(c.week.quests)} this week` : 'unpaid labor' }, { l: 'Honorable kills', v: s.honorableKills, sub: 'honor is relative' }, { l: 'Health', v: stats ? n('health') : null, sub: stats ? `${fmt(n('power'))} ${stats.powerType ?? ''}` : '' }] as t (t.l)}
 					<Card.Root class="p-3">
 						<div class="text-xs text-muted-foreground">{t.l}</div>
 						<div class="stat-value">
-							{#if t.v == null}<Locked compact />{:else}{fmt(t.v)}{/if}
+							{#if t.v == null}<Locked compact />{:else if 'unknown' in t && t.unknown}–{:else}{fmt(t.v)}{/if}
 						</div>
 						{#if t.sub}<div class="text-xs leading-snug text-muted-foreground italic">
 								{t.sub}

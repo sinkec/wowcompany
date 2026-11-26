@@ -8,6 +8,7 @@ import {
 	linkStart,
 	uploadCalendar,
 	uploadDiagnostics,
+	uploadGear,
 	uploadRecords,
 	uploadRun
 } from './companionHttp.js';
@@ -93,5 +94,6 @@ http.route({ path: '/companion/runs', method: 'POST', handler: uploadRun });
 http.route({ path: '/companion/records', method: 'POST', handler: uploadRecords });
 http.route({ path: '/companion/diagnostics', method: 'POST', handler: uploadDiagnostics });
 http.route({ path: '/companion/calendar', method: 'POST', handler: uploadCalendar });
+http.route({ path: '/companion/gear', method: 'POST', handler: uploadGear });
 
 export default http;

@@ -84,7 +84,7 @@ export function rosterEmbed(list: BotSummary[], fields: string[], site?: string)
 			[ok('race') ? s.race : null, ok('className') ? s.className : null]
 				.filter(Boolean)
 				.join(' ') || null,
-			ok('ilvlEquipped') ? `ilvl ${s.ilvlEquipped}` : null,
+			ok('ilvlEquipped') && s.ilvlEquipped > 0 ? `ilvl ${s.ilvlEquipped}` : null,
 			ok('kills') ? `🗡️ ${fmt(s.kills)}` : null,
 			ok('deaths') ? `💀 ${fmt(s.deaths)}` : null,
 			ok('lastLogin') && s.lastLogin ? `seen ${ts(s.lastLogin)}` : null
@@ -112,12 +112,14 @@ export function heroEmbed(
 	const out: { name: string; value: string; inline?: boolean }[] = [];
 	const inline = (name: string, value: string) => out.push({ name, value, inline: true });
 
-	if (ok('ilvlEquipped'))
+	if (ok('ilvlEquipped') && s.ilvlEquipped > 0)
 		inline(
 			'ilvl',
-			ok('ilvlAverage') ? `${s.ilvlEquipped} *(best ${s.ilvlAverage})*` : `${s.ilvlEquipped}`
+			ok('ilvlAverage') && s.ilvlAverage > 0
+				? `${s.ilvlEquipped} *(best ${s.ilvlAverage})*`
+				: `${s.ilvlEquipped}`
 		);
-	else if (ok('ilvlAverage')) inline('Best ilvl', `${s.ilvlAverage}`);
+	else if (ok('ilvlAverage') && s.ilvlAverage > 0) inline('Best ilvl', `${s.ilvlAverage}`);
 	if (ok('kills')) inline('Kills', fmt(s.kills));
 	if (ok('deaths')) inline('Deaths', `${fmt(s.deaths)} 💀`);
 	if (ok('kills') && ok('deaths')) {

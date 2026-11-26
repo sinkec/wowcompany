@@ -48,13 +48,13 @@
 	{#if s}
 		<dl class="mt-3 grid grid-cols-3 gap-2 text-center">
 			{#each [
-				{ l: 'ilvl', v: s.ilvlEquipped },
+				{ l: 'ilvl', v: s.ilvlEquipped, unknown: s.ilvlEquipped === 0 },
 				{ l: 'Murders', v: s.kills },
 				{ l: 'Deaths', v: s.deaths }
 			] as t (t.l)}
 				<div class="rounded-md bg-background/40 py-1">
 					<dt class="text-[10px] tracking-wider text-muted-foreground uppercase">{t.l}</dt>
-					<dd class="font-semibold tabular-nums">{#if t.v == null}<Locked compact />{:else}{fmt(t.v)}{/if}</dd>
+					<dd class="font-semibold tabular-nums">{#if t.v == null}<Locked compact />{:else if 'unknown' in t && t.unknown}–{:else}{fmt(t.v)}{/if}</dd>
 				</div>
 			{/each}
 		</dl>

@@ -7,6 +7,7 @@ import { classSpecs, get, getCharacterParts, itemIcon, mapLimit, profileNs, tale
 import { itemIds, normalize, talentRefs, type Item } from './lib/normalize.js';
 import { getSettings } from './lib/settings.js';
 import { sameFields } from './lib/same.js';
+import { withGameGear } from './lib/gameGear.js';
 import { detailFields, summaryFields } from './schema.js';
 import type { Id } from './_generated/dataModel.js';
 
@@ -296,9 +297,15 @@ export const apply = internalMutation({
 		let newEvents = 0;
 		let entriesChanged = false;
 
-		for (const u of updates) {
-			const player = await ctx.db.get(u.playerId);
+		for (const raw of updates) {
+			const player = await ctx.db.get(raw.playerId);
 			if (!player) continue; // medtem odstranjen
+			// Blizzard za Forever ne vrača več item levelov: dopolni jih oprema iz igre (lib/gameGear.ts)
+			const gear = await ctx.db
+				.query('gameGear')
+				.withIndex('by_player', (q) => q.eq('playerId', raw.playerId))
+				.unique();
+			const u = { ...raw, ...withGameGear(raw.summary, raw.details, gear) };
 
 			const prev = await ctx.db
 				.query('summaries')

@@ -255,3 +255,23 @@ export const uploadCalendar = httpAction(async (ctx, req) => {
 		return errorResponse(e);
 	}
 });
+
+/** POST /companion/gear – oprema z item leveli iz igre (addon GEAR), samo za lastnikove junake. */
+export const uploadGear = httpAction(async (ctx, req) => {
+	const auth = req.headers.get('authorization') ?? '';
+	const m = /^Bearer (wcc_[A-Za-z0-9_-]{20,})$/.exec(auth);
+	if (!m) return json({ error: 'missing or malformed device token', code: 'unauthorized' }, 401);
+	const body = await readJson(req, 32 * 1024);
+	if (body instanceof Response) return body;
+	if (!isObj(body) || body.schema !== 1 || !Array.isArray(body.characters))
+		return json({ error: 'need schema 1 and characters[]', code: 'schema' }, 400);
+	try {
+		const r = await ctx.runMutation(internal.companion.ingestGear, {
+			tokenHash: await sha256hex(m[1]),
+			characters: (body.characters as unknown[]).slice(0, 10)
+		});
+		return json(r, 200);
+	} catch (e) {
+		return errorResponse(e);
+	}
+});

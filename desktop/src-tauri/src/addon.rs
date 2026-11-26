@@ -65,6 +65,9 @@ pub struct AddonExport {
     pub at: Option<i64>,
     pub runs: Vec<AddonRun>,
     pub chars: Vec<AddonChar>,
+    /// What the character wears, with the item levels the game shows (`v1|GEAR|…`).
+    #[serde(skip)]
+    pub gear: Vec<AddonGear>,
     pub loot: Vec<AddonLoot>,
     /// Opt-in diagnostics report ("Help development" in the addon), sent to the portal once.
     #[serde(skip)]
@@ -75,6 +78,28 @@ pub struct AddonExport {
     /// The in-game calendar's holidays (`v1|CALWIN|…`, `v1|CAL|…`), for the portal's calendar.
     #[serde(skip)]
     pub calendar: Option<AddonCalendar>,
+}
+
+/// The character's gear as the game shows it: the Blizzard web API stopped giving item levels
+/// for WoW Forever characters (26. 11. 2026), so the portal takes them from here.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddonGear {
+    pub name: String,
+    pub ilvl: f64,
+    pub ilvl_best: f64,
+    pub items: Vec<AddonGearItem>,
+    /// UTC milliseconds.
+    pub at: i64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddonGearItem {
+    /// Inventory slot id (1 head … 19 tabard).
+    pub slot: u8,
+    pub item_id: u32,
+    pub ilvl: Option<u32>,
 }
 
 /// Holidays and system notices of this month and the next (never player or guild events).
@@ -245,6 +270,29 @@ pub fn parse_export(text: &str) -> AddonExport {
                         kind: kind.to_string(),
                         title: f[5].trim().chars().take(80).collect(),
                         description: f[6..].join(" ").trim().chars().take(600).collect(),
+                    });
+                }
+            }
+            Some("GEAR") if f.len() >= 7 => {
+                let items: Vec<AddonGearItem> = f[5]
+                    .split(',')
+                    .filter_map(|it| {
+                        let mut p = it.split(':');
+                        let slot = p.next()?.trim().parse().ok().filter(|s| (1..=19).contains(s))?;
+                        let item_id = p.next()?.trim().parse().ok().filter(|&id| id > 0)?;
+                        let ilvl = p.next().and_then(|l| l.trim().parse().ok()).filter(|&l| l > 0 && l < 1000);
+                        Some(AddonGearItem { slot, item_id, ilvl })
+                    })
+                    .take(19)
+                    .collect();
+                let name = f[2].trim().to_string();
+                if !name.is_empty() && !items.is_empty() {
+                    out.gear.push(AddonGear {
+                        name,
+                        ilvl: f[3].trim().parse().unwrap_or(0.0),
+                        ilvl_best: f[4].trim().parse().unwrap_or(0.0),
+                        items,
+                        at: secs_to_ms(f[6]).unwrap_or(0),
                     });
                 }
             }
@@ -578,6 +626,7 @@ WowCompanyDB = {
 "v1|RUN|43|1794690000|1794691800|Wailing Caverns|Fizzle Boom", -- [2]
 "v1|RUN|389|1794695000|0|Ragefire Chasm|", -- [3]
 "v1|CHAR|Grobos \"The\" Stinkfoot|18|MAGE|2.12|13|184|11.75|1794700000", -- [4]
+"v1|GEAR|Grobos Stinkfoot|11.75|12.50|4:6096:,16:2084:33,99:1:1,7:x:3|1794700000",
 "v1|RUN|broken", -- [5]
 "v1|LOOT|1794690600|2084|3|1|Darksteel Bastard Sword", -- [7]
 "v1|LOOT|1794690700|2589||3|Linen Cloth", -- [8]
@@ -626,6 +675,17 @@ WowCompanyDB = {
         assert_eq!(e.chars.len(), 1);
         assert_eq!(e.chars[0].name, "Grobos \"The\" Stinkfoot");
         assert_eq!((e.chars[0].level, e.chars[0].crit, e.chars[0].armor), (18, 2.12, 184));
+        assert_eq!(e.gear.len(), 1);
+        let g = &e.gear[0];
+        assert_eq!((g.name.as_str(), g.ilvl, g.ilvl_best, g.at), ("Grobos Stinkfoot", 11.75, 12.5, 1_794_700_000_000));
+        // a bad slot and a bad item id are skipped, an unknown item level stays empty
+        assert_eq!(
+            g.items,
+            vec![
+                AddonGearItem { slot: 4, item_id: 6096, ilvl: None },
+                AddonGearItem { slot: 16, item_id: 2084, ilvl: Some(33) }
+            ]
+        );
         assert_eq!(parse_export("garbage"), AddonExport::default());
     }
 

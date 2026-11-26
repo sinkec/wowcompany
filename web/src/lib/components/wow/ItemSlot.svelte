@@ -42,7 +42,7 @@
 					<div class="min-w-0">
 						<div class="truncate text-sm font-medium" style="color: {color}">{item.name}</div>
 						<div class="text-xs text-muted-foreground">
-							{SLOT_LABELS[slot] ?? item.slot} · ilvl {item.ilvl}
+							{SLOT_LABELS[slot] ?? item.slot}{#if item.ilvl > 0} · ilvl {item.ilvl}{/if}
 						</div>
 					</div>
 				</div>

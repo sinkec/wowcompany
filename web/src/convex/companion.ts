@@ -15,7 +15,8 @@ import {
 	type QueryCtx
 } from './_generated/server.js';
 import { getViewer } from './lib/access.js';
-import { itemById, itemByName, itemIcon, mapLimit } from './lib/blizzard.js';
+import { itemById, itemByName, itemIcon, mapLimit, slugify } from './lib/blizzard.js';
+import { cleanGear, withGameGear } from './lib/gameGear.js';
 import {
 	addRecorder,
 	beatsRecord,
@@ -46,7 +47,9 @@ const limiter = new RateLimiter(components.rateLimiter, {
 	// Na napravo: ~1 run na 2 min v povprečju, do 10 naenkrat (čakalna vrsta po izpadu interneta).
 	companionUpload: { kind: 'token bucket', rate: 30, period: HOUR, capacity: 10 },
 	// Na napravo: osebni rekordi (aplikacija jih pošlje največ enkrat na minuto, samo ob novem rekordu).
-	companionRecords: { kind: 'token bucket', rate: 60, period: HOUR, capacity: 10 }
+	companionRecords: { kind: 'token bucket', rate: 60, period: HOUR, capacity: 10 },
+	// Na napravo: oprema (aplikacija jo pošlje samo ob spremembi).
+	companionGear: { kind: 'token bucket', rate: 60, period: HOUR, capacity: 10 }
 });
 
 /** Napaka, ki jo HTTP plast pretvori v statusno kodo. */
@@ -715,6 +718,73 @@ export const ingestPersonal = internalMutation({
 				else await ctx.db.insert('heroRecords', row);
 				updated++;
 			}
+		}
+		return { updated, ignored };
+	}
+});
+
+/**
+ * Oprema iz igre za like lastnika naprave: shrani jo in takoj dopolni item level v povzetku in
+ * opremi junaka, kjer ga Blizzard nima. Tuj ali neznan junak se preskoči.
+ */
+export const ingestGear = internalMutation({
+	args: { tokenHash: v.string(), characters: v.array(v.any()) },
+	returns: v.object({ updated: v.number(), ignored: v.array(v.string()) }),
+	handler: async (ctx, { tokenHash, characters }) => {
+		const device = await ctx.db
+			.query('devices')
+			.withIndex('by_token_hash', (q) => q.eq('tokenHash', tokenHash))
+			.unique();
+		if (!device) fail('unauthorized', 'Unknown device. Link the app again.');
+		if (device.revokedAt) fail('forbidden', 'This device was revoked.');
+		const role = await roleOf(ctx, device.userId);
+		if (role !== 'admin' && role !== 'member') fail('forbidden', 'Members only.');
+
+		const rl = await limiter.limit(ctx, 'companionGear', { key: device._id });
+		if (!rl.ok) fail('rate_limited', 'Too many gear uploads.', rl.retryAfter);
+
+		const now = Date.now();
+		let updated = 0;
+		const ignored: string[] = [];
+		for (const raw of characters.slice(0, 10)) {
+			const c = cleanGear(raw, now);
+			if (!c) continue;
+			const slug = slugify(c.name);
+			const player = await ctx.db
+				.query('players')
+				.withIndex('by_slug', (q) => q.eq('slug', slug))
+				.first();
+			if (!player || (player.ownerUserId && player.ownerUserId !== device.userId)) {
+				ignored.push(slug);
+				continue;
+			}
+			const gear = { ilvl: c.ilvl, ilvlBest: c.ilvlBest, items: c.items, at: c.at };
+			const prev = await ctx.db
+				.query('gameGear')
+				.withIndex('by_player', (q) => q.eq('playerId', player._id))
+				.unique();
+			if (prev && prev.at > gear.at) continue; // starejši izvoz z drugega računalnika
+			if (prev) await ctx.db.replace('gameGear', prev._id, { playerId: player._id, ...gear });
+			else await ctx.db.insert('gameGear', { playerId: player._id, ...gear });
+
+			const s = await ctx.db
+				.query('summaries')
+				.withIndex('by_player', (q) => q.eq('playerId', player._id))
+				.unique();
+			const d = await ctx.db
+				.query('details')
+				.withIndex('by_player', (q) => q.eq('playerId', player._id))
+				.unique();
+			if (s && d) {
+				const merged = withGameGear(s, d, gear);
+				if (merged.summary !== s)
+					await ctx.db.patch('summaries', s._id, {
+						ilvlEquipped: merged.summary.ilvlEquipped,
+						ilvlAverage: merged.summary.ilvlAverage
+					});
+				if (merged.details !== d) await ctx.db.patch('details', d._id, { equipment: merged.details.equipment });
+			}
+			updated++;
 		}
 		return { updated, ignored };
 	}

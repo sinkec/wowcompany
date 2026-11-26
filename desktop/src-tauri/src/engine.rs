@@ -276,6 +276,9 @@ pub struct Core {
     /// The last calendar body sent to the portal (saved in `calendar-sent.json`): sent again only
     /// when the addon read something different.
     calendar_sent: Mutex<String>,
+    /// The last gear sent (saved in `gear-sent.json`, without the time): sent again only when
+    /// something was swapped or levelled.
+    gear_sent: Mutex<String>,
     /// Bumped to cancel a running link poller.
     link_gen: AtomicU64,
     wake_uploader: AtomicBool,
@@ -316,6 +319,7 @@ impl Core {
             calendar_sent: Mutex::new(
                 std::fs::read_to_string(config_dir.join("calendar-sent.json")).unwrap_or_default(),
             ),
+            gear_sent: Mutex::new(std::fs::read_to_string(config_dir.join("gear-sent.json")).unwrap_or_default()),
             link_gen: AtomicU64::new(0),
             wake_uploader: AtomicBool::new(false),
             cmd_tx: Mutex::new(None),
@@ -829,6 +833,25 @@ impl Core {
                         Upload::Ok { .. } | Upload::Rejected(_) => {
                             let _ = std::fs::write(self.config_dir.join("calendar-sent.json"), &body);
                             *self.calendar_sent.lock().expect("calendar lock") = body;
+                        }
+                        Upload::Retry { .. } | Upload::Unauthorized(_) => {}
+                    }
+                }
+            }
+
+            // gear with in-game item levels (the web API has none for Forever): only when it changed
+            let gear = self.addon.lock().expect("addon lock").export.gear.clone();
+            if !gear.is_empty() {
+                let key = serde_json::to_string(
+                    &gear.iter().map(|g| crate::addon::AddonGear { at: 0, ..g.clone() }).collect::<Vec<_>>(),
+                )
+                .unwrap_or_default();
+                if *self.gear_sent.lock().expect("gear lock") != key {
+                    let body = serde_json::json!({ "schema": 1, "characters": gear }).to_string();
+                    match api.upload_gear(&token, &body) {
+                        Upload::Ok { .. } | Upload::Rejected(_) => {
+                            let _ = std::fs::write(self.config_dir.join("gear-sent.json"), &key);
+                            *self.gear_sent.lock().expect("gear lock") = key;
                         }
                         Upload::Retry { .. } | Upload::Unauthorized(_) => {}
                     }

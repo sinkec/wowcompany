@@ -179,6 +179,11 @@ impl Api {
         self.upload_records_like("/companion/calendar", token, json)
     }
 
+    /// The character's gear with in-game item levels (`POST /companion/gear`). `Ok` carries no data.
+    pub fn upload_gear(&self, token: &str, json: &str) -> Upload {
+        self.upload_records_like("/companion/gear", token, json)
+    }
+
     /// Personal records of the log owner (`POST /companion/records`). `Ok` carries no data.
     pub fn upload_records(&self, token: &str, json: &str) -> Upload {
         self.upload_records_like("/companion/records", token, json)

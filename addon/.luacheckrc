@@ -48,7 +48,7 @@ read_globals = {
     "GameFontHighlightSmall",
     "GameFontNormal",
     "GameTooltip",
-    "GetAverageItemLevel",
+    "GetAverageItemLevel", "GetInventoryItemLink",
     "GetBuildInfo",
     "GetCritChance",
     "GetCursorPosition",
