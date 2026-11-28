@@ -1,6 +1,7 @@
 # WowCompany Companion: Windows + Linux build → GitHub Release (COMPANION.md §11).
 # Sprožilec: oznaka `companion-vX.Y.Z` (verzija mora biti enaka kot v desktop/src-tauri/tauri.conf.json)
 #   git tag companion-v0.1.0 && git push origin companion-v0.1.0
+# Ko sta oba builda uspela, job `cleanup` pobriše starejše izdaje (ostane samo najnovejša).
 name: Companion release
 
 on:
@@ -78,3 +79,26 @@ jobs:
           includeUpdaterJson: true
           releaseAssetNamePattern: 'WowCompany-Companion_[version]_[platform]_[arch][setup][ext]'
           uploadWorkflowArtifacts: ${{ github.ref_type != 'tag' }}
+
+  # Samo najnovejša izdaja ostane: ko sta oba builda uspela, pobriše starejše izdaje Companiona in njihove oznake.
+  # Če kak build pade, se nič ne briše (stara izdaja ostane za samodejne posodobitve).
+  cleanup:
+    needs: build
+    if: github.ref_type == 'tag' && success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete older Companion releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          CURRENT: ${{ github.ref_name }}
+        run: |
+          gh release view "$CURRENT" --json assets -q '.assets[].name' | grep -qx latest.json \
+            || { echo "new release has no latest.json – keeping the old ones"; exit 1; }
+          gh release list --limit 100 --json tagName -q '.[].tagName' \
+            | grep '^companion-v' | grep -vx "$CURRENT" \
+            | while read -r tag; do
+                echo "deleting $tag"
+                gh release delete "$tag" --yes --cleanup-tag
+              done
