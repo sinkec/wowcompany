@@ -166,9 +166,15 @@ function Export.Rebuild()
     if ns.Calendar then
         for _, l in ipairs(ns.Calendar.Lines()) do table.insert(lines, l) end
     end
-    local char = charLine()
+    -- at logout the game no longer answers for gear and stats (all zeros, seen 28. 11. 2026): the
+    -- lines from the last moment it did are kept and written instead
+    local char, gear = charLine(), gearLine()
+    if gear then
+        ns.db.lastChar, ns.db.lastGear = char, gear
+    else
+        char, gear = ns.db.lastChar or char, ns.db.lastGear
+    end
     if char then table.insert(lines, char) end
-    local gear = gearLine()
     if gear then table.insert(lines, gear) end
     ns.db.export = lines
 end
@@ -203,7 +209,11 @@ local function sync()
     Export.Rebuild()
 end
 
-ns.on("PLAYER_ENTERING_WORLD", sync)
+ns.on("PLAYER_ENTERING_WORLD", function()
+    sync()
+    -- right after loading the gear may not be there yet: look again a little later
+    if type(C_Timer) == "table" and type(C_Timer.After) == "function" then C_Timer.After(5, Export.Rebuild) end
+end)
 ns.on("ZONE_CHANGED_NEW_AREA", sync)
 ns.on("GROUP_ROSTER_UPDATE", sync)
 ns.on("PARTY_LEADER_CHANGED", sync)

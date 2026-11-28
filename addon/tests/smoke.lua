@@ -126,7 +126,7 @@ local function runTimers()
     for i = 1, #list do list[i]() end
 end
 C_AddOns = {
-    GetAddOnMetadata = function() return "0.7.2" end,
+    GetAddOnMetadata = function() return "0.7.3" end,
     IsAddOnLoaded = function(name) return name == "Details" and game.details == true end,
 }
 C_Spell = { GetSpellInfo = function(id) return { name = id == 133 and "Fireball" or "Frostbolt" } end }
@@ -520,13 +520,22 @@ game.instanceType, game.grouped, game.leaderUnit = "party", true, "party1"
 WowCompanyDB.state.run = nil
 fire("ZONE_CHANGED_NEW_AREA")
 fire("GROUP_ROSTER_UPDATE")
-check(exported("^v1|META|0%.7%.2|%d+$") ~= nil, "export: META line with the addon version")
+check(exported("^v1|META|0%.7%.3|%d+$") ~= nil, "export: META line with the addon version")
 local runLine = exported("^v1|RUN|")
 check(runLine ~= nil and string.find(runLine, "|43|", 1, true) and string.find(runLine, "|0|Somewhere|Fizzle Boom$"),
     "export: run in progress with instance id, zone and the party leader (" .. tostring(runLine) .. ")")
 check(exported("^v1|CHAR|Grobos Stinkfoot|18|MAGE|2%.12|15|184|11%.75|%d+$") ~= nil, "export: character stats")
 check(exported("^v1|GEAR|Grobos Stinkfoot|11%.75|11%.75|4:6096:,16:2084:33|%d+$") ~= nil,
     "export: gear with the item levels the game shows (unknown level left empty)")
+-- logout: the game answers nothing for gear and stats any more – the last good lines are written
+local realLink, realAvg = GetInventoryItemLink, GetAverageItemLevel
+GetInventoryItemLink = function() return nil end
+GetAverageItemLevel = function() return 0, 0 end
+ns.Export.Rebuild()
+check(exported("^v1|GEAR|Grobos Stinkfoot|11%.75|11%.75|4:6096:,16:2084:33|%d+$") ~= nil
+    and exported("^v1|CHAR|Grobos Stinkfoot|18|MAGE|2%.12|15|184|11%.75|%d+$") ~= nil,
+    "export at logout: the last gear and stats the game gave are kept, not zeros")
+GetInventoryItemLink, GetAverageItemLevel = realLink, realAvg
 game.leaderUnit = "player"
 fire("PARTY_LEADER_CHANGED")
 check(string.find(exported("^v1|RUN|"), "|Grobos Stinkfoot$") ~= nil, "export: leader change is picked up")
@@ -892,17 +901,17 @@ game.time = 5000
 addonSent = {}
 ns.Party.Hello()
 check(#addonSent == 1 and addonSent[1].prefix == "WowCoParty" and addonSent[1].ch == "PARTY"
-    and addonSent[1].text:match("^S\t0%.7%.2\t[01]\t[01]\t[01]\t1$"), "party: hello asks the others")
-fire("CHAT_MSG_ADDON", "WowCoParty", "S\t0.7.3\t1\t1\t0\t1", "PARTY", "Sinek Helgater-CAMWOWEU5Realm4PvP")
+    and addonSent[1].text:match("^S\t0%.7%.3\t[01]\t[01]\t[01]\t1$"), "party: hello asks the others")
+fire("CHAT_MSG_ADDON", "WowCoParty", "S\t0.7.4\t1\t1\t0\t1", "PARTY", "Sinek Helgater-CAMWOWEU5Realm4PvP")
 check(#ns.Party.Recorders() == 2 and ns.Party.Recorders()[2].name == "Sinek Helgater"
     and ns.Party.Recorders()[2].combat, "party: a member's status is heard")
 check(#addonSent == 2 and addonSent[2].text:match("\t0$"), "party: answers once, without asking back")
-fire("CHAT_MSG_ADDON", "WowCoParty", "S\t0.7.3\t1\t1\t0\t0", "GUILD", "Stranger-Realm")
+fire("CHAT_MSG_ADDON", "WowCoParty", "S\t0.7.4\t1\t1\t0\t0", "GUILD", "Stranger-Realm")
 check(#ns.Party.Recorders() == 2, "party: guild messages are ignored")
 check(ns.Party.RecordingCount() >= 1 and #ns.Party.TooltipLines() == 3, "party: count and tooltip")
 printed = {}
 runTimers()
-check(said("Sinek Helgater has WowCompany 0%.7%.3"), "party: warns about an older addon")
+check(said("Sinek Helgater has WowCompany 0%.7%.4"), "party: warns about an older addon")
 fire("GROUP_ROSTER_UPDATE")
 check(#ns.Party.Recorders() == 1, "party: a roster change forgets and asks again")
 game.grouped, game.instanceType = false, "none"

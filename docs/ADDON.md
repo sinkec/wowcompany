@@ -403,3 +403,6 @@ na disk) → Companion `POST /companion/gear` ob spremembi (`gear-sent.json`) �
 (samo lastnikovi junaki, tabela `gameGear`) dopolni `summaries.ilvlEquipped/ilvlAverage` in `details.equipment`
 (ilvl + vrstica »Item Level« v tooltipu), kjer je Blizzardov 0; `poll.apply` naredi isto ob vsakem osveževanju
 (`lib/gameGear.ts` `withGameGear`). Kar Blizzard da, ima prednost. Brez addona stran kaže »–« namesto 0.
+- **28. 11. (addon 0.7.3, Companion 0.1.24):** ob `PLAYER_LOGOUT` igra ne vrne več opreme in statistik (vse 0,
+  `GEAR` manjkal, `CHAR` same ničle – zadnji izvoz je povozil dobrega). Addon si zapomni zadnji dobri vrstici
+  (`db.lastChar`, `db.lastGear`; ob vstopu v svet +5 s in ob menjavi opreme) in ju ob odjavi zapiše namesto ničel.
